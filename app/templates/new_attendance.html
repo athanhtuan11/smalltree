@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Tạo học sinh mới</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="name" class="form-label">Họ và tên</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        <div class="mb-3">
+            <label for="class_name" class="form-label">Lớp</label>
+            <input type="text" class="form-control" id="class_name" name="class_name">
+        </div>
+        <div class="mb-3">
+            <label for="birth_date" class="form-label">Ngày sinh</label>
+            <input type="date" class="form-control" id="birth_date" name="birth_date">
+        </div>
+        <div class="mb-3">
+            <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
+            <input type="text" class="form-control" id="parent_contact" name="parent_contact">
+        </div>
+        <div class="mb-3">
+            <label for="student_code" class="form-label">Mã số học sinh</label>
+            <input type="text" class="form-control" id="student_code" name="student_code" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Thêm học sinh</button>
+    </form>
+</div>
+{% endblock %}

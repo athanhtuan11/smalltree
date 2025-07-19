@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2 class="mb-4 fw-bold" style="color:#43a047;">Tạo chương trình học mới</h2>
+    <form method="POST">
+        <div class="mb-3">
+            <label for="week_number" class="form-label">Tuần số</label>
+            <input type="number" class="form-control rounded" id="week_number" name="week_number" min="1" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Nội dung từng ngày</label>
+            <table class="table table-bordered align-middle bg-light">
+                <thead class="table-success">
+                    <tr>
+                        <th rowspan="2">Thứ</th>
+                        <th colspan="6" class="text-center">Khung giờ</th>
+                    </tr>
+                    <tr>
+                        <th>Sáng</th>
+                        <th>Phụ sáng</th>
+                        <th>Tráng miệng</th>
+                        <th>Trưa</th>
+                        <th>Xế</th>
+                        <th>Xế chiều</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
+                    <tr>
+                        <td>{{ label }}</td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_morning"></td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_snack"></td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_dessert"></td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_lunch"></td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_afternoon"></td>
+                        <td><input type="text" class="form-control" name="content_{{ day }}_lateafternoon"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-success">Lưu chương trình</button>
+        <a href="{{ url_for('main.curriculum') }}" class="btn btn-outline-secondary ms-2">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

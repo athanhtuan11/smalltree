@@ -1,0 +1,129 @@
+body {
+    font-family: 'Comic Sans MS', 'Arial', sans-serif;
+    background: linear-gradient(135deg, #e8f5e9 60%, #c8e6c9 100%);
+}
+
+header {
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px 0;
+    text-align: center;
+}
+
+nav {
+    margin: 20px 0;
+}
+
+nav a {
+    margin: 0 15px;
+    color: white;
+    text-decoration: none;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+/* Đã chuyển dropdown về mặc định Bootstrap click, nên xóa hiệu ứng hover */
+/* .navbar-nav .dropdown:hover .dropdown-menu { display: block; margin-top: 0; visibility: visible; opacity: 1; } */
+.navbar-nav .dropdown-menu {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 0;
+    z-index: 1050;
+    background: #fff;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+}
+/* .navbar-nav .dropdown-menu { position: absolute; left: 0; top: 100%; margin-top: 0; visibility: hidden; opacity: 0; transition: opacity 0.2s; z-index: 1000; } */
+/* .navbar-nav .dropdown:hover > .dropdown-menu { visibility: visible; opacity: 1; } */
+
+.container {
+    width: 80%;
+    margin: auto;
+    overflow: hidden;
+}
+
+footer {
+    background-color: #ffb6c1;
+    color: white;
+    text-align: center;
+    padding: 10px 0;
+    position: relative;
+    bottom: 0;
+    width: 100%;
+    font-family: 'Comic Sans MS', 'Arial', sans-serif;
+}
+
+h1, h2, h3 {
+    color: #ff69b4;
+    font-family: 'Comic Sans MS', 'Arial', sans-serif;
+    text-shadow: 1px 1px 2px #fff0f5;
+}
+
+p {
+    line-height: 1.6;
+}
+
+.button {
+    display: inline-block;
+    font-size: 16px;
+    color: white;
+    background-color: #4CAF50;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+.button:hover {
+    background-color: #45a049;
+}
+
+.btn-primary, .btn-info, .btn-success, .btn-secondary {
+    border-radius: 20px;
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.table {
+    background: #fff0f5;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2);
+}
+
+.table th {
+    background: #ffb6c1;
+    color: #fff;
+    font-size: 1em;
+    text-align: center;
+}
+
+.table td {
+    text-align: center;
+    vertical-align: middle;
+    font-size: 1em;
+    color: #d2691e;
+}
+
+.form-control, .form-label {
+    border-radius: 12px;
+    font-size: 1.1em;
+}
+
+.form-label {
+    color: #ff69b4;
+    font-weight: bold;
+}
+
+.form-control:focus {
+    border-color: #ffb6c1;
+    box-shadow: 0 0 0 0.2rem rgba(255,182,193,.25);
+}
+
+.card {
+    border-radius: 18px;
+    box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2);
+    background: #fff0f5;
+}

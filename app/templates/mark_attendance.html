@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Điểm danh học sinh</h2>
+    <form method="post">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Họ và tên</th>
+                    <th>Lớp</th>
+                    <th>Ngày sinh</th>
+                    <th>Liên hệ phụ huynh</th>
+                    <th>Có mặt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.class_name if student.class_name else '' }}</td>
+                    <td>{{ student.birth_date if student.birth_date else '' }}</td>
+                    <td>{{ student.parent_contact }}</td>
+                    <td><input type="checkbox" name="present_{{ student.id }}" {% if student.status == 'Có mặt' %}checked{% endif %}></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5">Chưa có học sinh nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-success">Lưu điểm danh</button>
+    </form>
+</div>
+{% endblock %}

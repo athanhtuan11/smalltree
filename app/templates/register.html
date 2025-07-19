@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2 class="fw-bold mb-4" style="color:#43a047;">Đăng ký tài khoản</h2>
+    <ul class="nav nav-tabs mb-4" id="registerTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="parent-tab" data-bs-toggle="tab" data-bs-target="#parent" type="button" role="tab" aria-controls="parent" aria-selected="true">Phụ huynh</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="teacher-tab" data-bs-toggle="tab" data-bs-target="#teacher" type="button" role="tab" aria-controls="teacher" aria-selected="false">Giáo viên</button>
+        </li>
+    </ul>
+    <div class="tab-content" id="registerTabContent">
+        <div class="tab-pane fade show active" id="parent" role="tabpanel" aria-labelledby="parent-tab">
+            <form method="POST" action="/register/parent" class="mt-3">
+                <div class="mb-3">
+                    <label for="parent_name" class="form-label">Họ tên phụ huynh</label>
+                    <input type="text" class="form-control" id="parent_name" name="parent_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="parent_email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="parent_email" name="parent_email" required>
+                </div>
+                <div class="mb-3">
+                    <label for="parent_phone" class="form-label">Số điện thoại</label>
+                    <input type="text" class="form-control" id="parent_phone" name="parent_phone" required>
+                </div>
+                <div class="mb-3">
+                    <label for="child_name" class="form-label">Tên bé</label>
+                    <input type="text" class="form-control" id="child_name" name="child_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="child_age" class="form-label">Tuổi bé</label>
+                    <input type="number" class="form-control" id="child_age" name="child_age" min="1" max="10" required>
+                </div>
+                <div class="mb-3">
+                    <label for="student_code" class="form-label">Mã số học sinh</label>
+                    <input type="text" class="form-control" id="student_code" name="student_code" required>
+                </div>
+                <div class="mb-3">
+                    <label for="parent_password" class="form-label">Mật khẩu</label>
+                    <input type="password" class="form-control" id="parent_password" name="parent_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="parent_password_confirm" class="form-label">Nhập lại mật khẩu</label>
+                    <input type="password" class="form-control" id="parent_password_confirm" name="parent_password_confirm" required>
+                </div>
+                <button type="submit" class="btn btn-success">Đăng ký phụ huynh</button>
+            </form>
+        </div>
+        <div class="tab-pane fade" id="teacher" role="tabpanel" aria-labelledby="teacher-tab">
+            <form method="POST" action="/register/teacher" class="mt-3">
+                <div class="mb-3">
+                    <label for="teacher_name" class="form-label">Họ tên giáo viên</label>
+                    <input type="text" class="form-control" id="teacher_name" name="teacher_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="teacher_email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="teacher_email" name="teacher_email" required>
+                </div>
+                <div class="mb-3">
+                    <label for="teacher_phone" class="form-label">Số điện thoại</label>
+                    <input type="text" class="form-control" id="teacher_phone" name="teacher_phone" required>
+                </div>
+                <div class="mb-3">
+                    <label for="teacher_position" class="form-label">Vị trí công việc</label>
+                    <input type="text" class="form-control" id="teacher_position" name="teacher_position" required>
+                </div>
+                <div class="mb-3">
+                    <label for="teacher_password" class="form-label">Mật khẩu</label>
+                    <input type="password" class="form-control" id="teacher_password" name="teacher_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="teacher_password_confirm" class="form-label">Nhập lại mật khẩu</label>
+                    <input type="password" class="form-control" id="teacher_password_confirm" name="teacher_password_confirm" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Đăng ký giáo viên</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

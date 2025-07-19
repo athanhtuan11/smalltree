@@ -1,0 +1,7 @@
+Hướng dẫn migrate:
+1. Chạy lệnh sau trong terminal để tạo migration:
+   flask db migrate -m "add image to activity"
+2. Chạy tiếp lệnh sau để cập nhật database:
+   flask db upgrade
+
+Hoặc dùng các lệnh tương ứng với Alembic nếu bạn dùng Alembic trực tiếp.

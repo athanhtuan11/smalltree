@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4 text-success fw-bold">Liên hệ với SmallTree Academy</h2>
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Thông tin trường</h5>
+                    <ul class="list-unstyled mb-3">
+                        <li><i class="bi bi-geo-alt-fill text-success me-2"></i><strong>Địa chỉ:</strong> 1 Rchai 2, Đức Trọng, Lâm Đồng</li>
+                        <li><i class="bi bi-telephone-fill text-success me-2"></i><strong>Điện thoại:</strong> 091 7618868</li>
+                        <li><i class="bi bi-envelope-fill text-success me-2"></i><strong>Email:</strong> mamnoncaynho@gmail.com</li>
+                    </ul>
+                    <h5 class="card-title text-primary">Kết nối với chúng tôi</h5>
+                    <div class="d-flex align-items-center mb-2">
+                        <a href="https://www.facebook.com/pemay95/" target="_blank" class="me-3">
+                            <img src="/static/images/facebook_logo.png" alt="Facebook" width="36" class="rounded-circle border shadow">
+                        </a>
+                        <a href="#" class="me-3">
+                            <img src="/static/images/zalo_logo.png" alt="Zalo" width="36" class="rounded-circle border shadow">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Bản đồ</h5>
+                    <iframe src="https://www.google.com/maps?q=1+Rchai+2,+Đức+Trọng,+Lâm+Đồng&output=embed" width="100%" height="200" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                    <h5 class="mt-4 card-title text-primary">Media</h5>
+                    <img src="/static/images/logo.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow border" style="max-width:120px;">
+                    <img src="/static/images/school.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow mt-3">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Chỉnh sửa thông tin tài khoản{% endblock %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7">
+        <form method="POST" class="card shadow rounded-4 border-0">
+            <div class="card-header bg-warning text-white rounded-top-4">
+                <h4 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2"></i>Chỉnh sửa thông tin tài khoản</h4>
+            </div>
+            <div class="card-body">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    <label for="full_name" class="form-label">Họ tên</label>
+                    {{ form.full_name(class="form-control", id="full_name") }}
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    {{ form.email(class="form-control", id="email") }}
+                </div>
+                <div class="mb-3">
+                    <label for="phone" class="form-label">Số điện thoại</label>
+                    {{ form.phone(class="form-control", id="phone") }}
+                </div>
+                <div class="mb-3">
+                    <label for="student_code" class="form-label">Mã số học sinh</label>
+                    {{ form.student_code(class="form-control", id="student_code") }}
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label for="old_password" class="form-label">Mật khẩu cũ (bắt buộc nếu đổi mật khẩu)</label>
+                    {{ form.old_password(class="form-control", id="old_password") }}
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Mật khẩu mới (nếu muốn đổi)</label>
+                    {{ form.password(class="form-control", id="password") }}
+                </div>
+                <div class="mb-3">
+                    <label for="confirm" class="form-label">Xác nhận mật khẩu mới</label>
+                    {{ form.confirm(class="form-control", id="confirm") }}
+                </div>
+            </div>
+            <div class="card-footer text-end rounded-bottom-4">
+                <button type="submit" class="btn btn-success px-4"><i class="bi bi-save me-1"></i>Lưu thay đổi</button>
+                <a href="/profile" class="btn btn-secondary px-4 ms-2">Hủy</a>
+            </div>
+        </form>
+        <!-- Modal for flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="modal fade" id="flashModal" tabindex="-1" aria-labelledby="flashModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h5 class="modal-title" id="flashModalLabel">Thông báo</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                  {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} mb-0">{{ message }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+          <script>
+            var flashModal = new bootstrap.Modal(document.getElementById('flashModal'));
+            flashModal.show();
+          </script>
+          {% endif %}
+        {% endwith %}
+    </div>
+</div>
+{% endblock %}

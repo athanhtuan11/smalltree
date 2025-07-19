@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2 class="fw-bold mb-4" style="color:#43a047;">Chỉnh sửa hoạt động</h2>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label for="title" class="form-label">Tiêu đề</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ post.title }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Nội dung</label>
+            <textarea class="form-control" id="content" name="content" rows="5" required>{{ post.description }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="background" class="form-label">Ảnh hoạt động (nếu muốn thay đổi)</label>
+            <input type="file" class="form-control" id="background" name="background">
+            {% if post.image %}
+            <div class="mt-2">
+                <img src="{{ post.image }}" alt="Ảnh hoạt động" style="max-width:200px;">
+            </div>
+            {% endif %}
+        </div>
+        <button type="submit" class="btn btn-success">Lưu thay đổi</button>
+        <a href="{{ url_for('main.activities') }}" class="btn btn-secondary ms-2">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

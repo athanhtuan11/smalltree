@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Điểm danh học sinh theo ngày</h2>
+    <a href="/attendance/new" class="btn btn-primary mb-3">Tạo học sinh mới</a>
+    <a href="/attendance/history" class="btn btn-info mb-3 ms-2">Xem lịch sử điểm danh</a>
+    <a href="/students" class="btn btn-secondary mb-3 ms-2">Danh sách học sinh</a>
+    <form method="get" action="">
+        <div class="mb-3">
+            <label for="attendance_date" class="form-label">Chọn ngày điểm danh:</label>
+            <input type="date" id="attendance_date" name="attendance_date" class="form-control" value="{{ current_date }}" onchange="this.form.submit()">
+        </div>
+    </form>
+    <form method="post">
+        <input type="hidden" name="attendance_date" value="{{ current_date }}">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Họ và tên</th>
+                    <th>Mã số học sinh</th>
+                    <th>Lớp</th>
+                    <th>Ngày sinh</th>
+                    <th>Liên hệ phụ huynh</th>
+                    <th>Có mặt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                <tr>
+                    <td>{{ student.name }}</td>
+                    <td>{{ student.student_code }}</td>
+                    <td>{{ student.class_name if student.class_name else '' }}</td>
+                    <td>{{ student.birth_date if student.birth_date else '' }}</td>
+                    <td>{{ student.parent_contact }}</td>
+                    <td>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_yes_{{ student.id }}" value="yes" {% if student.status == 'Có mặt' %}checked{% endif %}>
+                            <label class="form-check-label" for="present_yes_{{ student.id }}">Yes</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_no_{{ student.id }}" value="no" {% if student.status == 'Vắng' %}checked{% endif %}>
+                            <label class="form-check-label" for="present_no_{{ student.id }}">No</label>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6">Chưa có học sinh nào.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-success">Lưu điểm danh</button>
+    </form>
+</div>
+{% endblock %}

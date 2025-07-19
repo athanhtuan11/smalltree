@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h2>Tạo tài khoản mới</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="role" class="form-label">Loại tài khoản</label>
+            <select id="role" name="role" class="form-select" required>
+                <option value="parent">Phụ huynh</option>
+                <option value="teacher">Giáo viên</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="name" class="form-label">Họ tên</label>
+            <input type="text" id="name" name="name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" name="email" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="phone" class="form-label">Số điện thoại</label>
+            <input type="text" id="phone" name="phone" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Mật khẩu</label>
+            <input type="password" id="password" name="password" class="form-control" required>
+        </div>
+        <div id="extra-fields"></div>
+        <button type="submit" class="btn btn-success">Tạo tài khoản</button>
+        <a href="/accounts" class="btn btn-secondary ms-2">Quay lại</a>
+    </form>
+</div>
+<script>
+// Hiển thị trường bổ sung cho phụ huynh/học sinh
+const roleSelect = document.getElementById('role');
+const extraFields = document.getElementById('extra-fields');
+function updateFields() {
+    if (roleSelect.value === 'parent') {
+        extraFields.innerHTML = `
+            <div class="mb-3">
+                <label for="student_code" class="form-label">Mã số học sinh</label>
+                <input type="text" id="student_code" name="student_code" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label for="parent_contact" class="form-label">Phụ huynh của học sinh</label>
+                <input type="text" id="parent_contact" name="parent_contact" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label for="class_name" class="form-label">Lớp</label>
+                <input type="text" id="class_name" name="class_name" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label for="birth_date" class="form-label">Ngày sinh của học sinh</label>
+                <input type="date" id="birth_date" name="birth_date" class="form-control">
+            </div>
+        `;
+    } else if (roleSelect.value === 'teacher') {
+        extraFields.innerHTML = `
+            <div class="mb-3">
+                <label for="position" class="form-label">Chức vụ</label>
+                <input type="text" id="position" name="position" class="form-control">
+            </div>
+        `;
+    } else {
+        extraFields.innerHTML = '';
+    }
+}
+roleSelect.addEventListener('change', updateFields);
+updateFields();
+</script>
+{% endblock %}

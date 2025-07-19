@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>Gallery - Nursery Website</title>
+</head>
+<body>
+    {% include 'base.html' %}
+
+    <div class="gallery">
+        <h1>Gallery</h1>
+        <p>Welcome to our nursery gallery! Here are some moments captured from our activities.</p>
+        <div class="gallery-images">
+            <img src="{{ url_for('static', filename='images/image1.jpg') }}" alt="Activity 1">
+            <img src="{{ url_for('static', filename='images/image2.jpg') }}" alt="Activity 2">
+            <img src="{{ url_for('static', filename='images/image3.jpg') }}" alt="Activity 3">
+            <img src="{{ url_for('static', filename='images/image4.jpg') }}" alt="Activity 4">
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

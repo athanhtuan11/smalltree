@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow rounded-4 border-0">
+                {% if activity.image %}
+                <img src="{{ activity.image }}" class="card-img-top rounded-top-4 img-fluid" alt="Ảnh hoạt động" style="max-width:100%; height:auto;">
+                {% endif %}
+                <div class="card-body">
+                    <h2 class="fw-bold mb-3" style="color:#43a047;">{{ activity.title }}</h2>
+                    <div class="mb-3" style="color:#388e3c; font-size:1.2em;">
+                        {{ activity.content|safe }}
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-0 text-end">
+                    <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ activity.date_posted }}</small>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <a href="/activities" class="btn btn-outline-success">Quay lại danh sách hoạt động</a>
+                {% if session['role'] in ['admin', 'teacher'] %}
+                <form method="POST" action="/activities/{{ activity.title|replace(' ', '-') }}/delete" style="display:inline-block;">
+                    <button type="submit" class="btn btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">Xoá bài viết</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

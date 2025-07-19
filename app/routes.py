@@ -1,0 +1,707 @@
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff
+from app.forms import EditProfileForm
+from calendar import monthrange
+from datetime import datetime
+import io, zipfile, os, json
+
+main = Blueprint('main', __name__)
+
+def redirect_no_permission():
+    flash('Bạn không có quyền truy cập chức năng này!', 'danger')
+    return redirect(request.referrer or url_for('main.index'))
+
+@main.route('/')
+def index():
+    return render_template('about.html', title='Home')
+
+@main.route('/about')
+def about():
+    return render_template('about.html', title='About Us')
+
+@main.route('/gallery')
+def gallery():
+    return render_template('gallery.html', title='Gallery')
+
+@main.route('/contact')
+def contact():
+    return render_template('contact.html', title='Contact Us')
+
+@main.route('/activities/new', methods=['GET', 'POST'])
+def new_activity():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    if request.method == 'POST':
+        title = request.form.get('title')
+        content = request.form.get('content')
+        background_file = request.files.get('background')
+        image_url = ''
+        if background_file and background_file.filename:
+            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + background_file.filename
+            save_path = os.path.join('app', 'static', 'images', filename)
+            background_file.save(save_path)
+            image_url = url_for('static', filename=f'images/{filename}')
+        from datetime import date
+        new_post = Activity(title=title, description=content, date=date.today(), image=image_url)
+        db.session.add(new_post)
+        db.session.commit()
+        flash('Đã đăng bài viết mới!', 'success')
+        return redirect(url_for('main.activities'))
+    return render_template('new_activity.html', title='Đăng bài viết mới')
+
+@main.route('/activities/<title>/delete', methods=['POST'])
+def delete_activity(title):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    from urllib.parse import unquote
+    title = unquote(title.replace('-', ' '))
+    post = Activity.query.filter_by(title=title).first()
+    if post:
+        db.session.delete(post)
+        db.session.commit()
+        flash('Đã xoá bài viết!', 'success')
+    else:
+        flash('Không tìm thấy bài viết để xoá!', 'danger')
+    return redirect(url_for('main.activities'))
+
+@main.route('/activities/<title>')
+def activity_detail(title):
+    from urllib.parse import unquote
+    title = unquote(title.replace('-', ' '))
+    post = Activity.query.filter_by(title=title).first()
+    if not post:
+        flash('Không tìm thấy bài viết!', 'danger')
+        return redirect(url_for('main.activities'))
+    activity = {
+        'title': post.title,
+        'content': post.description,
+        'image': post.image,
+        'date_posted': post.date.strftime('%Y-%m-%d')
+    }
+    return render_template('activity_detail.html', activity=activity, title=post.title)
+
+@main.route('/curriculum/new', methods=['GET', 'POST'])
+def new_curriculum():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    if request.method == 'POST':
+        week_number = request.form.get('week_number')
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        curriculum_data = {}
+        for day in days:
+            curriculum_data[day] = {}
+            for slot in slots:
+                curriculum_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+        content = json.dumps(curriculum_data, ensure_ascii=False)
+        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        db.session.add(new_week)
+        db.session.commit()
+        flash('Đã thêm chương trình học mới!', 'success')
+        return redirect(url_for('main.curriculum'))
+    return render_template('new_curriculum.html', title='Tạo chương trình mới')
+
+@main.route('/curriculum')
+def curriculum():
+    weeks = Curriculum.query.order_by(Curriculum.week_number).all()
+    curriculum = []
+    for week in weeks:
+        try:
+            data = json.loads(week.content)
+        except Exception:
+            data = {}
+        curriculum.append({
+            'week_number': week.week_number,
+            'data': data
+        })
+    return render_template('curriculum.html', curriculum=curriculum, title='Chương trình học')
+
+@main.route('/attendance/new', methods=['GET', 'POST'])
+def new_student():
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        return redirect_no_permission()
+    if request.method == 'POST':
+        name = request.form.get('name')
+        student_code = request.form.get('student_code')
+        class_name = request.form.get('class_name')
+        birth_date = request.form.get('birth_date')
+        parent_contact = request.form.get('parent_contact')
+        new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code)
+        db.session.add(new_child)
+        db.session.commit()
+        flash('Đã thêm học sinh mới!', 'success')
+        return redirect(url_for('main.attendance'))
+    return render_template('new_attendance.html', title='Tạo học sinh mới')
+
+@main.route('/attendance', methods=['GET', 'POST'])
+def attendance():
+    if not session.get('role'):
+        flash('Bạn phải đăng nhập mới truy cập được trang này!', 'danger')
+        return redirect(url_for('main.about'))
+    if session.get('role') == 'parent':
+        return redirect(url_for('main.attendance_history'))
+    from datetime import date
+    attendance_date = request.form.get('attendance_date') if request.method == 'POST' else request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
+    students = Child.query.all()
+    # Lấy trạng thái điểm danh từ database cho ngày đã chọn
+    for student in students:
+        record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
+        if record:
+            student.status = record.status
+        else:
+            student.status = 'Vắng'
+    if request.method == 'POST':
+        for student in students:
+            present_value = request.form.get(f'present_{student.id}')
+            status = 'Có mặt' if present_value == 'yes' else 'Vắng'
+            record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
+            if record:
+                record.status = status
+            else:
+                record = AttendanceRecord(child_id=student.id, date=attendance_date, status=status)
+                db.session.add(record)
+            student.status = status
+        db.session.commit()
+        flash('Đã lưu điểm danh!', 'success')
+        return redirect(url_for('main.attendance', attendance_date=attendance_date))
+    return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date)
+
+@main.route('/attendance/mark', methods=['GET', 'POST'])
+def mark_attendance():
+    students = Child.query.all()
+    if request.method == 'POST':
+        for student in students:
+            present = request.form.get(f'present_{student.id}') == 'on'
+            # TODO: Lưu trạng thái điểm danh vào database (cần thêm trường status vào model Child)
+            student.status = 'Có mặt' if present else 'Vắng'
+        db.session.commit()
+        flash('Đã điểm danh cho tất cả học sinh!', 'success')
+        return redirect(url_for('main.attendance'))
+    return render_template('mark_attendance.html', students=students, title='Điểm danh học sinh')
+
+@main.route('/attendance/history')
+def attendance_history():
+    if session.get('role') == 'parent':
+        # Chỉ cho phụ huynh xem lịch sử điểm danh của con mình
+        user_id = session.get('user_id')
+        child = Child.query.filter_by(id=user_id).first()
+        students = [child] if child else []
+    else:
+        students = Child.query.all()
+    month = request.args.get('month')
+    if month:
+        year, m = map(int, month.split('-'))
+    else:
+        today = datetime.today()
+        year, m = today.year, today.month
+        month = f"{year:04d}-{m:02d}"
+    num_days = monthrange(year, m)[1]
+    days_in_month = [f"{year:04d}-{m:02d}-{day:02d}" for day in range(1, num_days+1)]
+    records_raw = AttendanceRecord.query.filter(AttendanceRecord.date.like(f"{year:04d}-{m:02d}-%")).all()
+    records = {}
+    for r in records_raw:
+        records[(r.child_id, r.date)] = r
+    return render_template('attendance_history.html', records=records, students=students, days_in_month=days_in_month, selected_month=month, title='Lịch sử điểm danh')
+
+@main.route('/invoice', methods=['GET', 'POST'])
+def invoice():
+    month = request.args.get('month')
+    if month:
+        year, m = map(int, month.split('-'))
+    else:
+        today = datetime.today()
+        year, m = today.year, today.month
+        month = f"{year:04d}-{m:02d}"
+    num_days = monthrange(year, m)[1]
+    days_in_month = [f"{year:04d}-{m:02d}-{day:02d}" for day in range(1, num_days+1)]
+    students = Child.query.all()
+    records_raw = AttendanceRecord.query.filter(AttendanceRecord.date.like(f"{year:04d}-{m:02d}-%")).all()
+    attendance_days = {student.id: 0 for student in students}
+    for r in records_raw:
+        if r.status == 'Có mặt':
+            attendance_days[r.child_id] += 1
+    invoices = []
+    if request.method == 'POST':
+        selected_ids = request.form.getlist('student_ids')
+        if request.form.get('export_word'):
+            from docx import Document
+            from docx.shared import Pt
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.oxml import OxmlElement
+            from docx.oxml.ns import qn
+            from docx.shared import RGBColor
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w') as zipf:
+                for student in students:
+                    if str(student.id) in selected_ids:
+                        doc = Document()
+                        title = doc.add_heading(f'HÓA ĐƠN THANH TOÁN THÁNG {month}', 0)
+                        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run = title.runs[0]
+                        run.font.color.rgb = RGBColor(76, 175, 80)  # Xanh lá mạ
+                        run.font.name = 'Comic Sans MS'
+                        # Thêm logo trường
+                        from docx.shared import Inches
+                        logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo.jpg')
+                        if os.path.exists(logo_path):
+                            doc.add_picture(logo_path, width=Inches(1.2))
+                        # Bảng thông tin học sinh
+                        info_table = doc.add_table(rows=2, cols=2)
+                        info_table.style = 'Table Grid'
+                        for row in info_table.rows:
+                            for cell in row.cells:
+                                tc = cell._tc
+                                tcPr = tc.get_or_add_tcPr()
+                                shd = OxmlElement('w:shd')
+                                shd.set(qn('w:fill'), 'e8f5e9')  # Xanh lá nhạt
+                                tcPr.append(shd)
+                        info_table.cell(0,0).text = 'Họ và tên:'
+                        info_table.cell(0,1).text = student.name
+                        info_table.cell(1,0).text = 'Ngày sinh:'
+                        info_table.cell(1,1).text = student.birth_date or "-"
+                        doc.add_paragraph('Lịch sử điểm danh:')
+                        table = doc.add_table(rows=1, cols=2)
+                        table.style = 'Table Grid'
+                        hdr_cells = table.rows[0].cells
+                        hdr_cells[0].text = 'Ngày'
+                        hdr_cells[1].text = 'Trạng thái'
+                        for cell in hdr_cells:
+                            tc = cell._tc
+                            tcPr = tc.get_or_add_tcPr()
+                            shd = OxmlElement('w:shd')
+                            shd.set(qn('w:fill'), 'c8e6c9')  # Xanh lá nhạt hơn
+                            tcPr.append(shd)
+                        for day in days_in_month:
+                            record = next((r for r in records_raw if r.child_id == student.id and r.date == day), None)
+                            status = record.status if record else '-'
+                            row_cells = table.add_row().cells
+                            row_cells[0].text = f'{day[8:10]}/{day[5:7]}/{day[0:4]}'
+                            row_cells[1].text = status
+                        days = attendance_days[student.id]
+                        doc.add_paragraph('')
+                        summary_table = doc.add_table(rows=3, cols=2)
+                        summary_table.style = 'Table Grid'
+                        for row in summary_table.rows:
+                            for cell in row.cells:
+                                tc = cell._tc
+                                tcPr = tc.get_or_add_tcPr()
+                                shd = OxmlElement('w:shd')
+                                shd.set(qn('w:fill'), 'e8f5e9')
+                                tcPr.append(shd)
+                        summary_table.cell(0,0).text = 'Số ngày đi học:'
+                        summary_table.cell(0,1).text = str(days)
+                        summary_table.cell(1,0).text = 'Tiền ăn:'
+                        summary_table.cell(1,1).text = f'{days * 40000:,} đ'
+                        summary_table.cell(2,0).text = 'Tiền học phí:'
+                        summary_table.cell(2,1).text = '1,500,000 đ'
+                        total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {days * 40000 + 1500000:,} đ')
+                        total_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                        total_run = total_paragraph.runs[0]
+                        total_run.font.color.rgb = RGBColor(76, 175, 80)
+                        total_run.font.bold = True
+                        total_run.font.name = 'Comic Sans MS'
+                        file_stream = io.BytesIO()
+                        doc.save(file_stream)
+                        file_stream.seek(0)
+                        filename = f"invoice_{student.name}_{month}.docx"
+                        zipf.writestr(filename, file_stream.read())
+            zip_buffer.seek(0)
+            return send_file(zip_buffer, download_name=f"invoices_{month}.zip", as_attachment=True)
+        else:
+            for student in students:
+                if str(student.id) in selected_ids:
+                    days = attendance_days[student.id]
+                    total = days * 40000 + 1500000
+                    invoices.append(f"Học sinh {student.name}: {days} ngày × 40.000đ + 1.500.000đ = {total:,} đ")
+    return render_template('invoice.html', students=students, attendance_days=attendance_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, title='Xuất hóa đơn')
+
+@main.route('/register', methods=['GET'])
+def register():
+    return render_template('register.html', title='Đăng ký tài khoản')
+
+@main.route('/register/parent', methods=['POST'])
+def register_parent():
+    name = request.form.get('parent_name')
+    email = request.form.get('parent_email')
+    phone = request.form.get('parent_phone')
+    child_name = request.form.get('child_name')
+    child_age = request.form.get('child_age')
+    password = request.form.get('parent_password')
+    password_confirm = request.form.get('parent_password_confirm')
+    if password != password_confirm:
+        flash('Mật khẩu nhập lại không khớp!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    # Kiểm tra trùng tên hoặc email với Child, Staff, admin
+    if (Child.query.filter_by(name=child_name).first() or
+        Staff.query.filter_by(name=child_name).first() or
+        child_name == 'admin'):
+        flash('Tên học sinh đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    if (Child.query.filter_by(email=email).first() or
+        Staff.query.filter_by(email=email).first() or
+        email == 'admin@smalltree.vn'):
+        flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    new_child = Child(name=child_name, age=child_age, parent_contact=name, email=email, phone=phone, password=password, student_code=student_code)
+    db.session.add(new_child)
+    db.session.commit()
+    flash('Đăng ký phụ huynh thành công!', 'success')
+    return redirect(url_for('main.about'))
+
+@main.route('/register/teacher', methods=['POST'])
+def register_teacher():
+    name = request.form.get('teacher_name')
+    email = request.form.get('teacher_email')
+    phone = request.form.get('teacher_phone')
+    position = request.form.get('teacher_position')
+    password = request.form.get('teacher_password')
+    password_confirm = request.form.get('teacher_password_confirm')
+    if password != password_confirm:
+        flash('Mật khẩu nhập lại không khớp!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    # Kiểm tra trùng tên hoặc email với Child, Staff, admin
+    if (Staff.query.filter_by(name=name).first() or
+        Child.query.filter_by(name=name).first() or
+        name == 'admin'):
+        flash('Tên giáo viên đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    if (Staff.query.filter_by(email=email).first() or
+        Child.query.filter_by(email=email).first() or
+        email == 'admin@smalltree.vn'):
+        flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+        return render_template('register.html', title='Đăng ký tài khoản')
+    new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=password)
+    db.session.add(new_staff)
+    db.session.commit()
+    flash('Đăng ký giáo viên thành công!', 'success')
+    return redirect(url_for('main.about'))
+
+@main.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email_or_phone = request.form.get('email')
+        password = request.form.get('password')
+        # Kiểm tra admin
+        admin = Staff.query.filter_by(position='admin').first()
+        if admin and (email_or_phone == admin.email or email_or_phone == admin.phone) and password == admin.password:
+            session['user_id'] = admin.id
+            session['role'] = 'admin'
+            flash('Đăng nhập admin thành công!', 'success')
+            return redirect(url_for('main.about'))
+        user = Child.query.filter(((Child.email==email_or_phone)|(Child.phone==email_or_phone)) & (Child.password==password)).first()
+        staff = Staff.query.filter(((Staff.email==email_or_phone)|(Staff.phone==email_or_phone)) & (Staff.password==password)).first()
+        if user:
+            session['user_id'] = user.id
+            session['role'] = 'parent'
+            flash('Đăng nhập thành công!', 'success')
+            return redirect(url_for('main.about'))
+        elif staff:
+            session['user_id'] = staff.id
+            session['role'] = 'teacher'
+            flash('Đăng nhập thành công!', 'success')
+            return redirect(url_for('main.about'))
+        else:
+            flash('Sai thông tin đăng nhập!', 'danger')
+            return render_template('login.html', title='Đăng nhập')
+    return render_template('login.html', title='Đăng nhập')
+
+@main.route('/logout')
+def logout():
+    session.clear()
+    flash('Đã đăng xuất!', 'success')
+    return redirect(url_for('main.about'))
+
+@main.route('/accounts', methods=['GET', 'POST'])
+def accounts():
+    # Chỉ cho phép đăng nhập bằng tài khoản administrator duy nhất
+    ADMIN_USERNAME = 'admin'
+    ADMIN_PASSWORD = 'admin123'
+    if session.get('role') != 'admin':
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+                session['user_id'] = 'admin'
+                session['role'] = 'admin'
+                flash('Đăng nhập administrator thành công!', 'success')
+                parents = Child.query.all()
+                teachers = Staff.query.all()
+                return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản')
+            else:
+                flash('Sai tài khoản hoặc mật khẩu administrator!', 'danger')
+                return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
+        return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
+    parents = Child.query.all()
+    teachers = Staff.query.all()
+    return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản')
+
+@main.route('/curriculum/<int:week_number>/delete', methods=['POST'])
+def delete_curriculum(week_number):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if week:
+        db.session.delete(week)
+        db.session.commit()
+        flash(f'Đã xoá chương trình học tuần {week_number}!', 'success')
+    else:
+        flash('Không tìm thấy chương trình học để xoá!', 'danger')
+    return redirect(url_for('main.curriculum'))
+
+@main.route('/curriculum/<int:week_number>/edit', methods=['GET', 'POST'])
+def edit_curriculum(week_number):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if not week:
+        flash('Không tìm thấy chương trình học để chỉnh sửa!', 'danger')
+        return redirect(url_for('main.curriculum'))
+    import json
+    if request.method == 'POST':
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        curriculum_data = {}
+        for day in days:
+            curriculum_data[day] = {}
+            for slot in slots:
+                curriculum_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+        week.content = json.dumps(curriculum_data, ensure_ascii=False)
+        db.session.commit()
+        flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
+        return redirect(url_for('main.curriculum'))
+    data = json.loads(week.content)
+    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week_number}')
+
+@main.route('/profile')
+def profile():
+    user = None
+    role = session.get('role')
+    user_id = session.get('user_id')
+    if role == 'parent':
+        user = Child.query.get(user_id)
+        role_display = 'Phụ huynh'
+        full_name = user.parent_contact if user else ''
+    elif role == 'teacher':
+        user = Staff.query.get(user_id)
+        role_display = 'Giáo viên'
+        full_name = user.name if user else ''
+    elif role == 'admin':
+        user = None
+        role_display = 'Admin'
+        full_name = 'Admin'
+    if not user and role != 'admin':
+        flash('Không tìm thấy thông tin tài khoản!', 'danger')
+        return redirect(url_for('main.about'))
+    return render_template('profile.html', user={
+        'full_name': full_name,
+        'email': user.email if user else '',
+        'phone': user.phone if user else '',
+        'role_display': role_display
+    })
+
+@main.route('/profile/edit', methods=['GET', 'POST'])
+def edit_profile():
+    role = session.get('role')
+    user_id = session.get('user_id')
+    if role == 'parent':
+        flash('Phụ huynh không có quyền chỉnh sửa thông tin!', 'danger')
+        return redirect(url_for('main.profile'))
+    elif role == 'teacher':
+        user = Staff.query.get(user_id)
+        full_name = user.name
+    else:
+        flash('Admin không thể chỉnh sửa thông tin!', 'danger')
+        return redirect(url_for('main.profile'))
+    if not user:
+        flash('Không tìm thấy thông tin tài khoản!', 'danger')
+        return redirect(url_for('main.profile'))
+    form = EditProfileForm(full_name=full_name, email=user.email, phone=user.phone)
+    if form.validate_on_submit():
+        user.name = form.full_name.data
+        user.email = form.email.data
+        user.phone = form.phone.data
+        if form.password.data:
+            if not form.old_password.data:
+                flash('Vui lòng nhập mật khẩu cũ để đổi mật khẩu!', 'danger')
+                return render_template('edit_profile.html', form=form)
+            if user.password != form.old_password.data:
+                flash('Mật khẩu cũ không đúng!', 'danger')
+                return render_template('edit_profile.html', form=form)
+            user.password = form.password.data
+        db.session.commit()
+        flash('Cập nhật thông tin thành công!', 'success')
+        return redirect(url_for('main.profile'))
+    return render_template('edit_profile.html', form=form)
+
+@main.route('/students')
+def student_list():
+    students = Child.query.all()
+    return render_template('student_list.html', students=students, title='Danh sách học sinh')
+
+@main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
+def edit_student(student_id):
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        return redirect_no_permission()
+    student = Child.query.get_or_404(student_id)
+    if request.method == 'POST':
+        student.name = request.form.get('name')
+        student.student_code = request.form.get('student_code')
+        student.class_name = request.form.get('class_name')
+        student.birth_date = request.form.get('birth_date')
+        student.parent_contact = request.form.get('parent_contact')
+        db.session.commit()
+        flash('Đã cập nhật thông tin học sinh!', 'success')
+        return redirect(url_for('main.student_list'))
+    return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh')
+
+@main.route('/students/<int:student_id>/delete', methods=['POST'])
+def delete_student(student_id):
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        return redirect_no_permission()
+    student = Child.query.get_or_404(student_id)
+    db.session.delete(student)
+    db.session.commit()
+    flash('Đã xoá học sinh!', 'success')
+    return redirect(url_for('main.student_list'))
+
+@main.route('/admin/change-password', methods=['GET', 'POST'])
+def change_admin_password():
+    if session.get('role') != 'admin':
+        flash('Bạn không có quyền đổi mật khẩu admin!', 'danger')
+        return redirect(url_for('main.login'))
+    admin = Staff.query.filter_by(name='admin').first()
+    if not admin:
+        flash('Không tìm thấy tài khoản admin!', 'danger')
+        return redirect(url_for('main.accounts'))
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        if old_password != admin.password:
+            flash('Mật khẩu hiện tại không đúng!', 'danger')
+        elif new_password != confirm_password:
+            flash('Mật khẩu mới nhập lại không khớp!', 'danger')
+        else:
+            admin.password = new_password
+            db.session.commit()
+            flash('Đổi mật khẩu admin thành công!', 'success')
+            return redirect(url_for('main.accounts'))
+    return render_template('change_admin_password.html', title='Đổi mật khẩu Admin')
+
+@main.route('/activities')
+def activities():
+    posts = Activity.query.order_by(Activity.date.desc()).all()
+    activities = [
+        {
+            'title': post.title,
+            'content': post.description,
+            'image': post.image,
+            'date_posted': post.date.strftime('%Y-%m-%d')
+        } for post in posts
+    ]
+    return render_template('activities.html', activities=activities, title='Hoạt động')
+
+@main.route('/accounts/create', methods=['GET', 'POST'])
+def create_account():
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    if request.method == 'POST':
+        role = request.form.get('role')
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        password = request.form.get('password')
+        # Kiểm tra trùng tên/email
+        if (Child.query.filter_by(name=name).first() or Staff.query.filter_by(name=name).first() or name == 'admin'):
+            flash('Tên đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+            return render_template('create_account.html', title='Tạo tài khoản mới')
+        if (Child.query.filter_by(email=email).first() or Staff.query.filter_by(email=email).first() or email == 'admin@smalltree.vn'):
+            flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
+            return render_template('create_account.html', title='Tạo tài khoản mới')
+        if role == 'parent':
+            student_code = request.form.get('student_code')
+            class_name = request.form.get('class_name')
+            birth_date = request.form.get('birth_date')
+            parent_contact = request.form.get('parent_contact')
+            new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, email=email, phone=phone, password=password, student_code=student_code)
+            db.session.add(new_child)
+        else:
+            position = role
+            new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=password)
+            db.session.add(new_staff)
+        db.session.commit()
+        flash('Tạo tài khoản thành công!', 'success')
+        return redirect(url_for('main.accounts'))
+    return render_template('create_account.html', title='Tạo tài khoản mới')
+
+@main.route('/accounts/<int:user_id>/edit', methods=['GET', 'POST'])
+def edit_account(user_id):
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    user_type = request.args.get('type', 'parent')
+    if user_type == 'teacher':
+        user = Staff.query.get_or_404(user_id)
+    else:
+        user = Child.query.get_or_404(user_id)
+    if request.method == 'POST':
+        user.name = request.form.get('name')
+        user.email = request.form.get('email')
+        user.phone = request.form.get('phone')
+        if user_type == 'parent':
+            user.parent_contact = request.form.get('parent_contact')
+            user.student_code = request.form.get('student_code')
+            user.class_name = request.form.get('class_name')
+            user.birth_date = request.form.get('birth_date')
+        elif user_type == 'teacher':
+            user.position = request.form.get('position')
+        password = request.form.get('password')
+        if password:
+            user.password = password
+        db.session.commit()
+        flash('Đã cập nhật thông tin tài khoản!', 'success')
+        return redirect(url_for('main.accounts'))
+    return render_template('edit_account.html', user=user, type=user_type, title='Chỉnh sửa tài khoản')
+
+@main.route('/accounts/parent/<int:user_id>/delete', methods=['POST'])
+def delete_parent_account(user_id):
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    user = Child.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Đã xoá tài khoản phụ huynh!', 'success')
+    return redirect(url_for('main.accounts'))
+
+@main.route('/accounts/teacher/<int:user_id>/delete', methods=['POST'])
+def delete_teacher_account(user_id):
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    user = Staff.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash('Đã xoá tài khoản giáo viên!', 'success')
+    return redirect(url_for('main.accounts'))
+
+@main.route('/activities/<title>/edit', methods=['GET', 'POST'])
+def edit_activity(title):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    from urllib.parse import unquote
+    title = unquote(title.replace('-', ' '))
+    post = Activity.query.filter_by(title=title).first()
+    if not post:
+        flash('Không tìm thấy bài viết để chỉnh sửa!', 'danger')
+        return redirect(url_for('main.activities'))
+    if request.method == 'POST':
+        post.title = request.form.get('title')
+        post.description = request.form.get('content')
+        background_file = request.files.get('background')
+        if background_file and background_file.filename:
+            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + background_file.filename
+            save_path = os.path.join('app', 'static', 'images', filename)
+            background_file.save(save_path)
+            post.image = url_for('static', filename=f'images/{filename}')
+        db.session.commit()
+        flash('Đã cập nhật bài viết!', 'success')
+        return redirect(url_for('main.activities'))
+    return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động')

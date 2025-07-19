@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2 class="fw-bold mb-4" style="color:#43a047;">Chỉnh sửa chương trình học tuần {{ week.week_number }}</h2>
+    <form method="POST">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label for="week_number" class="form-label fw-bold">Tuần</label>
+                <input type="text" class="form-control" id="week_number" name="week_number" value="{{ week.week_number }}" readonly>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle bg-light">
+                <thead class="table-success">
+                    <tr>
+                        <th rowspan="2">Thứ</th>
+                        <th colspan="6" class="text-center">Khung giờ</th>
+                    </tr>
+                    <tr>
+                        <th>Sáng</th>
+                        <th>Phụ sáng</th>
+                        <th>Tráng miệng</th>
+                        <th>Trưa</th>
+                        <th>Xế</th>
+                        <th>Xế chiều</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
+                    <tr>
+                        <td class="fw-bold text-success">{{ label }}</td>
+                        <td><textarea class="form-control" name="content_{{ day }}_morning" rows="2">{{ data[day]['morning'] }}</textarea></td>
+                        <td><textarea class="form-control" name="content_{{ day }}_snack" rows="2">{{ data[day]['snack'] }}</textarea></td>
+                        <td><textarea class="form-control" name="content_{{ day }}_dessert" rows="2">{{ data[day]['dessert'] }}</textarea></td>
+                        <td><textarea class="form-control" name="content_{{ day }}_lunch" rows="2">{{ data[day]['lunch'] }}</textarea></td>
+                        <td><textarea class="form-control" name="content_{{ day }}_afternoon" rows="2">{{ data[day]['afternoon'] }}</textarea></td>
+                        <td><textarea class="form-control" name="content_{{ day }}_lateafternoon" rows="2">{{ data[day]['lateafternoon'] }}</textarea></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-success mt-3">Lưu thay đổi</button>
+        <a href="{{ url_for('main.curriculum') }}" class="btn btn-secondary mt-3 ms-2">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Danh sách học sinh{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Danh sách học sinh đã đăng ký</h2>
+    <table class="table table-bordered table-hover">
+        <thead class="table-success">
+            <tr>
+                <th>STT</th>
+                <th>Họ và tên</th>
+                <th>Mã số học sinh</th>
+                <th>Lớp</th>
+                <th>Ngày sinh</th>
+                <th>Liên hệ phụ huynh</th>
+                {% if session.get('role') in ['admin', 'teacher'] %}
+                <th>Thao tác</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ student.name }}</td>
+                <td>{{ student.student_code }}</td>
+                <td>{{ student.class_name }}</td>
+                <td>{{ student.birth_date }}</td>
+                <td>{{ student.parent_contact }}</td>
+                {% if session.get('role') in ['admin', 'teacher'] %}
+                <td>
+                    <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1"><i class="bi bi-pencil-square"></i> Sửa</a>
+                    <form action="/students/{{ student.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá học sinh này?');">
+                        <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xóa</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center">Chưa có học sinh nào.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

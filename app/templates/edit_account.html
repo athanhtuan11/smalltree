@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Chỉnh sửa tài khoản{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Chỉnh sửa tài khoản</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label for="name" class="form-label">Họ tên</label>
+            <input type="text" id="name" name="name" class="form-control" value="{{ user.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="phone" class="form-label">Số điện thoại</label>
+            <input type="text" id="phone" name="phone" class="form-control" value="{{ user.phone }}" required>
+        </div>
+        {% if type == 'parent' %}
+        <div class="mb-3">
+            <label for="parent_contact" class="form-label">Tên phụ huynh</label>
+            <input type="text" id="parent_contact" name="parent_contact" class="form-control" value="{{ user.parent_contact }}">
+        </div>
+        <div class="mb-3">
+            <label for="student_code" class="form-label">Mã số học sinh</label>
+            <input type="text" id="student_code" name="student_code" class="form-control" value="{{ user.student_code }}">
+        </div>
+        <div class="mb-3">
+            <label for="class_name" class="form-label">Lớp</label>
+            <input type="text" id="class_name" name="class_name" class="form-control" value="{{ user.class_name }}">
+        </div>
+        <div class="mb-3">
+            <label for="birth_date" class="form-label">Ngày sinh</label>
+            <input type="date" id="birth_date" name="birth_date" class="form-control" value="{{ user.birth_date }}">
+        </div>
+        {% elif type == 'teacher' %}
+        <div class="mb-3">
+            <label for="position" class="form-label">Chức vụ</label>
+            <select id="position" name="position" class="form-select" required>
+                <option value="giáo viên" {% if user.position == 'giáo viên' %}selected{% endif %}>Giáo viên</option>
+                <option value="admin" {% if user.position == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="phụ huynh" {% if user.position == 'phụ huynh' %}selected{% endif %}>Phụ huynh</option>
+            </select>
+        </div>
+        {% endif %}
+        <div class="mb-3">
+            <label for="password" class="form-label">Mật khẩu mới (để trống nếu không đổi)</label>
+            <input type="password" id="password" name="password" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-success">Lưu thay đổi</button>
+        <a href="/accounts" class="btn btn-secondary ms-2">Quay lại</a>
+    </form>
+</div>
+{% endblock %}

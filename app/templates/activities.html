@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2 class="fw-bold mb-4" style="color:#43a047;">Hoạt động nổi bật</h2>
+    {% if session['role'] in ['admin', 'teacher'] %}
+    <a href="/activities/new" class="btn btn-success mb-4">+ Đăng bài viết mới</a>
+    {% endif %}
+    <div class="row g-4">
+        {% for post in activities %}
+        <div class="col-md-6 col-lg-4">
+            <a href="/activities/{{ post.title|replace(' ', '-') }}" style="text-decoration:none; color:inherit;">
+            <div class="card h-100 shadow rounded-4 border-0">
+                {% if post.image %}
+                <img src="{{ post.image }}" class="card-img-top rounded-top-4 img-fluid" alt="Ảnh hoạt động" style="max-width:100%; height:auto;">
+                {% else %}
+                <div class="text-center pt-4">
+                    <i class="bi bi-image" style="font-size:3em; color:#c8e6c9;"></i>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h5 class="card-title fw-bold" style="color:#43a047;">{{ post.title }}</h5>
+                    <p class="card-text" style="color:#388e3c;">{{ post.content|safe }}</p>
+                </div>
+                <div class="card-footer bg-white border-0 text-end">
+                    <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ post.date_posted }}</small>
+                    {% if session['role'] in ['admin', 'teacher'] %}
+                    <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
+                    <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
+                            <i class="bi bi-trash"></i> Xoá
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            </a>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <p>Chưa có hoạt động nào.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
