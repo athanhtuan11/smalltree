@@ -15,6 +15,15 @@ def is_mobile():
     ua = request.user_agent.string.lower()
     return 'mobile' in ua or 'android' in ua or 'iphone' in ua
 
+def calculate_age(birth_date):
+    today = datetime.today()
+    try:
+        birthday = datetime.strptime(birth_date, '%Y-%m-%d')
+    except Exception:
+        return 0
+    age = today.year - birthday.year - ((today.month, today.day) < (birthday.month, birthday.day))
+    return age
+
 @main.route('/')
 def index():
     mobile = is_mobile()
@@ -166,7 +175,14 @@ def attendance():
     if request.method == 'POST':
         for student in students:
             present_value = request.form.get(f'present_{student.id}')
-            status = 'Có mặt' if present_value == 'yes' else 'Vắng'
+            if present_value == 'yes':
+                status = 'Có mặt'
+            elif present_value == 'absent_excused':
+                status = 'Vắng mặt có phép'
+            elif present_value == 'absent_unexcused':
+                status = 'Vắng mặt không phép'
+            else:
+                status = 'Vắng'
             record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
             if record:
                 record.status = status
@@ -232,10 +248,14 @@ def invoice():
     days_in_month = [f"{year:04d}-{m:02d}-{day:02d}" for day in range(1, num_days+1)]
     students = Child.query.all()
     records_raw = AttendanceRecord.query.filter(AttendanceRecord.date.like(f"{year:04d}-{m:02d}-%")).all()
+    # Tính số ngày có mặt và số ngày vắng mặt không phép cho từng học sinh
     attendance_days = {student.id: 0 for student in students}
+    absent_unexcused_days = {student.id: 0 for student in students}
     for r in records_raw:
         if r.status == 'Có mặt':
             attendance_days[r.child_id] += 1
+        elif r.status == 'Vắng mặt không phép':
+            absent_unexcused_days[r.child_id] += 1
     invoices = []
     if request.method == 'POST':
         selected_ids = request.form.getlist('student_ids')
@@ -308,9 +328,21 @@ def invoice():
                         summary_table.cell(0,1).text = str(days)
                         summary_table.cell(1,0).text = 'Tiền ăn:'
                         summary_table.cell(1,1).text = f'{days * 40000:,} đ'
+                        # Tính học phí đúng theo độ tuổi
+                        age = calculate_age(student.birth_date) if student.birth_date else 0
+                        if age == 1:
+                            tuition = 1850000
+                        elif age == 2:
+                            tuition = 1750000
+                        elif age == 3:
+                            tuition = 1650000
+                        elif age == 4:
+                            tuition = 1550000
+                        else:
+                            tuition = 1500000
                         summary_table.cell(2,0).text = 'Tiền học phí:'
-                        summary_table.cell(2,1).text = '1,500,000 đ'
-                        total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {days * 40000 + 1500000:,} đ')
+                        summary_table.cell(2,1).text = f'{tuition:,} đ'
+                        total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {(days + absent_unexcused_days[student.id]) * 38000 + tuition:,} đ')
                         total_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                         total_run = total_paragraph.runs[0]
                         total_run.font.color.rgb = RGBColor(76, 175, 80)
@@ -326,11 +358,24 @@ def invoice():
         else:
             for student in students:
                 if str(student.id) in selected_ids:
-                    days = attendance_days[student.id]
-                    total = days * 40000 + 1500000
-                    invoices.append(f"Học sinh {student.name}: {days} ngày × 40.000đ + 1.500.000đ = {total:,} đ")
+                    days_present = attendance_days[student.id]
+                    days_absent_unexcused = absent_unexcused_days[student.id]
+                    # Học phí theo độ tuổi
+                    if student.age == 1:
+                        tuition = 1850000
+                    elif student.age == 2:
+                        tuition = 1750000
+                    elif student.age == 3:
+                        tuition = 1650000
+                    elif student.age == 4:
+                        tuition = 1550000
+                    else:
+                        tuition = 1500000
+                    total = (days_present + days_absent_unexcused) * 38000 + tuition
+                    invoices.append(f"Học sinh {student.name}: ({days_present} ngày có mặt + {days_absent_unexcused} ngày vắng không phép) × 38.000đ + {tuition:,}đ = {total:,}đ")
     mobile = is_mobile()
-    return render_template('invoice.html', students=students, attendance_days=attendance_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, title='Xuất hóa đơn', mobile=mobile)
+    student_ages = {student.id: calculate_age(student.birth_date) if student.birth_date else 0 for student in students}
+    return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
 
 @main.route('/register', methods=['GET'])
 def register():

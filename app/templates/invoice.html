@@ -1,43 +1,70 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <a href="{{ url_for('main.attendance_history', month=selected_month) }}" class="btn btn-secondary mb-3">Quay lại trang lịch sử điểm danh</a>
-    <h2>Hóa đơn thanh toán tháng {{ selected_month }}</h2>
+<style>
+    .invoice-table-mobile { font-size:0.85em; }
+    .invoice-table-desktop { font-size:1em; }
+    .invoice-btn-mobile { width:100%; margin-bottom:8px; font-size:0.95em; }
+    .invoice-btn-group-mobile { display:flex; flex-direction:column; gap:8px; }
+    .invoice-table-mobile td, .invoice-table-mobile th { padding:0.18em 0.08em; }
+    .invoice-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
+    @media (max-width: 576px) {
+        .invoice-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
+    <div class="d-flex flex-column flex-md-row gap-2 mb-3 invoice-btn-group-mobile">
+        <a href="{{ url_for('main.attendance_history', month=selected_month) }}" class="btn btn-secondary fw-bold {% if mobile %}invoice-btn-mobile{% endif %}">Quay lại lịch sử điểm danh</a>
+    </div>
+    <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Hóa đơn thanh toán tháng {{ selected_month }}</h2>
     <form method="post">
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Họ và tên</th>
-                    <th>Ngày sinh</th>
-                    <th>Lịch sử điểm danh</th>
-                    <th>Số ngày đi học</th>
-                    <th>Tiền ăn</th>
-                    <th>Tiền học phí</th>
-                    <th>Tổng tiền</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for student in students %}
-                <tr>
-                    <td><input type="checkbox" name="student_ids" value="{{ student.id }}" checked></td>
-                    <td>{{ student.name }}</td>
-                    <td>{{ student.birth_date or '-' }}</td>
-                    <td>
-                        {% for day in days_in_month %}
-                            {% set record = records.get((student.id, day), None) %}
-                            <span style="display:inline-block; min-width:70px;">{{ day[8:10] }}/{{ day[5:7] }}: <b>{{ record.status if record else '-' }}</b></span><br>
-                        {% endfor %}
-                    </td>
-                    <td>{{ attendance_days[student.id] }}</td>
-                    <td>{{ attendance_days[student.id] * 40000 | int }} đ</td>
-                    <td>1,500,000 đ</td>
-                    <td>{{ attendance_days[student.id] * 40000 + 1500000 | int }} đ</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <button type="submit" name="export_word" value="1" class="btn btn-primary ms-2">Xuất Word cho học sinh đã chọn</button>
+        <div class="table-responsive invoice-table-wrapper">
+            <table class="table table-bordered align-middle {% if mobile %}invoice-table-mobile{% else %}invoice-table-desktop{% endif %}">
+                <thead class="table-success">
+                    <tr>
+                        <th></th>
+                        <th>Họ và tên</th>
+                        <th>Ngày sinh</th>
+                        <th>Lịch sử điểm danh</th>
+                        <th>Số ngày có mặt</th>
+                        <th>Số ngày vắng không phép</th>
+                        <th>Tiền học phí</th>
+                        <th>Tổng tiền</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td><input type="checkbox" name="student_ids" value="{{ student.id }}" checked></td>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.birth_date or '-' }}</td>
+                        <td style="min-width:120px;">
+                            {% for day in days_in_month %}
+                                {% set record = records.get((student.id, day), None) %}
+                                <span style="display:inline-block; min-width:70px;">{{ day[8:10] }}/{{ day[5:7] }}: <b>{{ record.status if record else '-' }}</b></span><br>
+                            {% endfor %}
+                        </td>
+                        <td>{{ attendance_days[student.id] }}</td>
+                        <td>{{ absent_unexcused_days[student.id] }}</td>
+                        <td>
+                            {% set age = student_ages[student.id] %}
+                            {% if age == 0 %}1,850,000đ
+                            {% elif age == 1 %}1,850,000đ
+                            {% elif age == 2 %}1,750,000đ
+                            {% elif age == 3 %}1,650,000đ
+                            {% elif age == 4 %}1,550,000đ
+                            {% else %}1,500,000đ
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ ((attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 +
+                                (1850000 if age == 1 else 1750000 if age == 2 else 1650000 if age == 3 else 1550000 if age == 4 else 1500000)) | int | string | replace(',', '.') }}đ
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" name="export_word" value="1" class="btn btn-primary {% if mobile %}invoice-btn-mobile{% endif %}">Xuất Word cho học sinh đã chọn</button>
     </form>
     {% if invoices %}
     <h3 class="mt-4">Kết quả hóa đơn</h3>

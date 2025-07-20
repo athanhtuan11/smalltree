@@ -15,9 +15,8 @@
     <form method="post" onsubmit="return validateAccountForm();">
         <div class="mb-3">
             <label for="role" class="form-label">Loại tài khoản</label>
-            <select id="role" name="role" class="form-select" required>
-                <option value="parent">Phụ huynh</option>
-                <option value="teacher">Giáo viên</option>
+            <select id="role" name="role" class="form-select" required disabled>
+                <option value="teacher" selected>Giáo viên</option>
             </select>
         </div>
         <div class="mb-3">
@@ -36,7 +35,7 @@
             <label for="password" class="form-label">Mật khẩu</label>
             <input type="password" id="password" name="password" class="form-control" required>
         </div>
-        <div id="extra-fields"></div>
+        <div id="extra-fields" style="display:none;"></div>
         <button type="submit" class="btn btn-success">Tạo tài khoản</button>
         <a href="/accounts" class="btn btn-secondary ms-2">Quay lại</a>
     </form>
@@ -50,10 +49,6 @@ function updateFields() {
             <div class="mb-3">
                 <label for="student_code" class="form-label">Mã số học sinh <span class="text-danger">*</span></label>
                 <input type="text" id="student_code" name="student_code" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label for="parent_contact" class="form-label">Phụ huynh của học sinh <span class="text-danger">*</span></label>
-                <input type="text" id="parent_contact" name="parent_contact" class="form-control" required>
             </div>
             <div class="mb-3">
                 <label for="class_name" class="form-label">Lớp <span class="text-danger">*</span></label>
@@ -95,5 +90,20 @@ function validateAccountForm() {
     }
     return true;
 }
+document.getElementById('role').addEventListener('change', function() {
+    var wrapper = document.getElementById('student-select-wrapper');
+    if (this.value === 'parent') {
+        wrapper.style.display = '';
+    } else {
+        wrapper.style.display = 'none';
+    }
+});
+window.addEventListener('DOMContentLoaded', function() {
+    var role = document.getElementById('role');
+    var wrapper = document.getElementById('student-select-wrapper');
+    if (role.value === 'parent') {
+        wrapper.style.display = '';
+    }
+});
 </script>
 {% endblock %}
