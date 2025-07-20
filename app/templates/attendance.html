@@ -1,10 +1,27 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <h2>Điểm danh học sinh theo ngày</h2>
-    <a href="/attendance/new" class="btn btn-primary mb-3">Tạo học sinh mới</a>
-    <a href="/attendance/history" class="btn btn-info mb-3 ms-2">Xem lịch sử điểm danh</a>
-    <a href="/students" class="btn btn-secondary mb-3 ms-2">Danh sách học sinh</a>
+<style>
+    .attendance-table-mobile { font-size:0.85em; }
+    .attendance-table-desktop { font-size:1em; }
+    .attendance-btn-mobile { width:100%; margin-bottom:8px; font-size:0.95em; }
+    .attendance-btn-group-mobile { display:flex; flex-direction:column; gap:8px; }
+    .attendance-radio-mobile .form-check-input { width:1.1em; height:1.1em; }
+    .attendance-radio-mobile .form-check-label { font-size:0.92em; margin-left:3px; }
+    .attendance-table-mobile thead th { position:sticky; top:0; background:#c8e6c9; z-index:2; }
+    .attendance-table-mobile td, .attendance-table-mobile th { padding:0.18em 0.08em; }
+    .attendance-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
+    .attendance-scroll-hint { font-size:0.92em; color:#388e3c; text-align:center; margin-bottom:3px; }
+    @media (max-width: 576px) {
+        .attendance-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
+    <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Điểm danh học sinh theo ngày</h2>
+    <div class="d-flex flex-column flex-md-row gap-2 mb-3 attendance-btn-group-mobile">
+        <a href="/attendance/new" class="btn btn-primary {% if mobile %}attendance-btn-mobile{% endif %}">Tạo học sinh mới</a>
+        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">Xem lịch sử điểm danh</a>
+        <a href="/students" class="btn btn-secondary {% if mobile %}attendance-btn-mobile{% endif %}">Danh sách học sinh</a>
+    </div>
     <form method="get" action="">
         <div class="mb-3">
             <label for="attendance_date" class="form-label">Chọn ngày điểm danh:</label>
@@ -13,42 +30,49 @@
     </form>
     <form method="post">
         <input type="hidden" name="attendance_date" value="{{ current_date }}">
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Họ và tên</th>
-                    <th>Mã số học sinh</th>
-                    <th>Lớp</th>
-                    <th>Ngày sinh</th>
-                    <th>Liên hệ phụ huynh</th>
-                    <th>Có mặt</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for student in students %}
-                <tr>
-                    <td>{{ student.name }}</td>
-                    <td>{{ student.student_code }}</td>
-                    <td>{{ student.class_name if student.class_name else '' }}</td>
-                    <td>{{ student.birth_date if student.birth_date else '' }}</td>
-                    <td>{{ student.parent_contact }}</td>
-                    <td>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_yes_{{ student.id }}" value="yes" {% if student.status == 'Có mặt' %}checked{% endif %}>
-                            <label class="form-check-label" for="present_yes_{{ student.id }}">Yes</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_no_{{ student.id }}" value="no" {% if student.status == 'Vắng' %}checked{% endif %}>
-                            <label class="form-check-label" for="present_no_{{ student.id }}">No</label>
-                        </div>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6">Chưa có học sinh nào.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <button type="submit" class="btn btn-success">Lưu điểm danh</button>
+        {% if mobile %}
+        <div class="attendance-scroll-hint">Vuốt ngang để xem đủ các trường trong bảng &rarr;</div>
+        {% endif %}
+        <div class="table-responsive attendance-table-wrapper">
+            <table class="table table-bordered align-middle {% if mobile %}attendance-table-mobile{% else %}attendance-table-desktop{% endif %}">
+                <thead class="table-success">
+                    <tr>
+                        <th>Họ và tên</th>
+                        <th>Mã số học sinh</th>
+                        <th>Lớp</th>
+                        <th>Ngày sinh</th>
+                        <th>Liên hệ phụ huynh</th>
+                        <th>Có mặt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>{{ student.name }}</td>
+                        <td>{{ student.student_code }}</td>
+                        <td>{{ student.class_name if student.class_name else '' }}</td>
+                        <td>{{ student.birth_date if student.birth_date else '' }}</td>
+                        <td>{{ student.parent_contact }}</td>
+                        <td>
+                            <div class="d-flex flex-column flex-md-row gap-2 attendance-radio-mobile">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_yes_{{ student.id }}" value="yes" {% if student.status == 'Có mặt' %}checked{% endif %}>
+                                    <label class="form-check-label" for="present_yes_{{ student.id }}">Có mặt</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_no_{{ student.id }}" value="no" {% if student.status == 'Vắng' %}checked{% endif %}>
+                                    <label class="form-check-label" for="present_no_{{ student.id }}">Vắng</label>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center">Chưa có học sinh nào.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">Lưu điểm danh</button>
     </form>
 </div>
 {% endblock %}

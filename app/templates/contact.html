@@ -1,36 +1,48 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4 text-success fw-bold">Liên hệ với SmallTree Academy</h2>
+<style>
+    .contact-title-mobile { font-size:1.3em; }
+    .contact-title-desktop { font-size:1.1em; }
+    .contact-icon-mobile { width:48px; }
+    .contact-icon-desktop { width:36px; }
+    .contact-map-mobile { height:240px; }
+    .contact-map-desktop { height:200px; }
+    .contact-list-mobile { font-size:1.15em; }
+    .contact-list-desktop { font-size:1em; }
+    .contact-logo-mobile { max-width:160px; }
+    .contact-logo-desktop { max-width:120px; }
+</style>
+<div class="container mt-4 mb-4">
+    <h2 class="mb-3 text-success fw-bold text-center" style="font-size:1.5em;">Liên hệ với SmallTree Academy</h2>
     <div class="row g-4">
-        <div class="col-md-6">
+        <div class="col-12 col-md-6">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-body">
-                    <h5 class="card-title text-primary">Thông tin trường</h5>
-                    <ul class="list-unstyled mb-3">
+                    <h5 class="card-title text-primary {% if mobile %}contact-title-mobile{% else %}contact-title-desktop{% endif %}">Thông tin trường</h5>
+                    <ul class="list-unstyled mb-3 {% if mobile %}contact-list-mobile{% else %}contact-list-desktop{% endif %}">
                         <li><i class="bi bi-geo-alt-fill text-success me-2"></i><strong>Địa chỉ:</strong> 1 Rchai 2, Đức Trọng, Lâm Đồng</li>
                         <li><i class="bi bi-telephone-fill text-success me-2"></i><strong>Điện thoại:</strong> 091 7618868</li>
                         <li><i class="bi bi-envelope-fill text-success me-2"></i><strong>Email:</strong> mamnoncaynho@gmail.com</li>
                     </ul>
-                    <h5 class="card-title text-primary">Kết nối với chúng tôi</h5>
-                    <div class="d-flex align-items-center mb-2">
-                        <a href="https://www.facebook.com/pemay95/" target="_blank" class="me-3">
-                            <img src="/static/images/facebook_logo.png" alt="Facebook" width="36" class="rounded-circle border shadow">
+                    <h5 class="card-title text-primary {% if mobile %}contact-title-mobile{% else %}contact-title-desktop{% endif %}">Kết nối với chúng tôi</h5>
+                    <div class="d-flex align-items-center mb-2 gap-3">
+                        <a href="https://www.facebook.com/pemay95/" target="_blank">
+                            <img src="/static/images/facebook_logo.png" alt="Facebook" class="rounded-circle border shadow {% if mobile %}contact-icon-mobile{% else %}contact-icon-desktop{% endif %}">
                         </a>
-                        <a href="#" class="me-3">
-                            <img src="/static/images/zalo_logo.png" alt="Zalo" width="36" class="rounded-circle border shadow">
+                        <a href="#">
+                            <img src="/static/images/zalo_logo.png" alt="Zalo" class="rounded-circle border shadow {% if mobile %}contact-icon-mobile{% else %}contact-icon-desktop{% endif %}">
                         </a>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
+        <div class="col-12 col-md-6">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <h5 class="card-title text-primary">Bản đồ</h5>
-                    <iframe src="https://www.google.com/maps?q=1+Rchai+2,+Đức+Trọng,+Lâm+Đồng&output=embed" width="100%" height="200" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
-                    <h5 class="mt-4 card-title text-primary">Media</h5>
-                    <img src="/static/images/logo.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow border" style="max-width:120px;">
+                    <h5 class="card-title text-primary {% if mobile %}contact-title-mobile{% else %}contact-title-desktop{% endif %}">Bản đồ</h5>
+                    <iframe src="https://www.google.com/maps?q=1+Rchai+2,+Đức+Trọng,+Lâm+Đồng&output=embed" width="100%" class="rounded shadow border {% if mobile %}contact-map-mobile{% else %}contact-map-desktop{% endif %}" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                    <h5 class="mt-4 card-title text-primary {% if mobile %}contact-title-mobile{% else %}contact-title-desktop{% endif %}">Media</h5>
+                    <img src="/static/images/logo.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow border mb-2 {% if mobile %}contact-logo-mobile{% else %}contact-logo-desktop{% endif %}">
                     <img src="/static/images/school.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow mt-3">
                 </div>
             </div>

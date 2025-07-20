@@ -1,6 +1,15 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
+<style>
+    .history-table-mobile { font-size:0.85em; }
+    .history-table-desktop { font-size:1em; }
+    .history-table-mobile td, .history-table-mobile th { padding:0.18em 0.08em; }
+    .history-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
+    @media (max-width: 576px) {
+        .history-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
     <a href="{{ url_for('main.attendance') }}" class="btn btn-secondary mb-3">Quay lại trang điểm danh</a>
     <h2>Lịch sử điểm danh học sinh theo tháng</h2>
     <form method="get" class="mb-3">
@@ -11,8 +20,8 @@
         <a href="{{ url_for('main.invoice', month=selected_month) }}" class="btn btn-success ms-2">Xuất hóa đơn</a>
         {% endif %}
     </form>
-    <div style="overflow-x: auto;">
-        <table class="table table-bordered" style="min-width: 1200px;">
+    <div class="table-responsive history-table-wrapper">
+        <table class="table table-bordered {% if mobile %}history-table-mobile{% else %}history-table-desktop{% endif %}" style="min-width: 1200px;">
             <thead>
                 <tr>
                     <th>Họ và tên</th>

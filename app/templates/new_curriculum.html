@@ -1,14 +1,22 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5 mb-5">
+<style>
+    .curriculum-textarea { min-width:80px; min-height:2.2em; resize:vertical; font-size:1em; transition:all 0.2s; cursor:pointer; }
+    .curriculum-textarea:focus { outline:none; }
+    @media (max-width: 576px) {
+        .curriculum-textarea { min-width:100px; font-size:0.98em; padding:0.35em 0.5em; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="mb-4 fw-bold" style="color:#43a047;">Tạo chương trình học mới</h2>
-    <form method="POST">
+    <form method="POST" id="curriculumForm">
         <div class="mb-3">
             <label for="week_number" class="form-label">Tuần số</label>
-            <input type="number" class="form-control rounded" id="week_number" name="week_number" min="1" required>
+            <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Nội dung từng ngày</label>
+            <div class="table-responsive" style="margin-left:-12px; margin-right:-12px;">
             <table class="table table-bordered align-middle bg-light">
                 <thead class="table-success">
                     <tr>
@@ -28,19 +36,56 @@
                     {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
                     <tr>
                         <td>{{ label }}</td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_morning"></td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_snack"></td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_dessert"></td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_lunch"></td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_afternoon"></td>
-                        <td><input type="text" class="form-control" name="content_{{ day }}_lateafternoon"></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_morning" onclick="openPopup(this)"></textarea></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_snack" onclick="openPopup(this)"></textarea></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_dessert" onclick="openPopup(this)"></textarea></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_lunch" onclick="openPopup(this)"></textarea></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_afternoon" onclick="openPopup(this)"></textarea></td>
+                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_lateafternoon" onclick="openPopup(this)"></textarea></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         <button type="submit" class="btn btn-success">Lưu chương trình</button>
         <a href="{{ url_for('main.curriculum') }}" class="btn btn-outline-secondary ms-2">Quay lại</a>
     </form>
 </div>
+<!-- Modal nhập liệu -->
+<div class="modal fade" id="popupTextareaModal" tabindex="-1" aria-labelledby="popupTextareaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="popupTextareaLabel">Nhập nội dung</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <textarea id="popupTextarea" class="form-control" rows="7" style="font-size:1.15em;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" onclick="savePopupTextarea()">Lưu</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+let currentTextarea = null;
+function openPopup(textarea) {
+    currentTextarea = textarea;
+    document.getElementById('popupTextarea').value = textarea.value;
+    var modal = new bootstrap.Modal(document.getElementById('popupTextareaModal'));
+    modal.show();
+    setTimeout(function() { document.getElementById('popupTextarea').focus(); }, 300);
+}
+function savePopupTextarea() {
+    if (currentTextarea) {
+        currentTextarea.value = document.getElementById('popupTextarea').value;
+        var modalEl = document.getElementById('popupTextareaModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+    }
+}
+</script>
 {% endblock %}

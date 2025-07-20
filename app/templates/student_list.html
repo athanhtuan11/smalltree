@@ -1,9 +1,19 @@
 {% extends 'base.html' %}
 {% block title %}Danh sách học sinh{% endblock %}
 {% block content %}
-<div class="container mt-5">
+<style>
+    .student-table-mobile { font-size:0.85em; }
+    .student-table-desktop { font-size:1em; }
+    .student-table-mobile td, .student-table-mobile th { padding:0.18em 0.08em; }
+    .student-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
+    @media (max-width: 576px) {
+        .student-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="mb-4">Danh sách học sinh đã đăng ký</h2>
-    <table class="table table-bordered table-hover">
+    <div class="table-responsive student-table-wrapper">
+    <table class="table table-bordered table-hover {% if mobile %}student-table-mobile{% else %}student-table-desktop{% endif %}">
         <thead class="table-success">
             <tr>
                 <th>STT</th>
@@ -40,5 +50,6 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endblock %}

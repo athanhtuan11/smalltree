@@ -1,29 +1,55 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5 mb-5">
-    <h2 class="fw-bold mb-4" style="color:#43a047;">Hoạt động nổi bật</h2>
+<style>
+    .activity-img-mobile { height:220px; object-fit:cover; }
+    .activity-img-desktop { height:180px; object-fit:cover; }
+    .activity-title-mobile { font-size:1.25em; }
+    .activity-title-desktop { font-size:1.1em; }
+    .activity-body-mobile { font-size:1.15em; }
+    .activity-body-desktop { font-size:1em; }
+    .activity-icon-mobile { font-size:3.5em; }
+    .activity-icon-desktop { font-size:3em; }
+    .activity-card-mobile { margin-left:-12px; margin-right:-12px; border-radius:0; }
+    @media (max-width: 576px) {
+        .activity-card-mobile { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
+    <h2 class="fw-bold mb-3 text-center" style="color:#43a047; font-size:2em;">Hoạt động nổi bật</h2>
     {% if session['role'] in ['admin', 'teacher'] %}
-    <a href="/activities/new" class="btn btn-success mb-4">+ Đăng bài viết mới</a>
+    <div class="d-flex justify-content-center mb-3">
+        <a href="/activities/new" class="btn btn-success btn-lg w-100 w-md-auto" style="max-width:320px; font-size:1.1em;">+ Đăng bài viết mới</a>
+    </div>
     {% endif %}
     <div class="row g-4">
         {% for post in activities %}
-        <div class="col-md-6 col-lg-4">
+        <div class="col-12 col-md-6 col-lg-4">
             <a href="/activities/{{ post.title|replace(' ', '-') }}" style="text-decoration:none; color:inherit;">
-            <div class="card h-100 shadow rounded-4 border-0">
+            <div class="card h-100 shadow activity-card-mobile border-0 rounded-4">
                 {% if post.image %}
-                <img src="{{ post.image }}" class="card-img-top rounded-top-4 img-fluid" alt="Ảnh hoạt động" style="max-width:100%; height:auto;">
+                <img src="{{ post.image }}" class="card-img-top rounded-top-4 img-fluid {% if mobile %}activity-img-mobile{% else %}activity-img-desktop{% endif %}" alt="Ảnh hoạt động">
                 {% else %}
                 <div class="text-center pt-4">
-                    <i class="bi bi-image" style="font-size:3em; color:#c8e6c9;"></i>
+                    <i class="bi bi-image {% if mobile %}activity-icon-mobile{% else %}activity-icon-desktop{% endif %}" style="color:#c8e6c9;"></i>
                 </div>
                 {% endif %}
-                <div class="card-body">
-                    <h5 class="card-title fw-bold" style="color:#43a047;">{{ post.title }}</h5>
+                <div class="card-body {% if mobile %}activity-body-mobile{% else %}activity-body-desktop{% endif %}">
+                    <h5 class="card-title fw-bold" style="color:#43a047;" class="{% if mobile %}activity-title-mobile{% else %}activity-title-desktop{% endif %}">{{ post.title }}</h5>
                     <p class="card-text" style="color:#388e3c;">{{ post.content|safe }}</p>
                 </div>
                 <div class="card-footer bg-white border-0 text-end">
                     <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ post.date_posted }}</small>
                     {% if session['role'] in ['admin', 'teacher'] %}
+                    {% if mobile %}
+                    <div class="d-flex flex-column gap-2 mt-2">
+                        <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-warning btn-sm w-100"><i class="bi bi-pencil-square"></i> Sửa</a>
+                        <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
+                                <i class="bi bi-trash"></i> Xoá
+                            </button>
+                        </form>
+                    </div>
+                    {% else %}
                     <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
                     <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
                         <button type="submit" class="btn btn-sm btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
@@ -31,13 +57,14 @@
                         </button>
                     </form>
                     {% endif %}
+                    {% endif %}
                 </div>
             </div>
             </a>
         </div>
         {% else %}
         <div class="col-12">
-            <p>Chưa có hoạt động nào.</p>
+            <p class="text-center" style="font-size:1.15em;">Chưa có hoạt động nào.</p>
         </div>
         {% endfor %}
     </div>

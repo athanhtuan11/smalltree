@@ -1,5 +1,52 @@
 {% extends 'base.html' %}
 {% block content %}
+{% if mobile %}
+<div class="container mt-3 mb-3">
+    <div class="text-center mb-4">
+        <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo SmallTree" class="img-fluid rounded-circle shadow" style="width:120px;">
+        <h2 class="fw-bold mt-2" style="color:#43a047; font-family:'Comic Sans MS', 'Arial', sans-serif; font-size:1.5rem;">SmallTree Academy</h2>
+        <p class="lead" style="color:#388e3c; font-size:1.1rem;">Ngôi nhà thứ hai của bé - Mầm non xanh, an toàn và sáng tạo!</p>
+    </div>
+    <ul class="list-unstyled mb-3 text-success" style="font-size:1rem;">
+        <li><i class="bi bi-check-circle-fill"></i> Môi trường an toàn, yêu thương</li>
+        <li><i class="bi bi-check-circle-fill"></i> Chương trình học sáng tạo, đa dạng</li>
+        <li><i class="bi bi-check-circle-fill"></i> Đội ngũ giáo viên tận tâm, chuyên nghiệp</li>
+        <li><i class="bi bi-check-circle-fill"></i> Hoạt động ngoại khóa phong phú</li>
+    </ul>
+    <a href="/contact" class="btn btn-success btn-lg w-100 mb-3">Liên hệ tư vấn</a>
+    <div class="mb-3">
+        <div class="p-3 rounded bg-light shadow-sm mb-3">
+            <h4 class="fw-bold" style="color:#43a047;"><i class="bi bi-journal-bookmark-fill"></i> Chương trình học</h4>
+            <p style="font-size:0.95rem;">Chương trình học đa dạng, sáng tạo, phù hợp từng độ tuổi, giúp bé phát triển kỹ năng và tư duy.</p>
+            <a href="{{ url_for('main.curriculum') }}" class="btn btn-outline-success w-100">Xem chi tiết</a>
+        </div>
+        <div class="p-3 rounded bg-light shadow-sm mb-3">
+            <h4 class="fw-bold" style="color:#43a047;"><i class="bi bi-images"></i> Thư viện ảnh</h4>
+            <p style="font-size:0.95rem;">Khám phá những khoảnh khắc vui chơi, học tập và hoạt động ngoại khóa của các bé.</p>
+            <a href="/gallery" class="btn btn-outline-success w-100">Xem thư viện</a>
+        </div>
+        <div class="p-3 rounded bg-light shadow-sm mb-3">
+            <h4 class="fw-bold" style="color:#43a047;"><i class="bi bi-people-fill"></i> Giá trị & Sứ mệnh</h4>
+            <ul style="font-size:0.95rem;">
+                <li>An toàn</li>
+                <li>Giáo dục</li>
+                <li>Cộng đồng</li>
+                <li>Tôn trọng</li>
+            </ul>
+            <p style="font-size:0.95rem;">Sứ mệnh: Tạo không gian yêu thương, hỗ trợ trẻ phát triển kỹ năng và tư duy.</p>
+        </div>
+        <div class="p-3 rounded bg-light shadow-sm mb-3">
+            <h4 class="fw-bold" style="color:#43a047;"><i class="bi bi-star-fill"></i> Hoạt động nổi bật</h4>
+            <ul style="font-size:0.95rem;">
+                <li>Ngày hội thể thao</li>
+                <li>Hoạt động nghệ thuật</li>
+                <li>Khám phá thiên nhiên</li>
+                <li>Chương trình kỹ năng sống</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% else %}
 <div class="container mt-5">
     <div class="row align-items-center mb-5">
         <div class="col-md-7">
@@ -59,4 +106,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

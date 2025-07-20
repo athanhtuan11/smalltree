@@ -1,59 +1,79 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5 mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold" style="color:#43a047;">Chương trình học các tuần</h2>
+<style>
+    .curriculum-table-mobile { font-size:0.85em; }
+    .curriculum-table-desktop { font-size:1em; }
+    .curriculum-header-mobile { font-size:1.1em; }
+    .curriculum-header-desktop { font-size:1.1em; }
+    .curriculum-btn-mobile { width:100%; margin-bottom:8px; font-size:0.95em; }
+    .curriculum-btn-group-mobile { display:flex; flex-direction:column; gap:8px; }
+    .curriculum-table-mobile thead th { position:sticky; top:0; background:#c8e6c9; z-index:2; }
+    .curriculum-table-mobile td, .curriculum-table-mobile th { padding:0.18em 0.08em; }
+    .curriculum-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
+    .curriculum-scroll-hint { font-size:0.92em; color:#388e3c; text-align:center; margin-bottom:3px; }
+    @media (max-width: 576px) {
+        .curriculum-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-2">
+        <h2 class="fw-bold text-center text-md-start mb-2 mb-md-0 {% if mobile %}curriculum-header-mobile{% else %}curriculum-header-desktop{% endif %}" style="color:#43a047;">Chương trình học các tuần</h2>
         {% if session.get('role') in ['admin', 'teacher'] %}
-        <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-success">+ Thêm chương trình học</a>
+        <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-success {% if mobile %}curriculum-btn-mobile{% endif %}">+ Thêm chương trình học</a>
         {% endif %}
     </div>
     {% for week in curriculum %}
     <div class="card mb-4 shadow rounded-4 border-0">
-        <div class="card-header bg-success text-white rounded-top-4 d-flex justify-content-between align-items-center">
-            <h4 class="fw-bold mb-0">Tuần {{ week.week_number }}</h4>
+        <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
+            <h4 class="fw-bold mb-2 mb-md-0">Tuần {{ week.week_number }}</h4>
             {% if session.get('role') in ['admin', 'teacher'] %}
-                <div>
-                    <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm me-2">Chỉnh sửa</a>
+                <div class="d-flex flex-column flex-md-row gap-2 curriculum-btn-group-mobile">
+                    <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Chỉnh sửa</a>
                     <form method="POST" action="{{ url_for('main.delete_curriculum', week_number=week.week_number) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá chương trình này?');">
-                        <button type="submit" class="btn btn-outline-danger btn-sm">Xoá</button>
+                        <button type="submit" class="btn btn-outline-danger btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Xoá</button>
                     </form>
                 </div>
             {% endif %}
         </div>
         <div class="card-body">
-            <table class="table table-bordered align-middle bg-light mt-3">
-                <thead class="table-success">
-                    <tr>
-                        <th rowspan="2">Thứ</th>
-                        <th colspan="6" class="text-center">Khung giờ</th>
-                    </tr>
-                    <tr>
-                        <th>Sáng</th>
-                        <th>Phụ sáng</th>
-                        <th>Tráng miệng</th>
-                        <th>Trưa</th>
-                        <th>Xế</th>
-                        <th>Xế chiều</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
-                    <tr>
-                        <td class="fw-bold text-success">{{ label }}</td>
-                        <td>{{ week.data[day]['morning']|safe }}</td>
-                        <td>{{ week.data[day]['snack']|safe }}</td>
-                        <td>{{ week.data[day]['dessert']|safe }}</td>
-                        <td>{{ week.data[day]['lunch']|safe }}</td>
-                        <td>{{ week.data[day]['afternoon']|safe }}</td>
-                        <td>{{ week.data[day]['lateafternoon']|safe }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            {% if mobile %}
+            <div class="curriculum-scroll-hint">Vuốt ngang để xem đủ các trường trong bảng &rarr;</div>
+            {% endif %}
+            <div class="table-responsive curriculum-table-wrapper">
+                <table class="table table-bordered align-middle bg-light mt-3 {% if mobile %}curriculum-table-mobile{% else %}curriculum-table-desktop{% endif %}">
+                    <thead class="table-success">
+                        <tr>
+                            <th rowspan="2">Thứ</th>
+                            <th colspan="6" class="text-center">Khung giờ</th>
+                        </tr>
+                        <tr>
+                            <th>Sáng</th>
+                            <th>Phụ sáng</th>
+                            <th>Tráng miệng</th>
+                            <th>Trưa</th>
+                            <th>Xế</th>
+                            <th>Xế chiều</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
+                        <tr>
+                            <td class="fw-bold text-success">{{ label }}</td>
+                            <td>{{ week.data[day]['morning']|safe }}</td>
+                            <td>{{ week.data[day]['snack']|safe }}</td>
+                            <td>{{ week.data[day]['dessert']|safe }}</td>
+                            <td>{{ week.data[day]['lunch']|safe }}</td>
+                            <td>{{ week.data[day]['afternoon']|safe }}</td>
+                            <td>{{ week.data[day]['lateafternoon']|safe }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     {% else %}
-    <p>Chưa có chương trình học nào.</p>
+    <p class="text-center" style="font-size:1.1em;">Chưa có chương trình học nào.</p>
     {% endfor %}
 </div>
 {% endblock %}

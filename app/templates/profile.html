@@ -1,14 +1,21 @@
 {% extends 'base.html' %}
 {% block title %}Thông tin tài khoản{% endblock %}
 {% block content %}
-<div class="row justify-content-center mt-4">
-    <div class="col-md-7">
+<style>
+    .profile-title-mobile { font-size:1.3em; }
+    .profile-title-desktop { font-size:1.1em; }
+    .profile-btn-mobile { width:100%; font-size:1.1em; }
+    .profile-dl-mobile dt, .profile-dl-mobile dd { font-size:1.15em; }
+    .profile-dl-desktop dt, .profile-dl-desktop dd { font-size:1em; }
+</style>
+<div class="row justify-content-center mt-4 mb-4">
+    <div class="col-12 col-md-7">
         <div class="card shadow rounded-4 border-0">
             <div class="card-header bg-info text-white rounded-top-4">
-                <h4 class="mb-0 fw-bold"><i class="bi bi-person-circle me-2"></i>Thông tin tài khoản</h4>
+                <h4 class="mb-0 fw-bold {% if mobile %}profile-title-mobile{% else %}profile-title-desktop{% endif %}"><i class="bi bi-person-circle me-2"></i>Thông tin tài khoản</h4>
             </div>
             <div class="card-body">
-                <dl class="row mb-0">
+                <dl class="row mb-0 {% if mobile %}profile-dl-mobile{% else %}profile-dl-desktop{% endif %}">
                     <dt class="col-sm-4">Họ tên</dt>
                     <dd class="col-sm-8">{{ user.full_name }}</dd>
                     <dt class="col-sm-4">Email</dt>
@@ -22,7 +29,7 @@
                 </dl>
             </div>
             <div class="card-footer text-end rounded-bottom-4">
-                <a href="/profile/edit" class="btn btn-warning px-4"><i class="bi bi-pencil-square me-1"></i>Chỉnh sửa</a>
+                <a href="/profile/edit" class="btn btn-warning px-4 {% if mobile %}profile-btn-mobile{% endif %}"><i class="bi bi-pencil-square me-1"></i>Chỉnh sửa</a>
             </div>
         </div>
     </div>

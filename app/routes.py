@@ -11,21 +11,29 @@ def redirect_no_permission():
     flash('Bạn không có quyền truy cập chức năng này!', 'danger')
     return redirect(request.referrer or url_for('main.index'))
 
+def is_mobile():
+    ua = request.user_agent.string.lower()
+    return 'mobile' in ua or 'android' in ua or 'iphone' in ua
+
 @main.route('/')
 def index():
-    return render_template('about.html', title='Home')
+    mobile = is_mobile()
+    return render_template('about.html', title='Home', mobile=mobile)
 
 @main.route('/about')
 def about():
-    return render_template('about.html', title='About Us')
+    mobile = is_mobile()
+    return render_template('about.html', title='About Us', mobile=mobile)
 
 @main.route('/gallery')
 def gallery():
-    return render_template('gallery.html', title='Gallery')
+    mobile = is_mobile()
+    return render_template('gallery.html', title='Gallery', mobile=mobile)
 
 @main.route('/contact')
 def contact():
-    return render_template('contact.html', title='Contact Us')
+    mobile = is_mobile()
+    return render_template('contact.html', title='Contact Us', mobile=mobile)
 
 @main.route('/activities/new', methods=['GET', 'POST'])
 def new_activity():
@@ -47,7 +55,8 @@ def new_activity():
         db.session.commit()
         flash('Đã đăng bài viết mới!', 'success')
         return redirect(url_for('main.activities'))
-    return render_template('new_activity.html', title='Đăng bài viết mới')
+    mobile = is_mobile()
+    return render_template('new_activity.html', title='Đăng bài viết mới', mobile=mobile)
 
 @main.route('/activities/<title>/delete', methods=['POST'])
 def delete_activity(title):
@@ -62,7 +71,8 @@ def delete_activity(title):
         flash('Đã xoá bài viết!', 'success')
     else:
         flash('Không tìm thấy bài viết để xoá!', 'danger')
-    return redirect(url_for('main.activities'))
+    mobile = is_mobile()
+    return redirect(url_for('main.activities', mobile=mobile))
 
 @main.route('/activities/<title>')
 def activity_detail(title):
@@ -78,7 +88,8 @@ def activity_detail(title):
         'image': post.image,
         'date_posted': post.date.strftime('%Y-%m-%d')
     }
-    return render_template('activity_detail.html', activity=activity, title=post.title)
+    mobile = is_mobile()
+    return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile)
 
 @main.route('/curriculum/new', methods=['GET', 'POST'])
 def new_curriculum():
@@ -99,7 +110,8 @@ def new_curriculum():
         db.session.commit()
         flash('Đã thêm chương trình học mới!', 'success')
         return redirect(url_for('main.curriculum'))
-    return render_template('new_curriculum.html', title='Tạo chương trình mới')
+    mobile = is_mobile()
+    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile)
 
 @main.route('/curriculum')
 def curriculum():
@@ -114,7 +126,8 @@ def curriculum():
             'week_number': week.week_number,
             'data': data
         })
-    return render_template('curriculum.html', curriculum=curriculum, title='Chương trình học')
+    mobile = is_mobile()
+    return render_template('curriculum.html', curriculum=curriculum, title='Chương trình học', mobile=mobile)
 
 @main.route('/attendance/new', methods=['GET', 'POST'])
 def new_student():
@@ -131,7 +144,8 @@ def new_student():
         db.session.commit()
         flash('Đã thêm học sinh mới!', 'success')
         return redirect(url_for('main.attendance'))
-    return render_template('new_attendance.html', title='Tạo học sinh mới')
+    mobile = is_mobile()
+    return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile)
 
 @main.route('/attendance', methods=['GET', 'POST'])
 def attendance():
@@ -164,7 +178,8 @@ def attendance():
         db.session.commit()
         flash('Đã lưu điểm danh!', 'success')
         return redirect(url_for('main.attendance', attendance_date=attendance_date))
-    return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date)
+    mobile = is_mobile()
+    return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date, mobile=mobile)
 
 @main.route('/attendance/mark', methods=['GET', 'POST'])
 def mark_attendance():
@@ -177,7 +192,8 @@ def mark_attendance():
         db.session.commit()
         flash('Đã điểm danh cho tất cả học sinh!', 'success')
         return redirect(url_for('main.attendance'))
-    return render_template('mark_attendance.html', students=students, title='Điểm danh học sinh')
+    mobile = is_mobile()
+    return render_template('mark_attendance.html', students=students, title='Điểm danh học sinh', mobile=mobile)
 
 @main.route('/attendance/history')
 def attendance_history():
@@ -201,7 +217,8 @@ def attendance_history():
     records = {}
     for r in records_raw:
         records[(r.child_id, r.date)] = r
-    return render_template('attendance_history.html', records=records, students=students, days_in_month=days_in_month, selected_month=month, title='Lịch sử điểm danh')
+    mobile = is_mobile()
+    return render_template('attendance_history.html', records=records, students=students, days_in_month=days_in_month, selected_month=month, title='Lịch sử điểm danh', mobile=mobile)
 
 @main.route('/invoice', methods=['GET', 'POST'])
 def invoice():
@@ -313,7 +330,8 @@ def invoice():
                     days = attendance_days[student.id]
                     total = days * 40000 + 1500000
                     invoices.append(f"Học sinh {student.name}: {days} ngày × 40.000đ + 1.500.000đ = {total:,} đ")
-    return render_template('invoice.html', students=students, attendance_days=attendance_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, title='Xuất hóa đơn')
+    mobile = is_mobile()
+    return render_template('invoice.html', students=students, attendance_days=attendance_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, title='Xuất hóa đơn', mobile=mobile)
 
 @main.route('/register', methods=['GET'])
 def register():
@@ -342,6 +360,7 @@ def register_parent():
         email == 'admin@smalltree.vn'):
         flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
         return render_template('register.html', title='Đăng ký tài khoản')
+    student_code = request.form.get('student_code')
     new_child = Child(name=child_name, age=child_age, parent_contact=name, email=email, phone=phone, password=password, student_code=student_code)
     db.session.add(new_child)
     db.session.commit()
@@ -426,14 +445,16 @@ def accounts():
                 flash('Đăng nhập administrator thành công!', 'success')
                 parents = Child.query.all()
                 teachers = Staff.query.all()
-                return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản')
+                mobile = is_mobile()
+                return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
             else:
                 flash('Sai tài khoản hoặc mật khẩu administrator!', 'danger')
                 return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
         return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
     parents = Child.query.all()
     teachers = Staff.query.all()
-    return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản')
+    mobile = is_mobile()
+    return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
 
 @main.route('/curriculum/<int:week_number>/delete', methods=['POST'])
 def delete_curriculum(week_number):
@@ -470,7 +491,8 @@ def edit_curriculum(week_number):
         flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
         return redirect(url_for('main.curriculum'))
     data = json.loads(week.content)
-    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week_number}')
+    mobile = is_mobile()
+    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week_number}', mobile=mobile)
 
 @main.route('/profile')
 def profile():
@@ -492,12 +514,13 @@ def profile():
     if not user and role != 'admin':
         flash('Không tìm thấy thông tin tài khoản!', 'danger')
         return redirect(url_for('main.about'))
+    mobile = is_mobile()
     return render_template('profile.html', user={
         'full_name': full_name,
         'email': user.email if user else '',
         'phone': user.phone if user else '',
         'role_display': role_display
-    })
+    }, mobile=mobile)
 
 @main.route('/profile/edit', methods=['GET', 'POST'])
 def edit_profile():
@@ -531,12 +554,14 @@ def edit_profile():
         db.session.commit()
         flash('Cập nhật thông tin thành công!', 'success')
         return redirect(url_for('main.profile'))
-    return render_template('edit_profile.html', form=form)
+    mobile = is_mobile()
+    return render_template('edit_profile.html', form=form, mobile=mobile)
 
 @main.route('/students')
 def student_list():
     students = Child.query.all()
-    return render_template('student_list.html', students=students, title='Danh sách học sinh')
+    mobile = is_mobile()
+    return render_template('student_list.html', students=students, title='Danh sách học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
 def edit_student(student_id):
@@ -552,7 +577,8 @@ def edit_student(student_id):
         db.session.commit()
         flash('Đã cập nhật thông tin học sinh!', 'success')
         return redirect(url_for('main.student_list'))
-    return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh')
+    mobile = is_mobile()
+    return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/delete', methods=['POST'])
 def delete_student(student_id):
@@ -599,7 +625,8 @@ def activities():
             'date_posted': post.date.strftime('%Y-%m-%d')
         } for post in posts
     ]
-    return render_template('activities.html', activities=activities, title='Hoạt động')
+    mobile = is_mobile()
+    return render_template('activities.html', activities=activities, title='Hoạt động', mobile=mobile)
 
 @main.route('/accounts/create', methods=['GET', 'POST'])
 def create_account():
@@ -704,4 +731,5 @@ def edit_activity(title):
         db.session.commit()
         flash('Đã cập nhật bài viết!', 'success')
         return redirect(url_for('main.activities'))
-    return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động')
+    mobile = is_mobile()
+    return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=mobile)
