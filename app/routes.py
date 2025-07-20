@@ -638,7 +638,13 @@ def create_account():
         email = request.form.get('email')
         phone = request.form.get('phone')
         password = request.form.get('password')
+        if role == 'admin':
+            flash('Không thể tạo tài khoản admin qua form này!', 'danger')
+            return render_template('create_account.html', title='Tạo tài khoản mới')
         # Kiểm tra trùng tên/email
+        if not name or not email or not phone or not password:
+            flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+            return render_template('create_account.html', title='Tạo tài khoản mới')
         if (Child.query.filter_by(name=name).first() or Staff.query.filter_by(name=name).first() or name == 'admin'):
             flash('Tên đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
             return render_template('create_account.html', title='Tạo tài khoản mới')
@@ -650,10 +656,16 @@ def create_account():
             class_name = request.form.get('class_name')
             birth_date = request.form.get('birth_date')
             parent_contact = request.form.get('parent_contact')
+            if not student_code or not class_name or not birth_date or not parent_contact:
+                flash('Vui lòng nhập đầy đủ thông tin học sinh/phụ huynh!', 'danger')
+                return render_template('create_account.html', title='Tạo tài khoản mới')
             new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, email=email, phone=phone, password=password, student_code=student_code)
             db.session.add(new_child)
-        else:
-            position = role
+        elif role == 'teacher':
+            position = request.form.get('position')
+            if not position:
+                flash('Vui lòng nhập chức vụ giáo viên!', 'danger')
+                return render_template('create_account.html', title='Tạo tài khoản mới')
             new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=password)
             db.session.add(new_staff)
         db.session.commit()

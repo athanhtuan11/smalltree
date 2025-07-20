@@ -2,13 +2,22 @@
 {% block content %}
 <div class="container mt-5">
     <h2>Tạo tài khoản mới</h2>
-    <form method="post">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <form method="post" onsubmit="return validateAccountForm();">
         <div class="mb-3">
             <label for="role" class="form-label">Loại tài khoản</label>
             <select id="role" name="role" class="form-select" required>
                 <option value="parent">Phụ huynh</option>
                 <option value="teacher">Giáo viên</option>
-                <option value="admin">Admin</option>
             </select>
         </div>
         <div class="mb-3">
@@ -33,34 +42,33 @@
     </form>
 </div>
 <script>
-// Hiển thị trường bổ sung cho phụ huynh/học sinh
 const roleSelect = document.getElementById('role');
 const extraFields = document.getElementById('extra-fields');
 function updateFields() {
     if (roleSelect.value === 'parent') {
         extraFields.innerHTML = `
             <div class="mb-3">
-                <label for="student_code" class="form-label">Mã số học sinh</label>
-                <input type="text" id="student_code" name="student_code" class="form-control">
+                <label for="student_code" class="form-label">Mã số học sinh <span class="text-danger">*</span></label>
+                <input type="text" id="student_code" name="student_code" class="form-control" required>
             </div>
             <div class="mb-3">
-                <label for="parent_contact" class="form-label">Phụ huynh của học sinh</label>
-                <input type="text" id="parent_contact" name="parent_contact" class="form-control">
+                <label for="parent_contact" class="form-label">Phụ huynh của học sinh <span class="text-danger">*</span></label>
+                <input type="text" id="parent_contact" name="parent_contact" class="form-control" required>
             </div>
             <div class="mb-3">
-                <label for="class_name" class="form-label">Lớp</label>
-                <input type="text" id="class_name" name="class_name" class="form-control">
+                <label for="class_name" class="form-label">Lớp <span class="text-danger">*</span></label>
+                <input type="text" id="class_name" name="class_name" class="form-control" required>
             </div>
             <div class="mb-3">
-                <label for="birth_date" class="form-label">Ngày sinh của học sinh</label>
-                <input type="date" id="birth_date" name="birth_date" class="form-control">
+                <label for="birth_date" class="form-label">Ngày sinh của học sinh <span class="text-danger">*</span></label>
+                <input type="date" id="birth_date" name="birth_date" class="form-control" required>
             </div>
         `;
     } else if (roleSelect.value === 'teacher') {
         extraFields.innerHTML = `
             <div class="mb-3">
-                <label for="position" class="form-label">Chức vụ</label>
-                <input type="text" id="position" name="position" class="form-control">
+                <label for="position" class="form-label">Chức vụ <span class="text-danger">*</span></label>
+                <input type="text" id="position" name="position" class="form-control" required>
             </div>
         `;
     } else {
@@ -69,5 +77,23 @@ function updateFields() {
 }
 roleSelect.addEventListener('change', updateFields);
 updateFields();
+function validateAccountForm() {
+    let valid = true;
+    let role = roleSelect.value;
+    let requiredFields = ['name','email','phone','password'];
+    if (role === 'parent') {
+        requiredFields.push('student_code','parent_contact','class_name','birth_date');
+    } else if (role === 'teacher') {
+        requiredFields.push('position');
+    }
+    for (let f of requiredFields) {
+        let el = document.getElementsByName(f)[0];
+        if (!el || !el.value.trim()) {
+            alert('Vui lòng nhập đầy đủ thông tin bắt buộc!');
+            return false;
+        }
+    }
+    return true;
+}
 </script>
 {% endblock %}
