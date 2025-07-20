@@ -42,3 +42,11 @@ class AttendanceRecord(db.Model):
     child_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
     date = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(20), nullable=False)
+
+class BmiRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    weight = db.Column(db.Float, nullable=False)
+    height = db.Column(db.Float, nullable=False)
+    bmi = db.Column(db.Float, nullable=False)

@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord
 from app.forms import EditProfileForm
 from calendar import monthrange
-from datetime import datetime
+from datetime import datetime, date
 import io, zipfile, os, json
 
 main = Blueprint('main', __name__)
@@ -49,7 +49,6 @@ def new_activity():
             save_path = os.path.join('app', 'static', 'images', filename)
             background_file.save(save_path)
             image_url = url_for('static', filename=f'images/{filename}')
-        from datetime import date
         new_post = Activity(title=title, description=content, date=date.today(), image=image_url)
         db.session.add(new_post)
         db.session.commit()
@@ -745,3 +744,73 @@ def edit_activity(title):
         return redirect(url_for('main.activities'))
     mobile = is_mobile()
     return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=mobile)
+
+@main.route('/bmi-index', methods=['GET', 'POST'])
+def bmi_index():
+    students = Child.query.all()
+    bmi = None
+    bmi_id = None
+
+    if request.method == 'POST':
+        student_id = int(request.form['student_id'])
+        weight = float(request.form['weight'])
+        height = float(request.form['height']) / 100  # đổi cm sang m
+        bmi = round(weight / (height * height), 2)
+        bmi_id = student_id
+        record_date = request.form.get('date', date.today().isoformat())
+        new_record = BmiRecord(
+            student_id=student_id,
+            date=date.fromisoformat(record_date),
+            weight=weight,
+            height=height * 100,  # lưu lại đơn vị cm
+            bmi=bmi
+        )
+        db.session.add(new_record)
+        db.session.commit()
+
+    bmi_history = {}
+    for student in students:
+        records = BmiRecord.query.filter_by(student_id=student.id).order_by(BmiRecord.date.desc(), BmiRecord.id.desc()).all()
+        filtered = {}
+        for record in records:
+            date_str = record.date.strftime('%Y-%m-%d')
+            if date_str not in filtered:
+                filtered[date_str] = record
+        bmi_history[student.id] = list(filtered.values())
+
+    current_date_iso = date.today().isoformat()
+    return render_template(
+        'bmi_index.html',
+        title='Chỉ Số BMI',
+        students=students,
+        bmi=bmi,
+        bmi_id=bmi_id,
+        bmi_history=bmi_history,
+        current_date_iso=current_date_iso,
+        mobile=False
+    )
+
+@main.route('/bmi-record/<int:record_id>/edit', methods=['POST'])
+def edit_bmi_record(record_id):
+    record = BmiRecord.query.get_or_404(record_id)
+    date_str = request.form.get('date')
+    weight = request.form.get('weight')
+    height = request.form.get('height')
+    if date_str and weight and height:
+        record.date = date.fromisoformat(date_str)
+        record.weight = float(weight)
+        record.height = float(height)
+        record.bmi = round(float(weight) / ((float(height)/100) ** 2), 2)
+        db.session.commit()
+        flash('Đã cập nhật chỉ số BMI!', 'success')
+    else:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
+    return redirect(url_for('main.bmi_index', edit_id=None))
+
+@main.route('/bmi-record/<int:record_id>/delete', methods=['POST'])
+def delete_bmi_record(record_id):
+    record = BmiRecord.query.get_or_404(record_id)
+    db.session.delete(record)
+    db.session.commit()
+    flash('Đã xoá chỉ số BMI!', 'success')
+    return redirect(url_for('main.bmi_index', edit_id=None))
