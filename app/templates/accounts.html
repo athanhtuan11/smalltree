@@ -47,7 +47,7 @@
                     <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <td>
-                        <a href="/accounts/{{ child.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
+                        <a href="/accounts/{{ child.id }}/edit?type=parent" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
                         <form method="POST" action="/accounts/parent/{{ child.id }}/delete" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá tài khoản này?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xoá</button>
@@ -84,7 +84,7 @@
                     <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <td>
-                        <a href="/accounts/{{ teacher.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
+                        <a href="/accounts/{{ teacher.id }}/edit?type=teacher" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
                         <form method="POST" action="/accounts/teacher/{{ teacher.id }}/delete" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá tài khoản này?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xoá</button>
