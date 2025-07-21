@@ -6,6 +6,7 @@
     </div>
     <h2>Tạo học sinh mới</h2>
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="name" class="form-label">Họ và tên</label>
             <input type="text" class="form-control" id="name" name="name" required>

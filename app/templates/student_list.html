@@ -43,6 +43,7 @@
                 <td>
                     <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1"><i class="bi bi-pencil-square"></i> Sửa</a>
                     <form action="/students/{{ student.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá học sinh này?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xóa</button>
                     </form>
                 </td>

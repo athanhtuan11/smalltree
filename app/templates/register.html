@@ -13,6 +13,7 @@
     <div class="tab-content" id="registerTabContent">
         <div class="tab-pane fade show active" id="parent" role="tabpanel" aria-labelledby="parent-tab">
             <form method="POST" action="/register/parent" class="mt-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label for="parent_name" class="form-label">Họ tên phụ huynh</label>
                     <input type="text" class="form-control" id="parent_name" name="parent_name" required>
@@ -50,6 +51,7 @@
         </div>
         <div class="tab-pane fade" id="teacher" role="tabpanel" aria-labelledby="teacher-tab">
             <form method="POST" action="/register/teacher" class="mt-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="mb-3">
                     <label for="teacher_name" class="form-label">Họ tên giáo viên</label>
                     <input type="text" class="form-control" id="teacher_name" name="teacher_name" required>

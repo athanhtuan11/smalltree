@@ -49,6 +49,7 @@
                     <td>
                         <a href="/accounts/{{ child.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
                         <form method="POST" action="/accounts/parent/{{ child.id }}/delete" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá tài khoản này?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xoá</button>
                         </form>
                     </td>
@@ -85,6 +86,7 @@
                     <td>
                         <a href="/accounts/{{ teacher.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
                         <form method="POST" action="/accounts/teacher/{{ teacher.id }}/delete" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá tài khoản này?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xoá</button>
                         </form>
                     </td>
@@ -104,6 +106,7 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <form method="POST" action="/accounts">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="modal-body">
             <div class="mb-3">
               <label for="username" class="form-label">Tên đăng nhập</label>

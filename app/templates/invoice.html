@@ -17,6 +17,7 @@
     </div>
     <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Hóa đơn thanh toán tháng {{ selected_month }}</h2>
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="table-responsive invoice-table-wrapper">
             <table class="table table-bordered align-middle {% if mobile %}invoice-table-mobile{% else %}invoice-table-desktop{% endif %}">
                 <thead class="table-success">

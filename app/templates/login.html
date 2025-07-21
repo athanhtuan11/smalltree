@@ -16,6 +16,7 @@
                     <div class="card-body">
                         <h3 class="card-title text-center mb-4" style="color:#43a047;">Đăng nhập</h3>
                         <form method="POST" action="{{ url_for('main.login') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email hoặc Số điện thoại</label>
                                 <input type="text" class="form-control" id="email" name="email" required>

@@ -11,6 +11,7 @@
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="mb-4 fw-bold" style="color:#43a047;">Đăng bài viết mới</h2>
     <form method="POST" enctype="multipart/form-data" id="activity-form" onsubmit="return submitQuillContent();">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="title" class="form-label">Tiêu đề <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="title" name="title" required placeholder="Nhập tiêu đề bài viết">

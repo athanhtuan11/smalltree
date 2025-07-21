@@ -3,6 +3,7 @@
 <div class="container mt-5">
     <h2>Điểm danh học sinh</h2>
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <table class="table table-bordered">
             <thead>
                 <tr>

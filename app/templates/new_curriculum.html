@@ -10,6 +10,7 @@
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="mb-4 fw-bold" style="color:#43a047;">Tạo chương trình học mới</h2>
     <form method="POST" id="curriculumForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="week_number" class="form-label">Tuần số</label>
             <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>

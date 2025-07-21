@@ -4,6 +4,7 @@
 <div class="row justify-content-center mt-4">
     <div class="col-md-7">
         <form method="POST" class="card shadow rounded-4 border-0">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="card-header bg-warning text-white rounded-top-4">
                 <h4 class="mb-0 fw-bold"><i class="bi bi-pencil-square me-2"></i>Chỉnh sửa thông tin tài khoản</h4>
             </div>

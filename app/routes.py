@@ -62,7 +62,18 @@ def new_activity():
         background_file = request.files.get('background')
         image_url = ''
         if background_file and background_file.filename:
-            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + background_file.filename
+            # Kiểm tra loại file hợp lệ
+            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif'}
+            import os, re
+            ext = os.path.splitext(background_file.filename)[1].lower()
+            safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
+            if ext not in allowed_ext:
+                flash('Chỉ cho phép upload file ảnh (.jpg, .jpeg, .png, .gif)!', 'danger')
+                return render_template('new_activity.html', title='Đăng bài viết mới', mobile=is_mobile())
+            if safe_filename != background_file.filename:
+                flash('Tên file không hợp lệ!', 'danger')
+                return render_template('new_activity.html', title='Đăng bài viết mới', mobile=is_mobile())
+            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
             save_path = os.path.join('app', 'static', 'images', filename)
             background_file.save(save_path)
             image_url = url_for('static', filename=f'images/{filename}')
@@ -855,7 +866,18 @@ def edit_activity(title):
         post.description = request.form.get('content')
         background_file = request.files.get('background')
         if background_file and background_file.filename:
-            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + background_file.filename
+            # Kiểm tra loại file hợp lệ
+            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif'}
+            import os, re
+            ext = os.path.splitext(background_file.filename)[1].lower()
+            safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
+            if ext not in allowed_ext:
+                flash('Chỉ cho phép upload file ảnh (.jpg, .jpeg, .png, .gif)!', 'danger')
+                return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=is_mobile())
+            if safe_filename != background_file.filename:
+                flash('Tên file không hợp lệ!', 'danger')
+                return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=is_mobile())
+            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
             save_path = os.path.join('app', 'static', 'images', filename)
             background_file.save(save_path)
             post.image = url_for('static', filename=f'images/{filename}')
