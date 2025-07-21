@@ -10,6 +10,7 @@
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="fw-bold mb-4" style="color:#43a047;">Chỉnh sửa chương trình học tuần {{ week.week_number }}</h2>
     <form method="POST" id="editCurriculumForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row mb-3">
             <div class="col-md-3">
                 <label for="week_number" class="form-label fw-bold">Tuần</label>
@@ -20,28 +21,49 @@
             <table class="table table-bordered align-middle bg-light">
                 <thead class="table-success">
                     <tr>
-                        <th rowspan="2">Thứ</th>
-                        <th colspan="6" class="text-center">Khung giờ</th>
+                        <th rowspan="2">Khung giờ</th>
+                        <th colspan="6" class="text-center">Thứ</th>
                     </tr>
                     <tr>
-                        <th>Sáng</th>
-                        <th>Phụ sáng</th>
-                        <th>Tráng miệng</th>
-                        <th>Trưa</th>
-                        <th>Xế</th>
-                        <th>Xế chiều</th>
+                        <th>Thứ 2</th>
+                        <th>Thứ 3</th>
+                        <th>Thứ 4</th>
+                        <th>Thứ 5</th>
+                        <th>Thứ 6</th>
+                        <th>Thứ 7</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
+                    <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi sáng</td></tr>
+                    {% set morning_slots = [
+                        ('7-8h', 'morning_1'),
+                        ('8h-8h30', 'morning_2'),
+                        ('8h30-9h', 'morning_3'),
+                        ('9h-9h40', 'morning_4'),
+                        ('9h40-10h30', 'morning_5'),
+                        ('10h30-14h', 'morning_6')
+                    ] %}
+                    {% for label, key in morning_slots %}
                     <tr>
                         <td class="fw-bold text-success">{{ label }}</td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_morning" onclick="openPopup(this)">{{ data[day]['morning'] }}</textarea></td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_snack" onclick="openPopup(this)">{{ data[day]['snack'] }}</textarea></td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_dessert" onclick="openPopup(this)">{{ data[day]['dessert'] }}</textarea></td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_lunch" onclick="openPopup(this)">{{ data[day]['lunch'] }}</textarea></td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_afternoon" onclick="openPopup(this)">{{ data[day]['afternoon'] }}</textarea></td>
-                        <td><textarea class="form-control curriculum-textarea" name="content_{{ day }}_lateafternoon" onclick="openPopup(this)">{{ data[day]['lateafternoon'] }}</textarea></td>
+                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                        <td><textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">{{ data[day][key] if data[day][key] is defined else '' }}</textarea></td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi chiều</td></tr>
+                    {% set afternoon_slots = [
+                        ('14h15-15h', 'afternoon_1'),
+                        ('15h-15h30', 'afternoon_2'),
+                        ('15h45-16h', 'afternoon_3'),
+                        ('16h-17h', 'afternoon_4')
+                    ] %}
+                    {% for label, key in afternoon_slots %}
+                    <tr>
+                        <td class="fw-bold text-success">{{ label }}</td>
+                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                        <td><textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">{{ data[day][key] if data[day][key] is defined else '' }}</textarea></td>
+                        {% endfor %}
                     </tr>
                     {% endfor %}
                 </tbody>

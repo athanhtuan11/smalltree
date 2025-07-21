@@ -44,6 +44,7 @@
                     <div class="d-flex flex-column gap-2 mt-2">
                         <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-warning btn-sm w-100"><i class="bi bi-pencil-square"></i> Sửa</a>
                         <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
                                 <i class="bi bi-trash"></i> Xoá
                             </button>
@@ -52,6 +53,7 @@
                     {% else %}
                     <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
                     <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
                             <i class="bi bi-trash"></i> Xoá
                         </button>

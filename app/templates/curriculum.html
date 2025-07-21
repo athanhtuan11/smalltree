@@ -30,6 +30,7 @@
                 <div class="d-flex flex-column flex-md-row gap-2 curriculum-btn-group-mobile">
                     <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Chỉnh sửa</a>
                     <form method="POST" action="{{ url_for('main.delete_curriculum', week_number=week.week_number) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá chương trình này?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Xoá</button>
                     </form>
                 </div>
@@ -43,28 +44,49 @@
                 <table class="table table-bordered align-middle bg-light mt-3 {% if mobile %}curriculum-table-mobile{% else %}curriculum-table-desktop{% endif %}">
                     <thead class="table-success">
                         <tr>
-                            <th rowspan="2">Thứ</th>
-                            <th colspan="6" class="text-center">Khung giờ</th>
+                            <th rowspan="2">Khung giờ</th>
+                            <th colspan="6" class="text-center">Thứ</th>
                         </tr>
                         <tr>
-                            <th>Sáng</th>
-                            <th>Phụ sáng</th>
-                            <th>Tráng miệng</th>
-                            <th>Trưa</th>
-                            <th>Xế</th>
-                            <th>Xế chiều</th>
+                            <th>Thứ 2</th>
+                            <th>Thứ 3</th>
+                            <th>Thứ 4</th>
+                            <th>Thứ 5</th>
+                            <th>Thứ 6</th>
+                            <th>Thứ 7</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
+                        <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi sáng</td></tr>
+                        {% set morning_slots = [
+                            ('7-8h', 'morning_1'),
+                            ('8h-8h30', 'morning_2'),
+                            ('8h30-9h', 'morning_3'),
+                            ('9h-9h40', 'morning_4'),
+                            ('9h40-10h30', 'morning_5'),
+                            ('10h30-14h', 'morning_6')
+                        ] %}
+                        {% for label, key in morning_slots %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            <td>{{ week.data[day]['morning']|safe }}</td>
-                            <td>{{ week.data[day]['snack']|safe }}</td>
-                            <td>{{ week.data[day]['dessert']|safe }}</td>
-                            <td>{{ week.data[day]['lunch']|safe }}</td>
-                            <td>{{ week.data[day]['afternoon']|safe }}</td>
-                            <td>{{ week.data[day]['lateafternoon']|safe }}</td>
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                            <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi chiều</td></tr>
+                        {% set afternoon_slots = [
+                            ('14h15-15h', 'afternoon_1'),
+                            ('15h-15h30', 'afternoon_2'),
+                            ('15h45-16h', 'afternoon_3'),
+                            ('16h-17h', 'afternoon_4')
+                        ] %}
+                        {% for label, key in afternoon_slots %}
+                        <tr>
+                            <td class="fw-bold text-success">{{ label }}</td>
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                            <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
+                            {% endfor %}
                         </tr>
                         {% endfor %}
                     </tbody>

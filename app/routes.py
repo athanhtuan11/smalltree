@@ -131,12 +131,15 @@ def new_curriculum():
     if request.method == 'POST':
         week_number = request.form.get('week_number')
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
             curriculum_data[day] = {}
-            for slot in slots:
-                curriculum_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+            for slot in morning_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
+            for slot in afternoon_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
         content = json.dumps(curriculum_data, ensure_ascii=False)
         new_week = Curriculum(week_number=week_number, content=content, material=None)
         db.session.add(new_week)
@@ -617,12 +620,15 @@ def edit_curriculum(week_number):
     import json
     if request.method == 'POST':
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
             curriculum_data[day] = {}
-            for slot in slots:
-                curriculum_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+            for slot in morning_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
+            for slot in afternoon_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
         week.content = json.dumps(curriculum_data, ensure_ascii=False)
         db.session.commit()
         flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
@@ -991,3 +997,79 @@ def delete_bmi_record(record_id):
     db.session.commit()
     flash('Đã xoá chỉ số BMI!', 'success')
     return redirect(url_for('main.bmi_index', edit_id=None))
+
+@main.route('/menu')
+def menu():
+    weeks = Curriculum.query.order_by(Curriculum.week_number).all()
+    menu = []
+    for week in weeks:
+        try:
+            data = json.loads(week.content)
+        except Exception:
+            data = {}
+        menu.append({
+            'week_number': week.week_number,
+            'data': data
+        })
+    mobile = is_mobile()
+    return render_template('menu.html', menu=menu, title='Thực đơn', mobile=mobile)
+
+@main.route('/menu/new', methods=['GET', 'POST'])
+def new_menu():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    if request.method == 'POST':
+        week_number = request.form.get('week_number')
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        menu_data = {}
+        for day in days:
+            menu_data[day] = {}
+            for slot in slots:
+                menu_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+        content = json.dumps(menu_data, ensure_ascii=False)
+        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        db.session.add(new_week)
+        db.session.commit()
+        flash('Đã thêm thực đơn mới!', 'success')
+        return redirect(url_for('main.menu'))
+    mobile = is_mobile()
+    return render_template('new_menu.html', title='Tạo thực đơn mới', mobile=mobile)
+
+@main.route('/menu/<int:week_number>/edit', methods=['GET', 'POST'])
+def edit_menu(week_number):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if not week:
+        flash('Không tìm thấy thực đơn để chỉnh sửa!', 'danger')
+        return redirect(url_for('main.menu'))
+    import json
+    if request.method == 'POST':
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+        menu_data = {}
+        for day in days:
+            menu_data[day] = {}
+            for slot in slots:
+                menu_data[day][slot] = request.form.get(f'content_{day}_{slot}')
+        week.content = json.dumps(menu_data, ensure_ascii=False)
+        db.session.commit()
+        flash(f'Đã cập nhật thực đơn tuần {week_number}!', 'success')
+        return redirect(url_for('main.menu'))
+    data = json.loads(week.content)
+    mobile = is_mobile()
+    return render_template('edit_menu.html', week=week, data=data, title=f'Chỉnh sửa thực đơn tuần {week_number}', mobile=mobile)
+
+@main.route('/menu/<int:week_number>/delete', methods=['POST'])
+def delete_menu(week_number):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if week:
+        db.session.delete(week)
+        db.session.commit()
+        flash(f'Đã xoá thực đơn tuần {week_number}!', 'success')
+    else:
+        flash('Không tìm thấy thực đơn để xoá!', 'danger')
+    return redirect(url_for('main.menu'))
