@@ -13,9 +13,10 @@
       {% endif %}
     {% endwith %}
     <form method="post" onsubmit="return validateAccountForm();">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="role" class="form-label">Loại tài khoản</label>
-            <select id="role" name="role" class="form-select" required disabled>
+            <select id="role" name="role" class="form-select" required>
                 <option value="teacher" selected>Giáo viên</option>
             </select>
         </div>
@@ -44,7 +45,10 @@
 const roleSelect = document.getElementById('role');
 const extraFields = document.getElementById('extra-fields');
 function updateFields() {
+    extraFields.style.display = '';
+    extraFields.innerHTML = '';
     if (roleSelect.value === 'parent') {
+        extraFields.style.display = '';
         extraFields.innerHTML = `
             <div class="mb-3">
                 <label for="student_code" class="form-label">Mã số học sinh <span class="text-danger">*</span></label>
@@ -63,6 +67,7 @@ function updateFields() {
             </div>
         `;
     } else if (roleSelect.value === 'teacher') {
+        extraFields.style.display = '';
         extraFields.innerHTML = `
             <div class="mb-3">
                 <label for="position" class="form-label">Chức vụ <span class="text-danger">*</span></label>
@@ -70,24 +75,30 @@ function updateFields() {
             </div>
         `;
     } else {
+        extraFields.style.display = 'none';
         extraFields.innerHTML = '';
     }
 }
 roleSelect.addEventListener('change', updateFields);
 updateFields();
 function validateAccountForm() {
-    let valid = true;
-    let role = roleSelect.value;
-    let requiredFields = ['name','email','phone','password'];
-    if (role === 'parent') {
-        requiredFields.push('student_code','parent_contact','class_name','birth_date');
-    } else if (role === 'teacher') {
-        requiredFields.push('position');
-    }
-    for (let f of requiredFields) {
-        let el = document.getElementsByName(f)[0];
-        if (!el || !el.value.trim()) {
-            alert('Vui lòng nhập đầy đủ thông tin bắt buộc!');
+    let form = document.querySelector('form');
+    let requiredFields = form.querySelectorAll('[required]');
+    for (let el of requiredFields) {
+        // Chỉ kiểm tra các trường đang hiển thị
+        if (el.offsetParent !== null && (!el.value || !el.value.trim())) {
+            let alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = 'Vui lòng nhập đầy đủ thông tin bắt buộc!';
+            let closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'btn-close';
+            closeBtn.setAttribute('data-bs-dismiss', 'alert');
+            closeBtn.setAttribute('aria-label', 'Close');
+            alertDiv.appendChild(closeBtn);
+            document.querySelector('.container').prepend(alertDiv);
+            el.focus();
             return false;
         }
     }

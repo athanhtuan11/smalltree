@@ -4,7 +4,7 @@ from app.forms import EditProfileForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -526,23 +526,23 @@ def login():
         password = request.form.get('password')
         # Kiểm tra admin
         admin = Staff.query.filter_by(position='admin').first()
-        if admin and (email_or_phone == admin.email or email_or_phone == admin.phone) and password == admin.password:
+        if admin and (email_or_phone == admin.email or email_or_phone == admin.phone) and check_password_hash(admin.password, password):
             session['user_id'] = admin.id
             session['role'] = 'admin'
             flash('Đăng nhập admin thành công!', 'success')
             login_attempts[user_ip] = 0
             last_login_time[user_ip] = now
             return redirect(url_for('main.about'))
-        user = Child.query.filter(((Child.email==email_or_phone)|(Child.phone==email_or_phone)) & (Child.password==password)).first()
-        staff = Staff.query.filter(((Staff.email==email_or_phone)|(Staff.phone==email_or_phone)) & (Staff.password==password)).first()
-        if user:
+        user = Child.query.filter(((Child.email==email_or_phone)|(Child.phone==email_or_phone))).first()
+        staff = Staff.query.filter(((Staff.email==email_or_phone)|(Staff.phone==email_or_phone))).first()
+        if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             session['role'] = 'parent'
             flash('Đăng nhập thành công!', 'success')
             login_attempts[user_ip] = 0
             last_login_time[user_ip] = now
             return redirect(url_for('main.about'))
-        elif staff:
+        elif staff and check_password_hash(staff.password, password):
             session['user_id'] = staff.id
             session['role'] = 'teacher'
             flash('Đăng nhập thành công!', 'success')
@@ -810,6 +810,7 @@ def create_account():
         email = request.form.get('email')
         phone = request.form.get('phone')
         password = request.form.get('password')
+        from werkzeug.security import generate_password_hash
         if role == 'admin':
             flash('Không thể tạo tài khoản admin qua form này!', 'danger')
             return render_template('create_account.html', title='Tạo tài khoản mới')
@@ -831,14 +832,14 @@ def create_account():
             if not student_code or not class_name or not birth_date or not parent_contact:
                 flash('Vui lòng nhập đầy đủ thông tin học sinh/phụ huynh!', 'danger')
                 return render_template('create_account.html', title='Tạo tài khoản mới')
-            new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, email=email, phone=phone, password=password, student_code=student_code)
+            new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, email=email, phone=phone, password=generate_password_hash(password), student_code=student_code)
             db.session.add(new_child)
         elif role == 'teacher':
             position = request.form.get('position')
             if not position:
                 flash('Vui lòng nhập chức vụ giáo viên!', 'danger')
                 return render_template('create_account.html', title='Tạo tài khoản mới')
-            new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=password)
+            new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=generate_password_hash(password))
             db.session.add(new_staff)
         db.session.commit()
         flash('Tạo tài khoản thành công!', 'success')
@@ -955,11 +956,13 @@ def bmi_index():
         bmi = round(weight / (height * height), 2)
         bmi_id = student_id
         record_date = request.form.get('date', date.today().isoformat())
+        # Fix: round height to 2 decimals before saving
+        rounded_height_cm = round(height * 100, 2)
         new_record = BmiRecord(
             student_id=student_id,
             date=date.fromisoformat(record_date),
             weight=weight,
-            height=height * 100,  # lưu lại đơn vị cm
+            height=rounded_height_cm,  # lưu lại đơn vị cm, đã làm tròn
             bmi=bmi
         )
         db.session.add(new_record)
