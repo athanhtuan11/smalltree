@@ -32,6 +32,7 @@
         </div>
     </form>
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="attendance_date" value="{{ current_date }}">
         {% if mobile %}
         <div class="attendance-scroll-hint">Vuốt ngang để xem đủ các trường trong bảng &rarr;</div>
