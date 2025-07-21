@@ -194,10 +194,10 @@ def attendance():
     if session.get('role') == 'parent':
         return redirect(url_for('main.attendance_history'))
     from datetime import date
-    attendance_date = request.form.get('attendance_date') if request.method == 'POST' else request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
-    selected_class = request.args.get('class_name') or request.form.get('class_name')
-    # Lấy danh sách lớp
-    class_names = [row[0] for row in db.session.query(Child.class_name).distinct().filter(Child.class_name != None).all()]
+    attendance_date = request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
+    selected_class = request.args.get('class_name')
+    # Lấy danh sách lớp cố định
+    class_names = ['Kay 01', 'Kay 02']
     # Lọc học sinh theo lớp
     if selected_class:
         students = Child.query.filter_by(class_name=selected_class).all()
