@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Thông báo học phí</title>
+  <style>
+    body {
+      font-family: DejaVu Sans, Arial, sans-serif;
+      margin: 40px;
+    }
+    .center {
+      text-align: center;
+    }
+    .title {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .subtitle {
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    .info {
+      margin-bottom: 18px;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      margin-bottom: 18px;
+    }
+    table, th, td {
+      border: 1px solid black;
+    }
+    th {
+      background: #e0e0e0;
+      font-weight: bold;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    .right {
+      text-align: right;
+    }
+    .signature {
+      margin-top: 40px;
+    }
+    .signature div {
+      display: inline-block;
+      width: 45%;
+      vertical-align: top;
+    }
+    .italic {
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div class="center">
+    <img src="https://raw.githubusercontent.com/athanhtuan11/smalltree/master/app/static/images/logo.jpg" alt="Logo" style="height:80px; margin-bottom:10px;"><br>
+    <div class="title">MẦM NON CÂY NHỎ</div>
+    <div class="subtitle">Số 1, Rchai’ 2, Phú Hội, Đức Trọng, Lâm Đồng</div>
+    <div class="subtitle">SDT: 0917618868 / STK: Nguyễn Thị Vân 108875858567 NH VietinBank</div>
+    <h3 style="margin-top:18px;">THÔNG BÁO HỌC PHÍ: HỌC PHÍ THÁNG {{ month }}</h3>
+  </div>
+  <div class="info">
+    <strong>Họ và tên học sinh:</strong> {{ student_name }}<br>
+    <strong>Ngày sinh:</strong> {{ birth_date }}<br>
+    <strong>Lớp:</strong> {{ class_name }}<br>
+    <strong>Thời hạn đóng học phí:</strong> 02/{{ month }} - 10/{{ month }}/{{ year }}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Tên khoản thu</th>
+        <th>Đơn giá</th>
+        <th>Giảm trừ</th>
+        <th>Thành tiền</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in fee_items %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ item.name }}</td>
+        <td>{{ item.unit_price }}</td>
+        <td>{{ item.discount }}</td>
+        <td>{{ item.total }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4" class="right"><strong>Tổng</strong></td>
+        <td><strong>{{ total }}</strong></td>
+      </tr>
+    </tfoot>
+  </table>
+  <div class="info"><strong>Viết bằng chữ:</strong> {{ total_text }}</div>
+  <p class="right">Ngày {{ day }} tháng {{ month }} năm {{ year }}</p>
+  <div class="signature">
+    <div>
+      <strong>Người nộp tiền</strong><br>
+      <span class="italic">(Kí và ghi rõ họ tên)</span>
+    </div>
+    <div class="right">
+      <strong>Chủ Trường</strong><br>
+      <span class="italic">(Kí và ghi rõ họ tên)</span><br><br>
+      <strong>Nguyễn Thị Vân</strong>
+    </div>
+  </div>
+</body>
+</html>

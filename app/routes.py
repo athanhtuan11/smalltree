@@ -5,6 +5,12 @@ from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json
 from werkzeug.security import generate_password_hash
+from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import RGBColor
 
 main = Blueprint('main', __name__)
 
@@ -279,27 +285,43 @@ def invoice():
     if request.method == 'POST':
         selected_ids = request.form.getlist('student_ids')
         if request.form.get('export_word'):
-            from docx import Document
-            from docx.shared import Pt
-            from docx.enum.text import WD_ALIGN_PARAGRAPH
-            from docx.oxml import OxmlElement
-            from docx.oxml.ns import qn
-            from docx.shared import RGBColor
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w') as zipf:
                 for student in students:
                     if str(student.id) in selected_ids:
                         doc = Document()
+                        # Bảng header: thông tin trường bên trái, logo bên phải
+                        header_table = doc.add_table(rows=1, cols=2)
+                        header_table.style = None  # Remove borders for a cleaner look
+                        left_cell = header_table.cell(0,0)
+                        right_cell = header_table.cell(0,1)
+                        left_cell.vertical_alignment = 1  # Top
+                        right_cell.vertical_alignment = 1  # Top
+                        # Logo on the left
+                        logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo.jpg')
+                        if os.path.exists(logo_path):
+                            run_logo = left_cell.paragraphs[0].add_run()
+                            from docx.shared import Inches
+                            run_logo.add_picture(logo_path, width=Inches(1.2))
+                            left_cell.paragraphs[0].alignment = 0  # Left
+                        # School info on the right
+                        right_paragraph = right_cell.paragraphs[0]
+                        right_paragraph.alignment = 1  # Center
+                        right_paragraph.add_run('SMALL TREE\n').bold = True
+                        right_paragraph.add_run('MẦM NON CÂY NHỎ\n').bold = True
+                        right_paragraph.add_run('Số 1, Rchai’ 2, Đức Trọng, Lâm Đồng\n')
+                        right_paragraph.add_run('SDT: 0917618868 / STK: Nguyễn Thị Vân 108875858567 NH VietinBank')
+                        # Đảm bảo mọi paragraph trong cell đều căn giữa
+                        for para in right_cell.paragraphs:
+                            para.alignment = 1
+                        doc.add_paragraph('')
                         title = doc.add_heading(f'HÓA ĐƠN THANH TOÁN THÁNG {month}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
-                        run.font.color.rgb = RGBColor(76, 175, 80)  # Xanh lá mạ
+                        run.font.size = Pt(18)  # Reduce font size
+                        run.font.color.rgb = RGBColor(76, 175, 80)
                         run.font.name = 'Comic Sans MS'
-                        # Thêm logo trường
-                        from docx.shared import Inches
-                        logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo.jpg')
-                        if os.path.exists(logo_path):
-                            doc.add_picture(logo_path, width=Inches(1.2))
+                        
                         # Bảng thông tin học sinh
                         info_table = doc.add_table(rows=2, cols=2)
                         info_table.style = 'Table Grid'
@@ -308,46 +330,16 @@ def invoice():
                                 tc = cell._tc
                                 tcPr = tc.get_or_add_tcPr()
                                 shd = OxmlElement('w:shd')
-                                shd.set(qn('w:fill'), 'e8f5e9')  # Xanh lá nhạt
+                                shd.set(qn('w:fill'), 'e8f5e9')
                                 tcPr.append(shd)
                         info_table.cell(0,0).text = 'Họ và tên:'
                         info_table.cell(0,1).text = student.name
                         info_table.cell(1,0).text = 'Ngày sinh:'
                         info_table.cell(1,1).text = student.birth_date or "-"
-                        doc.add_paragraph('Lịch sử điểm danh:')
-                        table = doc.add_table(rows=1, cols=2)
-                        table.style = 'Table Grid'
-                        hdr_cells = table.rows[0].cells
-                        hdr_cells[0].text = 'Ngày'
-                        hdr_cells[1].text = 'Trạng thái'
-                        for cell in hdr_cells:
-                            tc = cell._tc
-                            tcPr = tc.get_or_add_tcPr()
-                            shd = OxmlElement('w:shd')
-                            shd.set(qn('w:fill'), 'c8e6c9')  # Xanh lá nhạt hơn
-                            tcPr.append(shd)
-                        for day in days_in_month:
-                            record = next((r for r in records_raw if r.child_id == student.id and r.date == day), None)
-                            status = record.status if record else '-'
-                            row_cells = table.add_row().cells
-                            row_cells[0].text = f'{day[8:10]}/{day[5:7]}/{day[0:4]}'
-                            row_cells[1].text = status
-                        days = attendance_days[student.id]
                         doc.add_paragraph('')
-                        summary_table = doc.add_table(rows=3, cols=2)
-                        summary_table.style = 'Table Grid'
-                        for row in summary_table.rows:
-                            for cell in row.cells:
-                                tc = cell._tc
-                                tcPr = tc.get_or_add_tcPr()
-                                shd = OxmlElement('w:shd')
-                                shd.set(qn('w:fill'), 'e8f5e9')
-                                tcPr.append(shd)
-                        summary_table.cell(0,0).text = 'Số ngày đi học:'
-                        summary_table.cell(0,1).text = str(days)
-                        summary_table.cell(1,0).text = 'Tiền ăn:'
-                        summary_table.cell(1,1).text = f'{days * 40000:,} đ'
-                        # Tính học phí đúng theo độ tuổi
+                        # Bảng tổng kết
+                        days = attendance_days[student.id]
+                        absents = absent_unexcused_days[student.id]
                         age = calculate_age(student.birth_date) if student.birth_date else 0
                         if age == 1:
                             tuition = 1850000
@@ -359,14 +351,57 @@ def invoice():
                             tuition = 1550000
                         else:
                             tuition = 1500000
-                        summary_table.cell(2,0).text = 'Tiền học phí:'
-                        summary_table.cell(2,1).text = f'{tuition:,} đ'
-                        total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {(days + absent_unexcused_days[student.id]) * 38000 + tuition:,} đ')
+                        excused_absents = sum(1 for r in records_raw if r.child_id == student.id and r.status == 'Vắng mặt có phép')
+                        summary_table = doc.add_table(rows=7, cols=2)
+                        summary_table.style = 'Table Grid'
+                        for row in summary_table.rows:
+                            for cell in row.cells:
+                                tc = cell._tc
+                                tcPr = tc.get_or_add_tcPr()
+                                shd = OxmlElement('w:shd')
+                                shd.set(qn('w:fill'), 'e8f5e9')
+                                tcPr.append(shd)
+                        summary_table.cell(0,0).text = 'Số ngày đi học:'
+                        summary_table.cell(0,1).text = str(days)
+                        summary_table.cell(1,0).text = 'Số ngày vắng không phép:'
+                        summary_table.cell(1,1).text = str(absents)
+                        summary_table.cell(2,0).text = 'Số ngày vắng có phép:'
+                        summary_table.cell(2,1).text = str(excused_absents)
+                        summary_table.cell(3,0).text = 'Tiền ăn:'
+                        summary_table.cell(3,1).text = f'{days * 38000:,} đ'
+                        summary_table.cell(4,0).text = 'Tiền học phí:'
+                        summary_table.cell(4,1).text = f'{tuition:,} đ'
+                        summary_table.cell(5,0).text = 'Tiền học anh văn:'
+                        summary_table.cell(5,1).text = '500,000 đ'
+                        summary_table.cell(6,0).text = 'Tiền học STEMax:'
+                        summary_table.cell(6,1).text = '200,000 đ'
+                        total = tuition + days * 38000 + absents * 38000 + 500000 + 200000
+                        total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {total:,} đ')
                         total_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                         total_run = total_paragraph.runs[0]
                         total_run.font.color.rgb = RGBColor(76, 175, 80)
                         total_run.font.bold = True
                         total_run.font.name = 'Comic Sans MS'
+
+                        # Add payment info table
+                        from datetime import datetime
+                        payment_table = doc.add_table(rows=1, cols=2)
+                        payment_table.style = None  # No border for clean look
+                        left_payment_cell = payment_table.cell(0,0)
+                        right_payment_cell = payment_table.cell(0,1)
+                        left_payment_cell.vertical_alignment = 1  # Top
+                        right_payment_cell.vertical_alignment = 1  # Top
+                        left_payment_cell.text = 'Người nộp tiền:'
+                        left_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')                        
+                        now = datetime.now()
+                        right_payment_cell.text = ''  # Xóa nội dung mặc định
+                        right_payment_cell.add_paragraph(f'Ngày ...... tháng ...... năm {now.year}').alignment = 1
+                        right_payment_cell.add_paragraph('Chủ Trường').alignment = 1
+                        right_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)').alignment = 1
+                        right_payment_cell.add_paragraph().alignment = 1
+                        right_payment_cell.add_paragraph().alignment = 1
+                        right_payment_cell.add_paragraph('Nguyễn Thị Vân').alignment = 1
+                        
                         file_stream = io.BytesIO()
                         doc.save(file_stream)
                         file_stream.seek(0)
