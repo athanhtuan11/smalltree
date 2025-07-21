@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord
 from app.forms import EditProfileForm
 from calendar import monthrange
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import io, zipfile, os, json
+from werkzeug.security import generate_password_hash
 
 main = Blueprint('main', __name__)
 
@@ -23,6 +24,13 @@ def calculate_age(birth_date):
         return 0
     age = today.year - birthday.year - ((today.month, today.day) < (birthday.month, birthday.day))
     return age
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_TIME_MINUTES = 10
+LOGIN_COOLDOWN_SECONDS = 30
+login_attempts = {}
+lockout_until = {}
+last_login_time = {}
 
 @main.route('/')
 def index():
@@ -405,7 +413,8 @@ def register_parent():
         flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
         return render_template('register.html', title='Đăng ký tài khoản')
     student_code = request.form.get('student_code')
-    new_child = Child(name=child_name, age=child_age, parent_contact=name, email=email, phone=phone, password=password, student_code=student_code)
+    hashed_pw = generate_password_hash(password)
+    new_child = Child(name=child_name, age=child_age, parent_contact=name, email=email, phone=phone, password=hashed_pw, student_code=student_code)
     db.session.add(new_child)
     db.session.commit()
     flash('Đăng ký phụ huynh thành công!', 'success')
@@ -433,7 +442,8 @@ def register_teacher():
         email == 'admin@smalltree.vn'):
         flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
         return render_template('register.html', title='Đăng ký tài khoản')
-    new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=password)
+    hashed_pw = generate_password_hash(password)
+    new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=hashed_pw)
     db.session.add(new_staff)
     db.session.commit()
     flash('Đăng ký giáo viên thành công!', 'success')
@@ -441,6 +451,17 @@ def register_teacher():
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
+    user_ip = request.remote_addr
+    now = datetime.now()
+    # Kiểm tra lockout do nhập sai
+    if user_ip in lockout_until and now < lockout_until[user_ip]:
+        flash(f'Tài khoản hoặc IP này bị khóa đăng nhập tạm thời. Vui lòng thử lại sau!', 'danger')
+        return render_template('login.html', title='Đăng nhập')
+    # Kiểm tra cooldown sau đăng nhập thành công
+    if user_ip in last_login_time and (now - last_login_time[user_ip]).total_seconds() < LOGIN_COOLDOWN_SECONDS:
+        wait_time = LOGIN_COOLDOWN_SECONDS - int((now - last_login_time[user_ip]).total_seconds())
+        flash(f'Bạn vừa đăng nhập thành công. Vui lòng chờ {wait_time} giây trước khi đăng nhập lại!', 'warning')
+        return render_template('login.html', title='Đăng nhập')
     if request.method == 'POST':
         email_or_phone = request.form.get('email')
         password = request.form.get('password')
@@ -450,6 +471,8 @@ def login():
             session['user_id'] = admin.id
             session['role'] = 'admin'
             flash('Đăng nhập admin thành công!', 'success')
+            login_attempts[user_ip] = 0
+            last_login_time[user_ip] = now
             return redirect(url_for('main.about'))
         user = Child.query.filter(((Child.email==email_or_phone)|(Child.phone==email_or_phone)) & (Child.password==password)).first()
         staff = Staff.query.filter(((Staff.email==email_or_phone)|(Staff.phone==email_or_phone)) & (Staff.password==password)).first()
@@ -457,14 +480,23 @@ def login():
             session['user_id'] = user.id
             session['role'] = 'parent'
             flash('Đăng nhập thành công!', 'success')
+            login_attempts[user_ip] = 0
+            last_login_time[user_ip] = now
             return redirect(url_for('main.about'))
         elif staff:
             session['user_id'] = staff.id
             session['role'] = 'teacher'
             flash('Đăng nhập thành công!', 'success')
+            login_attempts[user_ip] = 0
+            last_login_time[user_ip] = now
             return redirect(url_for('main.about'))
         else:
-            flash('Sai thông tin đăng nhập!', 'danger')
+            login_attempts[user_ip] = login_attempts.get(user_ip, 0) + 1
+            if login_attempts[user_ip] >= MAX_LOGIN_ATTEMPTS:
+                lockout_until[user_ip] = now + timedelta(minutes=LOCKOUT_TIME_MINUTES)
+                flash(f'Bạn đã nhập sai quá số lần cho phép. Đăng nhập bị khóa {LOCKOUT_TIME_MINUTES} phút!', 'danger')
+            else:
+                flash('Sai thông tin đăng nhập!', 'danger')
             return render_template('login.html', title='Đăng nhập')
     return render_template('login.html', title='Đăng nhập')
 
@@ -498,7 +530,22 @@ def accounts():
     parents = Child.query.all()
     teachers = Staff.query.all()
     mobile = is_mobile()
-    return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
+    # Hide sensitive info for non-admins
+    show_sensitive = session.get('role') == 'admin'
+    def mask_user(u):
+        return {
+            'id': u.id,
+            'name': u.name,
+            'email': u.email if show_sensitive else 'Ẩn',
+            'phone': u.phone if show_sensitive else 'Ẩn',
+            'student_code': getattr(u, 'student_code', None) if show_sensitive else 'Ẩn',
+            'class_name': getattr(u, 'class_name', None) if show_sensitive else 'Ẩn',
+            'parent_contact': getattr(u, 'parent_contact', None) if show_sensitive else 'Ẩn',
+            'position': getattr(u, 'position', None) if show_sensitive else 'Ẩn',
+        }
+    masked_parents = [mask_user(p) for p in parents]
+    masked_teachers = [mask_user(t) for t in teachers]
+    return render_template('accounts.html', parents=masked_parents, teachers=masked_teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
 
 @main.route('/curriculum/<int:week_number>/delete', methods=['POST'])
 def delete_curriculum(week_number):
@@ -543,6 +590,7 @@ def profile():
     user = None
     role = session.get('role')
     user_id = session.get('user_id')
+    show_sensitive = role == 'admin'
     if role == 'parent':
         user = Child.query.get(user_id)
         role_display = 'Phụ huynh'
@@ -559,10 +607,11 @@ def profile():
         flash('Không tìm thấy thông tin tài khoản!', 'danger')
         return redirect(url_for('main.about'))
     mobile = is_mobile()
+    # Hide sensitive info for non-admins
     return render_template('profile.html', user={
         'full_name': full_name,
-        'email': user.email if user else '',
-        'phone': user.phone if user else '',
+        'email': user.email if user and show_sensitive else 'Ẩn',
+        'phone': user.phone if user and show_sensitive else 'Ẩn',
         'role_display': role_display
     }, mobile=mobile)
 
@@ -605,7 +654,19 @@ def edit_profile():
 def student_list():
     students = Child.query.all()
     mobile = is_mobile()
-    return render_template('student_list.html', students=students, title='Danh sách học sinh', mobile=mobile)
+    show_sensitive = session.get('role') == 'admin'
+    def mask_student(s):
+        return {
+            'id': s.id,
+            'name': s.name,
+            'email': s.email if show_sensitive else 'Ẩn',
+            'phone': s.phone if show_sensitive else 'Ẩn',
+            'student_code': s.student_code if show_sensitive else 'Ẩn',
+            'class_name': s.class_name if show_sensitive else 'Ẩn',
+            'parent_contact': s.parent_contact if show_sensitive else 'Ẩn',
+        }
+    masked_students = [mask_student(s) for s in students]
+    return render_template('student_list.html', students=masked_students, title='Danh sách học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
 def edit_student(student_id):
@@ -652,7 +713,8 @@ def change_admin_password():
         elif new_password != confirm_password:
             flash('Mật khẩu mới nhập lại không khớp!', 'danger')
         else:
-            admin.password = new_password
+            from werkzeug.security import generate_password_hash
+            admin.password = generate_password_hash(new_password)
             db.session.commit()
             flash('Đổi mật khẩu admin thành công!', 'success')
             return redirect(url_for('main.accounts'))
@@ -739,11 +801,24 @@ def edit_account(user_id):
             user.position = request.form.get('position')
         password = request.form.get('password')
         if password:
-            user.password = password
+            from werkzeug.security import generate_password_hash
+            user.password = generate_password_hash(password)
         db.session.commit()
         flash('Đã cập nhật thông tin tài khoản!', 'success')
         return redirect(url_for('main.accounts'))
-    return render_template('edit_account.html', user=user, type=user_type, title='Chỉnh sửa tài khoản')
+    # Hide sensitive info for non-admins (should only be admin here, but for safety)
+    show_sensitive = session.get('role') == 'admin'
+    masked_user = {
+        'id': user.id,
+        'name': user.name,
+        'email': user.email if show_sensitive else 'Ẩn',
+        'phone': user.phone if show_sensitive else 'Ẩn',
+        'student_code': getattr(user, 'student_code', None) if show_sensitive else 'Ẩn',
+        'class_name': getattr(user, 'class_name', None) if show_sensitive else 'Ẩn',
+        'parent_contact': getattr(user, 'parent_contact', None) if show_sensitive else 'Ẩn',
+        'position': getattr(user, 'position', None) if show_sensitive else 'Ẩn',
+    }
+    return render_template('edit_account.html', user=masked_user, type=user_type, title='Chỉnh sửa tài khoản')
 
 @main.route('/accounts/parent/<int:user_id>/delete', methods=['POST'])
 def delete_parent_account(user_id):

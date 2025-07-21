@@ -35,10 +35,10 @@
             <tr>
                 <td>{{ loop.index }}</td>
                 <td>{{ student.name }}</td>
-                <td>{{ student.student_code }}</td>
-                <td>{{ student.class_name }}</td>
+                <td>{% if student.student_code == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.student_code }}{% endif %}</td>
+                <td>{% if student.class_name == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.class_name }}{% endif %}</td>
                 <td>{{ student.birth_date }}</td>
-                <td>{{ student.parent_contact }}</td>
+                <td>{% if student.parent_contact == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.parent_contact }}{% endif %}</td>
                 {% if session.get('role') in ['admin', 'teacher'] %}
                 <td>
                     <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1"><i class="bi bi-pencil-square"></i> Sửa</a>

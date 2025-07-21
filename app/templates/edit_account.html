@@ -10,24 +10,24 @@
         </div>
         <div class="mb-3">
             <label for="email" class="form-label">Email</label>
-            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" required>
+            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" {% if user.email == 'Ẩn' %}readonly style="background:#eee;"{% endif %} required>
         </div>
         <div class="mb-3">
             <label for="phone" class="form-label">Số điện thoại</label>
-            <input type="text" id="phone" name="phone" class="form-control" value="{{ user.phone }}" required>
+            <input type="text" id="phone" name="phone" class="form-control" value="{{ user.phone }}" {% if user.phone == 'Ẩn' %}readonly style="background:#eee;"{% endif %} required>
         </div>
         {% if type == 'parent' %}
         <div class="mb-3">
             <label for="parent_contact" class="form-label">Tên phụ huynh</label>
-            <input type="text" id="parent_contact" name="parent_contact" class="form-control" value="{{ user.parent_contact }}">
+            <input type="text" id="parent_contact" name="parent_contact" class="form-control" value="{{ user.parent_contact }}" {% if user.parent_contact == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
         </div>
         <div class="mb-3">
             <label for="student_code" class="form-label">Mã số học sinh</label>
-            <input type="text" id="student_code" name="student_code" class="form-control" value="{{ user.student_code }}">
+            <input type="text" id="student_code" name="student_code" class="form-control" value="{{ user.student_code }}" {% if user.student_code == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
         </div>
         <div class="mb-3">
             <label for="class_name" class="form-label">Lớp</label>
-            <input type="text" id="class_name" name="class_name" class="form-control" value="{{ user.class_name }}">
+            <input type="text" id="class_name" name="class_name" class="form-control" value="{{ user.class_name }}" {% if user.class_name == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
         </div>
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>

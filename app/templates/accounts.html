@@ -31,7 +31,7 @@
                     <th>Tên của phụ huynh</th>
                     <th>Email</th>
                     <th>Số điện thoại</th>
-                    <th>Mật khẩu</th>
+                    <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <th>Hành động</th>
                     {% endif %}
@@ -44,7 +44,7 @@
                     <td>{{ child.parent_contact }}</td>
                     <td>{{ child.email }}</td>
                     <td>{{ child.phone }}</td>
-                    <td>{{ child.password }}</td>
+                    <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <td>
                         <a href="/accounts/{{ child.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
@@ -67,7 +67,7 @@
                     <th>Chức vụ</th>
                     <th>Email</th>
                     <th>Số điện thoại</th>
-                    <th>Mật khẩu</th>
+                    <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <th>Hành động</th>
                     {% endif %}
@@ -80,7 +80,7 @@
                     <td>{{ teacher.position }}</td>
                     <td>{{ teacher.email }}</td>
                     <td>{{ teacher.phone }}</td>
-                    <td>{{ teacher.password }}</td>
+                    <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <td>
                         <a href="/accounts/{{ teacher.id }}/edit" class="btn btn-warning btn-sm"><i class="bi bi-pencil-square"></i> Sửa</a>
