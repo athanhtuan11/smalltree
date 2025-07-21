@@ -27,7 +27,10 @@
         </div>
         <div class="mb-3">
             <label for="class_name" class="form-label">Lớp</label>
-            <input type="text" id="class_name" name="class_name" class="form-control" value="{{ user.class_name }}" {% if user.class_name == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
+            <select class="form-select" id="class_name" name="class_name" required>
+                <option value="Kay 01" {% if user.class_name == 'Kay 01' %}selected{% endif %}>Kay 01</option>
+                <option value="Kay 02" {% if user.class_name == 'Kay 02' %}selected{% endif %}>Kay 02</option>
+            </select>
         </div>
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>

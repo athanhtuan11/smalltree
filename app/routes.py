@@ -175,6 +175,9 @@ def new_student():
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
+        if class_name not in ['Kay 01', 'Kay 02']:
+            flash('Lớp không hợp lệ!', 'danger')
+            return redirect(url_for('main.new_student'))
         new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code)
         db.session.add(new_child)
         db.session.commit()
@@ -192,7 +195,14 @@ def attendance():
         return redirect(url_for('main.attendance_history'))
     from datetime import date
     attendance_date = request.form.get('attendance_date') if request.method == 'POST' else request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
-    students = Child.query.all()
+    selected_class = request.args.get('class_name') or request.form.get('class_name')
+    # Lấy danh sách lớp
+    class_names = [row[0] for row in db.session.query(Child.class_name).distinct().filter(Child.class_name != None).all()]
+    # Lọc học sinh theo lớp
+    if selected_class:
+        students = Child.query.filter_by(class_name=selected_class).all()
+    else:
+        students = Child.query.all()
     # Lấy trạng thái điểm danh từ database cho ngày đã chọn
     for student in students:
         record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
@@ -220,9 +230,9 @@ def attendance():
             student.status = status
         db.session.commit()
         flash('Đã lưu điểm danh!', 'success')
-        return redirect(url_for('main.attendance', attendance_date=attendance_date))
+        return redirect(url_for('main.attendance', attendance_date=attendance_date, class_name=selected_class))
     mobile = is_mobile()
-    return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date, mobile=mobile)
+    return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date, mobile=mobile, class_names=class_names, selected_class=selected_class)
 
 @main.route('/attendance/mark', methods=['GET', 'POST'])
 def mark_attendance():
@@ -726,13 +736,17 @@ def edit_student(student_id):
         return redirect_no_permission()
     student = Child.query.get_or_404(student_id)
     if request.method == 'POST':
+        class_name = request.form.get('class_name')
+        if class_name not in ['Kay 01', 'Kay 02']:
+            flash('Lớp không hợp lệ!', 'danger')
+            return redirect(url_for('main.edit_student', student_id=student_id))
         student.name = request.form.get('name')
         student.student_code = request.form.get('student_code')
-        student.class_name = request.form.get('class_name')
+        student.class_name = class_name
         student.birth_date = request.form.get('birth_date')
         student.parent_contact = request.form.get('parent_contact')
         db.session.commit()
-        flash('Đã cập nhật thông tin học sinh!', 'success')
+        flash('Đã lưu thay đổi!', 'success')
         return redirect(url_for('main.student_list'))
     mobile = is_mobile()
     return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh', mobile=mobile)
