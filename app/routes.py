@@ -1,9 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord
-from app.forms import EditProfileForm
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage
+from app.forms import EditProfileForm, ActivityForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
-import io, zipfile, os, json
+import io, zipfile, os, json, re
 from werkzeug.security import generate_password_hash, check_password_hash
 from docx import Document
 from docx.shared import Pt
@@ -13,6 +13,7 @@ from docx.oxml.ns import qn
 from docx.shared import RGBColor
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from PIL import Image
 
 main = Blueprint('main', __name__)
 
@@ -64,34 +65,58 @@ def contact():
 def new_activity():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        background_file = request.files.get('background')
+    form = ActivityForm()
+    if form.validate_on_submit():
+        title = form.title.data
+        content = form.description.data
+        date_val = datetime.strptime(form.date.data, '%Y-%m-%d') if form.date.data else date.today()
+        background_file = form.background.data
         image_url = ''
         if background_file and background_file.filename:
-            # Kiểm tra loại file hợp lệ
             allowed_ext = {'.jpg', '.jpeg', '.png', '.gif'}
-            import os, re
             ext = os.path.splitext(background_file.filename)[1].lower()
             safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
             if ext not in allowed_ext:
                 flash('Chỉ cho phép upload file ảnh (.jpg, .jpeg, .png, .gif)!', 'danger')
-                return render_template('new_activity.html', title='Đăng bài viết mới', mobile=is_mobile())
-            if safe_filename != background_file.filename:
-                flash('Tên file không hợp lệ!', 'danger')
-                return render_template('new_activity.html', title='Đăng bài viết mới', mobile=is_mobile())
+                return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile())
             filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
             save_path = os.path.join('app', 'static', 'images', filename)
-            background_file.save(save_path)
+            # Resize background
+            img = Image.open(background_file)
+            img.thumbnail((1200, 800))
+            img.save(save_path)
             image_url = url_for('static', filename=f'images/{filename}')
-        new_post = Activity(title=title, description=content, date=date.today(), image=image_url)
+        new_post = Activity(title=title, description=content, date=date_val, image=image_url)
         db.session.add(new_post)
+        db.session.commit()
+        # Tạo thư mục lưu ảnh hoạt động
+        activity_dir = os.path.join('app', 'static', 'images', 'activities', str(new_post.id))
+        os.makedirs(activity_dir, exist_ok=True)
+        # Lưu nhiều ảnh hoạt động
+        files = form.images.data
+        for file in files:
+            if file and getattr(file, 'filename', None):
+                ext = os.path.splitext(file.filename)[1].lower()
+                if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                    continue
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                img_path = os.path.join(activity_dir, img_filename)
+                try:
+                    file.stream.seek(0)
+                    img = Image.open(file.stream)
+                    img.thumbnail((1200, 800))
+                    img.save(img_path)
+                    rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                    db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
+                except Exception as e:
+                    flash(f"Lỗi upload ảnh: {file.filename} - {e}", 'danger')
+                    continue
         db.session.commit()
         flash('Đã đăng bài viết mới!', 'success')
         return redirect(url_for('main.activities'))
     mobile = is_mobile()
-    return render_template('new_activity.html', title='Đăng bài viết mới', mobile=mobile)
+    return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile)
 
 @main.route('/activities/<title>/delete', methods=['POST'])
 def delete_activity(title):
@@ -124,7 +149,9 @@ def activity_detail(title):
         'date_posted': post.date.strftime('%Y-%m-%d')
     }
     mobile = is_mobile()
-    return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile)
+    from app.forms import DeleteActivityForm
+    form = DeleteActivityForm()
+    return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile, form=form)
 
 @main.route('/curriculum/new', methods=['GET', 'POST'])
 def new_curriculum():
@@ -799,14 +826,18 @@ def activities():
     posts = Activity.query.order_by(Activity.date.desc()).all()
     activities = [
         {
+            'id': post.id,
             'title': post.title,
             'content': post.description,
             'image': post.image,
-            'date_posted': post.date.strftime('%Y-%m-%d')
+            'date_posted': post.date.strftime('%Y-%m-%d'),
+            'images': post.images  # Truyền danh sách ảnh gallery
         } for post in posts
     ]
     mobile = is_mobile()
-    return render_template('activities.html', activities=activities, title='Hoạt động', mobile=mobile)
+    from app.forms import DeleteActivityForm
+    form = DeleteActivityForm()
+    return render_template('activities.html', activities=activities, title='Hoạt động', mobile=mobile, form=form)
 
 @main.route('/accounts/create', methods=['GET', 'POST'])
 def create_account():
@@ -932,7 +963,6 @@ def edit_activity(title):
         if background_file and background_file.filename:
             # Kiểm tra loại file hợp lệ
             allowed_ext = {'.jpg', '.jpeg', '.png', '.gif'}
-            import os, re
             ext = os.path.splitext(background_file.filename)[1].lower()
             safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
             if ext not in allowed_ext:
@@ -943,7 +973,10 @@ def edit_activity(title):
                 return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=is_mobile())
             filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
             save_path = os.path.join('app', 'static', 'images', filename)
-            background_file.save(save_path)
+            # Resize background
+            img = Image.open(background_file)
+            img.thumbnail((1200, 800))
+            img.save(save_path)
             post.image = url_for('static', filename=f'images/{filename}')
         db.session.commit()
         flash('Đã cập nhật bài viết!', 'success')

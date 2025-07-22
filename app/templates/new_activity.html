@@ -19,7 +19,7 @@
         <div class="mb-3">
             <label for="content" class="form-label">Nội dung <span class="text-danger">*</span></label>
             <div id="quillEditor" class="quill-editor bg-white"></div>
-            <input type="hidden" name="content" id="content">
+            <input type="hidden" name="description" id="description">
         </div>
         <div class="mb-3">
             <label for="background" class="form-label">Chọn hình nền cho bài viết</label>
@@ -27,6 +27,14 @@
             <div id="preview-bg" class="mt-3" style="display:none;">
                 <img id="preview-img" src="#" alt="Preview" style="max-width:100%; border-radius:16px; filter: blur(4px) brightness(0.8);">
             </div>
+        </div>
+        <div class="mb-3">
+            <label for="date" class="form-label">Ngày đăng <span class="text-danger">*</span></label>
+            <input type="date" class="form-control" id="date" name="date" required value="{{ form.date.data if form and form.date.data else '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
+            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple>
         </div>
         <button type="submit" class="btn btn-success">Đăng bài</button>
         <a href="/activities" class="btn btn-outline-secondary ms-2">Quay lại</a>
@@ -50,7 +58,7 @@ var quill = new Quill('#quillEditor', {
     }
 });
 function submitQuillContent() {
-    document.getElementById('content').value = quill.root.innerHTML;
+    document.getElementById('description').value = quill.root.innerHTML;
     return true;
 }
 </script>

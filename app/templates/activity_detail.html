@@ -21,6 +21,7 @@
                 <a href="/activities" class="btn btn-outline-success">Quay lại danh sách hoạt động</a>
                 {% if session['role'] in ['admin', 'teacher'] %}
                 <form method="POST" action="/activities/{{ activity.title|replace(' ', '-') }}/delete" style="display:inline-block;">
+                    {{ form.hidden_tag() }}
                     <button type="submit" class="btn btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">Xoá bài viết</button>
                 </form>
                 {% endif %}

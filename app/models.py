@@ -30,6 +30,14 @@ class Activity(db.Model):
     description = db.Column(db.Text, nullable=False)
     date = db.Column(db.Date, nullable=False)
     image = db.Column(db.String(200))  # Đường dẫn hình nền
+    images = db.relationship('ActivityImage', backref='activity', lazy=True)
+
+class ActivityImage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(200), nullable=False)
+    filepath = db.Column(db.String(300), nullable=False)
+    upload_date = db.Column(db.DateTime, nullable=False)
+    activity_id = db.Column(db.Integer, db.ForeignKey('activity.id'), nullable=False)
 
 class Curriculum(db.Model):
     id = db.Column(db.Integer, primary_key=True)
