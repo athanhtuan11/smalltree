@@ -22,6 +22,27 @@
         <a href="{{ url_for('main.new_menu') }}" class="btn btn-success {% if mobile %}menu-btn-mobile{% endif %}">+ Thêm thực đơn</a>
         {% endif %}
     </div>
+    <div class="d-flex flex-row gap-2 mb-3">
+        <form action="/menu/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="excel_file" accept=".xlsx" required style="display:inline-block;">
+            <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:90px;display:inline-block;" title="Tuần">
+            <button type="submit" class="btn btn-primary">Import Excel</button>
+        </form>
+        <a href="/menu/export" class="btn btn-success">Export Excel</a>
+    </div>
+    <script>
+    // Auto-fill week number input with current week of year
+    document.addEventListener('DOMContentLoaded', function() {
+        var weekInput = document.getElementById('import-week-number');
+        if (weekInput) {
+            var now = new Date();
+            var onejan = new Date(now.getFullYear(),0,1);
+            var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+            weekInput.value = week;
+        }
+    });
+    </script>
     {% for week in menu %}
     <div class="card mb-4 shadow rounded-4 border-0">
         <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
@@ -30,7 +51,7 @@
                 <div class="d-flex flex-column flex-md-row gap-2 menu-btn-group-mobile">
                     <a href="{{ url_for('main.edit_menu', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}menu-btn-mobile{% endif %}">Chỉnh sửa</a>
                     <form method="POST" action="{{ url_for('main.delete_menu', week_number=week.week_number) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá thực đơn này?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm {% if mobile %}menu-btn-mobile{% endif %}">Xoá</button>
                     </form>
                 </div>

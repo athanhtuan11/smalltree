@@ -11,6 +11,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import RGBColor
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
 main = Blueprint('main', __name__)
 
@@ -151,6 +153,9 @@ def new_curriculum():
 
 @main.route('/curriculum')
 def curriculum():
+    import secrets
+    if 'csrf_token' not in session or not session['csrf_token']:
+        session['csrf_token'] = secrets.token_hex(16)
     weeks = Curriculum.query.order_by(Curriculum.week_number).all()
     curriculum = []
     for week in weeks:
@@ -999,7 +1004,7 @@ def edit_bmi_record(record_id):
     if date_str and weight and height:
         record.date = date.fromisoformat(date_str)
         record.weight = float(weight)
-        record.height = float(height)
+        record.height = request.form.get('height')
         record.bmi = round(float(weight) / ((float(height)/100) ** 2), 2)
         db.session.commit()
         flash('Đã cập nhật chỉ số BMI!', 'success')
@@ -1090,3 +1095,242 @@ def delete_menu(week_number):
     else:
         flash('Không tìm thấy thực đơn để xoá!', 'danger')
     return redirect(url_for('main.menu'))
+
+@main.route('/menu/import', methods=['POST'])
+def import_menu():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    file = request.files.get('excel_file')
+    week_number = request.form.get('week_number')
+    if not file:
+        flash('Vui lòng chọn file Excel!', 'danger')
+        return redirect(url_for('main.menu'))
+    if not week_number:
+        flash('Vui lòng nhập số tuần!', 'danger')
+        return redirect(url_for('main.menu'))
+
+    from openpyxl import load_workbook
+    wb = load_workbook(file)
+    ws = wb.active
+
+    # Đọc dữ liệu từ dòng 3 đến 8, cột B-G (theo mẫu: A1:A2 "Thứ", B1:G1 "Khung giờ", B2-G2 slot, A3-A8 thứ)
+    days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+    menu_data = {}
+    for i, day in enumerate(days):
+        row = i + 3  # Dòng 3-8
+        menu_data[day] = {}
+        for j, slot in enumerate(slots):
+            col = j + 2  # B=2, C=3, ... G=7
+            value = ws.cell(row=row, column=col).value
+            menu_data[day][slot] = value if value is not None else ""
+    import json
+    content = json.dumps(menu_data, ensure_ascii=False)
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if week:
+        week.content = content
+    else:
+        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        db.session.add(new_week)
+    db.session.commit()
+    flash('Đã import thực đơn từ Excel!', 'success')
+    return redirect(url_for('main.menu'))
+
+@main.route('/curriculum/import', methods=['POST'])
+def import_curriculum():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    file = request.files.get('excel_file')
+    week_number = request.form.get('week_number')
+    if not file:
+        flash('Vui lòng chọn file Excel!', 'danger')
+        return redirect(url_for('main.curriculum'))
+    if not week_number:
+        flash('Vui lòng nhập số tuần!', 'danger')
+        return redirect(url_for('main.curriculum'))
+
+    from openpyxl import load_workbook
+    wb = load_workbook(file)
+    ws = wb.active
+
+    # Đọc dữ liệu theo mẫu mới:
+    days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+    afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
+    curriculum_data = {}
+
+    # Sáng: dòng 4-9 (A4-A9)
+    for col_idx, day in enumerate(days):
+        curriculum_data[day] = {}
+        for slot_idx, slot in enumerate(morning_slots):
+            row = 4 + slot_idx  # dòng 4-9
+            col = 2 + col_idx   # B=2, C=3, ... G=7
+            value = ws.cell(row=row, column=col).value
+            curriculum_data[day][slot] = value if value is not None else ""
+        # Chiều: dòng 11-14 (A11-A14)
+        for slot_idx, slot in enumerate(afternoon_slots):
+            row = 11 + slot_idx  # dòng 11-14
+            col = 2 + col_idx
+            value = ws.cell(row=row, column=col).value
+            curriculum_data[day][slot] = value if value is not None else ""
+    import json
+    content = json.dumps(curriculum_data, ensure_ascii=False)
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if week:
+        week.content = content
+    else:
+        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        db.session.add(new_week)
+    db.session.commit()
+    flash('Đã import chương trình học từ Excel!', 'success')
+    return redirect(url_for('main.curriculum'))
+
+@main.route('/curriculum/export', methods=['GET'])
+def export_curriculum_template():
+    """Export file Excel mẫu chương trình học với định dạng nâng cao (merged cells, header, khung giờ, ...)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
+    from io import BytesIO
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Curriculum Template"
+
+    # Định nghĩa style
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+
+    # Header
+    ws.merge_cells('A1:A2')
+    ws['A1'] = "Khung giờ"
+    ws['A1'].font = bold
+    ws['A1'].alignment = center
+    ws['A1'].fill = fill
+    ws['A1'].border = border
+    ws.merge_cells('B1:G1')
+    ws['B1'] = "Thứ"
+    ws['B1'].font = bold
+    ws['B1'].alignment = center
+    ws['B1'].fill = fill
+    ws['B1'].border = border
+    days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+    for i, day in enumerate(days):
+        cell = ws.cell(row=2, column=2+i, value=day)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+
+    # Section: Buổi sáng
+    ws.merge_cells('A3:G3')
+    ws['A3'] = "Buổi sáng"
+    ws['A3'].font = bold
+    ws['A3'].alignment = center
+    ws['A3'].fill = fill
+    ws['A3'].border = border
+
+    morning_slots = [
+        ("7-8h", 4), ("8h-8h30", 5), ("8h30-9h", 6), ("9h-9h40", 7), ("9h40-10h30", 8), ("10h30-14h", 9)
+    ]
+    for label, row in morning_slots:
+        ws.cell(row=row, column=1, value=label).font = bold
+        ws.cell(row=row, column=1).alignment = center
+        ws.cell(row=row, column=1).border = border
+        for col in range(2, 8):
+            ws.cell(row=row, column=col).border = border
+
+    # Section: Buổi chiều
+    ws.merge_cells('A10:G10')
+    ws['A10'] = "Buổi chiều"
+    ws['A10'].font = bold
+    ws['A10'].alignment = center
+    ws['A10'].fill = fill
+    ws['A10'].border = border
+
+    afternoon_slots = [
+        ("14h15-15h", 11), ("15h-15h30", 12), ("15h45-16h", 13), ("16h-17h", 14)
+    ]
+    for label, row in afternoon_slots:
+        ws.cell(row=row, column=1, value=label).font = bold
+        ws.cell(row=row, column=1).alignment = center
+        ws.cell(row=row, column=1).border = border
+        for col in range(2, 8):
+            ws.cell(row=row, column=col).border = border
+
+    # Set column widths
+    ws.column_dimensions['A'].width = 16
+    for col in ['B','C','D','E','F','G']:
+        ws.column_dimensions[col].width = 18
+
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, download_name="curriculum_template.xlsx", as_attachment=True)
+
+@main.route('/menu/export', methods=['GET'])
+def export_menu_template():
+    """Export file Excel mẫu thực đơn với định dạng nâng cao (merged cells, header, khung giờ, ...)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
+    from io import BytesIO
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Menu Template"
+
+    # Định nghĩa style
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+    fill = PatternFill(start_color="C8E6C9", end_color="C8E6C9", fill_type="solid")
+
+    # Header
+    ws.merge_cells('A1:A2')
+    ws['A1'] = "Thứ"
+    ws['A1'].font = bold
+    ws['A1'].alignment = center
+    ws['A1'].fill = fill
+    ws['A1'].border = border
+    ws.merge_cells('B1:G1')
+    ws['B1'] = "Khung giờ"
+    ws['B1'].font = bold
+    ws['B1'].alignment = center
+    ws['B1'].fill = fill
+    ws['B1'].border = border
+    slots = ["Sáng", "Phụ sáng", "Tráng miệng", "Trưa", "Xế", "Xế chiều"]
+    for i, slot in enumerate(slots):
+        cell = ws.cell(row=2, column=2+i, value=slot)
+        cell.font = bold
+        cell.alignment = center
+        cell.fill = fill
+        cell.border = border
+
+    # Fill days
+    days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"]
+    for i, day in enumerate(days):
+        cell = ws.cell(row=3+i, column=1, value=day)
+        cell.font = bold
+        cell.alignment = center
+        cell.border = border
+        for col in range(2, 8):
+            ws.cell(row=3+i, column=col).border = border
+
+    # Set column widths
+    ws.column_dimensions['A'].width = 16
+    for col in ['B','C','D','E','F','G']:
+        ws.column_dimensions[col].width = 18
+
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(output, download_name="menu_template.xlsx", as_attachment=True)

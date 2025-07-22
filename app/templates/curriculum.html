@@ -22,6 +22,27 @@
         <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-success {% if mobile %}curriculum-btn-mobile{% endif %}">+ Thêm chương trình học</a>
         {% endif %}
     </div>
+    <div class="d-flex flex-row gap-2 mb-3">
+        <form action="/curriculum/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="file" name="excel_file" accept=".xlsx" required style="display:inline-block;">
+            <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:90px;display:inline-block;" title="Tuần">
+            <button type="submit" class="btn btn-primary">Import Excel</button>
+        </form>
+        <a href="/curriculum/export" class="btn btn-success">Export Excel</a>
+    </div>
+    <script>
+    // Auto-fill week number input with current week of year
+    document.addEventListener('DOMContentLoaded', function() {
+        var weekInput = document.getElementById('import-week-number');
+        if (weekInput) {
+            var now = new Date();
+            var onejan = new Date(now.getFullYear(),0,1);
+            var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+            weekInput.value = week;
+        }
+    });
+    </script>
     {% for week in curriculum %}
     <div class="card mb-4 shadow rounded-4 border-0">
         <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
