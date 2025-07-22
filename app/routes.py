@@ -294,7 +294,10 @@ def invoice():
     # Tính số ngày có mặt và số ngày vắng mặt không phép cho từng học sinh
     attendance_days = {student.id: 0 for student in students}
     absent_unexcused_days = {student.id: 0 for student in students}
+    valid_student_ids = set(attendance_days.keys())
     for r in records_raw:
+        if r.child_id not in valid_student_ids:
+            continue
         if r.status == 'Có mặt':
             attendance_days[r.child_id] += 1
         elif r.status == 'Vắng mặt không phép':
@@ -356,8 +359,8 @@ def invoice():
                         info_table.cell(1,1).text = student.birth_date or "-"
                         doc.add_paragraph('')
                         # Bảng tổng kết
-                        days = attendance_days[student.id]
-                        absents = absent_unexcused_days[student.id]
+                        days = attendance_days.get(student.id, 0)
+                        absents = absent_unexcused_days.get(student.id, 0)
                         age = calculate_age(student.birth_date) if student.birth_date else 0
                         if age == 1:
                             tuition = 1850000
@@ -430,8 +433,8 @@ def invoice():
         else:
             for student in students:
                 if str(student.id) in selected_ids:
-                    days_present = attendance_days[student.id]
-                    days_absent_unexcused = absent_unexcused_days[student.id]
+                    days_present = attendance_days.get(student.id, 0)
+                    days_absent_unexcused = absent_unexcused_days.get(student.id, 0)
                     # Học phí theo độ tuổi
                     if student.age == 1:
                         tuition = 1850000
