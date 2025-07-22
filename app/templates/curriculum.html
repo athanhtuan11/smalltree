@@ -22,6 +22,7 @@
         <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-success {% if mobile %}curriculum-btn-mobile{% endif %}">+ Thêm chương trình học</a>
         {% endif %}
     </div>
+    {% if session.get('role') in ['admin', 'teacher'] %}
     <div class="d-flex flex-row gap-2 mb-3">
         <form action="/curriculum/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -31,6 +32,7 @@
         </form>
         <a href="/curriculum/export" class="btn btn-success">Export Excel</a>
     </div>
+    {% endif %}
     <script>
     // Auto-fill week number input with current week of year
     document.addEventListener('DOMContentLoaded', function() {
