@@ -7,6 +7,7 @@
     @media (max-width: 576px) {
         .quill-editor { min-height:120px; }
     }
+    .gallery-img-edit { max-height: 120px; object-fit: cover; border-radius: 8px; margin: 4px; }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="fw-bold mb-4" style="color:#43a047;">Chỉnh sửa hoạt động</h2>
@@ -28,6 +29,26 @@
                 <img id="preview-img" src="#" alt="Preview" style="max-width:100%; border-radius:16px; filter: blur(4px) brightness(0.8);">
             </div>
         </div>
+        <div class="mb-3">
+            <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
+            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple>
+        </div>
+        {% if post.images and post.images|length > 0 %}
+        <div class="mb-3">
+            <label class="form-label">Ảnh hoạt động hiện tại</label>
+            <div class="d-flex flex-wrap align-items-center">
+                {% for img in post.images %}
+                <div class="position-relative me-2 mb-2">
+                    <img src="{{ url_for('static', filename=img.filepath) }}" class="gallery-img-edit shadow">
+                    <form method="POST" action="{{ url_for('main.delete_activity_image', image_id=img.id, title=post.title|replace(' ', '-')) }}" style="position:absolute;top:2px;right:2px;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px; font-size:0.9em;" onclick="return confirm('Xoá ảnh này?');">&times;</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
         <button type="submit" class="btn btn-success">Lưu thay đổi</button>
         <a href="{{ url_for('main.activities') }}" class="btn btn-secondary ms-2">Quay lại</a>
     </form>

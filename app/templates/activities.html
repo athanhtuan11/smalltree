@@ -33,6 +33,14 @@
                     <i class="bi bi-image {% if mobile %}activity-icon-mobile{% else %}activity-icon-desktop{% endif %}" style="color:#c8e6c9;"></i>
                 </div>
                 {% endif %}
+                {# Hiển thị gallery ảnh hoạt động nếu có #}
+                {% if post.images and post.images|length > 0 %}
+                <div class="d-flex flex-wrap gap-2 justify-content-center p-2">
+                    {% for img in post.images[:3] %}
+                        <img src="{{ url_for('static', filename=img.filepath) }}" alt="Ảnh hoạt động" style="height:80px; width:auto; border-radius:8px; object-fit:cover; box-shadow:0 2px 8px #e0e0e0;">
+                    {% endfor %}
+                </div>
+                {% endif %}
                 <div class="card-body {% if mobile %}activity-body-mobile{% else %}activity-body-desktop{% endif %}">
                     <h5 class="card-title fw-bold" style="color:#43a047;" class="{% if mobile %}activity-title-mobile{% else %}activity-title-desktop{% endif %}">{{ post.title }}</h5>
                     <p class="card-text" style="color:#388e3c;">{{ post.content|safe }}</p>

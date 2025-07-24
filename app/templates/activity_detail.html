@@ -12,6 +12,20 @@
                     <div class="mb-3" style="color:#388e3c; font-size:1.2em;">
                         {{ activity.content|safe }}
                     </div>
+                    {% if activity.gallery and activity.gallery|length > 0 %}
+                    <div class="mb-3">
+                        <h5 class="fw-bold mb-2" style="color:#388e3c;">Ảnh hoạt động</h5>
+                        <div class="row g-2">
+                            {% for img in activity.gallery %}
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <a href="{{ url_for('static', filename=img.filepath) }}" target="_blank">
+                                    <img src="{{ url_for('static', filename=img.filepath) }}" class="img-fluid rounded shadow-sm mb-2" style="max-height:140px; object-fit:cover; width:100%;" alt="Ảnh hoạt động">
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="card-footer bg-white border-0 text-end">
                     <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ activity.date_posted }}</small>

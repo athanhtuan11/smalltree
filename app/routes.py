@@ -93,11 +93,11 @@ def new_activity():
         activity_dir = os.path.join('app', 'static', 'images', 'activities', str(new_post.id))
         os.makedirs(activity_dir, exist_ok=True)
         # Lưu nhiều ảnh hoạt động
-        files = form.images.data
+        files = request.files.getlist('images')
         for file in files:
             if file and getattr(file, 'filename', None):
                 ext = os.path.splitext(file.filename)[1].lower()
-                if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
                     continue
                 safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
                 img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
@@ -110,13 +110,18 @@ def new_activity():
                     rel_path = f'images/activities/{new_post.id}/{img_filename}'
                     db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
                 except Exception as e:
+                    import traceback
+                    print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
+                    traceback.print_exc()
                     flash(f"Lỗi upload ảnh: {file.filename} - {e}", 'danger')
                     continue
         db.session.commit()
         flash('Đã đăng bài viết mới!', 'success')
         return redirect(url_for('main.activities'))
     mobile = is_mobile()
-    return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile)
+    from datetime import date
+    current_date_iso = date.today().isoformat()
+    return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile, current_date_iso=current_date_iso)
 
 @main.route('/activities/<title>/delete', methods=['POST'])
 def delete_activity(title):
@@ -126,6 +131,12 @@ def delete_activity(title):
     title = unquote(title.replace('-', ' '))
     post = Activity.query.filter_by(title=title).first()
     if post:
+        # Xoá toàn bộ ảnh gallery liên quan trước khi xoá bài viết
+        for img in post.images:
+            img_path = os.path.join('app', 'static', img.filepath)
+            if os.path.exists(img_path):
+                os.remove(img_path)
+            db.session.delete(img)
         db.session.delete(post)
         db.session.commit()
         flash('Đã xoá bài viết!', 'success')
@@ -142,11 +153,13 @@ def activity_detail(title):
     if not post:
         flash('Không tìm thấy bài viết!', 'danger')
         return redirect(url_for('main.activities'))
+    print('DEBUG: Gallery images:', post.images)
     activity = {
         'title': post.title,
         'content': post.description,
         'image': post.image,
-        'date_posted': post.date.strftime('%Y-%m-%d')
+        'date_posted': post.date.strftime('%Y-%m-%d'),
+        'gallery': post.images  # Thêm danh sách ảnh gallery
     }
     mobile = is_mobile()
     from app.forms import DeleteActivityForm
@@ -1370,3 +1383,19 @@ def export_menu_template():
     wb.save(output)
     output.seek(0)
     return send_file(output, download_name="menu_template.xlsx", as_attachment=True)
+
+@main.route('/activities/<title>/delete-image/<int:image_id>', methods=['POST'])
+def delete_activity_image(title, image_id):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    from urllib.parse import unquote
+    title = unquote(title.replace('-', ' '))
+    img = ActivityImage.query.get_or_404(image_id)
+    # Xoá file vật lý
+    img_path = os.path.join('app', 'static', img.filepath)
+    if os.path.exists(img_path):
+        os.remove(img_path)
+    db.session.delete(img)
+    db.session.commit()
+    flash('Đã xoá ảnh hoạt động!', 'success')
+    return redirect(url_for('main.edit_activity', title=title.replace(' ', '-')))
