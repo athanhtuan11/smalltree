@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage
-from app.forms import EditProfileForm, ActivityForm
+from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re
@@ -65,7 +65,7 @@ def contact():
 def new_activity():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    form = ActivityForm()
+    form = ActivityCreateForm()
     if form.validate_on_submit():
         title = form.title.data
         content = form.description.data
@@ -954,66 +954,84 @@ def delete_teacher_account(user_id):
     flash('Đã xoá tài khoản giáo viên!', 'success')
     return redirect(url_for('main.accounts'))
 
-@main.route('/activities/<title>/edit', methods=['GET', 'POST'])
-def edit_activity(title):
-    if session.get('role') not in ['admin', 'teacher']:
-        return redirect_no_permission()
-    from urllib.parse import unquote
-    title = unquote(title.replace('-', ' '))
-    post = Activity.query.filter_by(title=title).first()
-    if not post:
-        flash('Không tìm thấy bài viết để chỉnh sửa!', 'danger')
+@main.route('/activities/<int:id>/edit', methods=['GET', 'POST'])
+def edit_activity(id):
+    try:
+        if session.get('role') not in ['admin', 'teacher']:
+            return redirect_no_permission()
+        post = Activity.query.get_or_404(id)
+        if not post:
+            flash('Không tìm thấy bài viết để chỉnh sửa!', 'danger')
+            return redirect(url_for('main.activities'))
+        from app.forms import ActivityEditForm
+        form = ActivityEditForm()
+        if request.method == 'POST':
+            print('---[DEBUG] POST DATA---')
+            print('form.title:', form.title.data)
+            print('form.description:', form.description.data)
+            print('form.background:', form.background.data)
+            print('request.files:', request.files)
+            print('request.files.getlist("images"):', request.files.getlist('images'))
+            print('form.validate_on_submit:', form.validate_on_submit())
+        if request.method == 'POST' and form.validate_on_submit():
+            post.title = form.title.data
+            post.description = form.description.data
+            background_file = form.background.data
+            image_url = post.image
+            if background_file and getattr(background_file, 'filename', None):
+                allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.jfif'}
+                ext = os.path.splitext(background_file.filename)[1].lower()
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
+                if ext not in allowed_ext:
+                    flash('Chỉ cho phép tải lên các file ảnh có đuôi: .jpg, .jpeg, .png, .gif, .jfif!', 'danger')
+                    return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=is_mobile())
+                filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
+                save_path = os.path.join('app', 'static', 'images', filename)
+                img = Image.open(background_file)
+                img.thumbnail((1200, 800))
+                img.save(save_path)
+                image_url = url_for('static', filename=f'images/{filename}')
+                post.image = image_url
+            files = request.files.getlist('images')
+            activity_dir = os.path.join('app', 'static', 'images', 'activities', str(post.id))
+            os.makedirs(activity_dir, exist_ok=True)
+            for file in files:
+                if file and getattr(file, 'filename', None):
+                    ext = os.path.splitext(file.filename)[1].lower()
+                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
+                        flash(f"File {file.filename} không đúng định dạng ảnh!", 'danger')
+                        continue
+                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                    img_path = os.path.join(activity_dir, img_filename)
+                    try:
+                        file.stream.seek(0)
+                        img = Image.open(file.stream)
+                        img.thumbnail((1200, 800))
+                        img.save(img_path)
+                        rel_path = os.path.join('images', 'activities', str(post.id), img_filename).replace('\\', '/')
+                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=post.id))
+                    except Exception as e:
+                        print(f"[ERROR] Lỗi upload ảnh: {getattr(file, 'filename', 'unknown')} - {e}")
+                        import traceback
+                        traceback.print_exc()
+                        flash(f"Lỗi upload ảnh: {getattr(file, 'filename', 'unknown')} - {e}", 'danger')
+                        continue
+            db.session.commit()
+            flash('Đã cập nhật bài viết!', 'success')
+            return redirect(url_for('main.activities'))
+        mobile = is_mobile()
+        # Gán dữ liệu mặc định cho form khi GET
+        if request.method == 'GET':
+            form.title.data = post.title
+            form.description.data = post.description
+        return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=mobile)
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi render edit_activity: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Lỗi hệ thống khi chỉnh sửa hoạt động: {e}", 'danger')
         return redirect(url_for('main.activities'))
-    if request.method == 'POST':
-        post.title = request.form.get('title')
-        post.description = request.form.get('content')
-        background_file = request.files.get('background')
-        image_url = post.image
-        if background_file and background_file.filename:
-            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.jfif'}
-            ext = os.path.splitext(background_file.filename)[1].lower()
-            safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
-            if ext not in allowed_ext:
-                flash('Chỉ cho phép tải lên các file ảnh có đuôi: .jpg, .jpeg, .png, .gif, .jfif!', 'danger')
-                return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=is_mobile())
-            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
-            save_path = os.path.join('app', 'static', 'images', filename)
-            # Resize background
-            img = Image.open(background_file)
-            img.thumbnail((1200, 800))
-            img.save(save_path)
-            image_url = url_for('static', filename=f'images/{filename}')
-            post.image = image_url
-        # Lưu nhiều ảnh hoạt động
-        files = request.files.getlist('images')
-        activity_dir = os.path.join('app', 'static', 'images', 'activities', str(post.id))
-        os.makedirs(activity_dir, exist_ok=True)
-        for file in files:
-            if file and getattr(file, 'filename', None):
-                ext = os.path.splitext(file.filename)[1].lower()
-                if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                    continue
-                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                img_path = os.path.join(activity_dir, img_filename)
-                try:
-                    file.stream.seek(0)
-                    img = Image.open(file.stream)
-                    img.thumbnail((1200, 800))
-                    img.save(img_path)
-                    rel_path = f'images/activities/{post.id}/{img_filename}'
-                    db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=post.id))
-                except Exception as e:
-                    import traceback
-                    print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                    traceback.print_exc()
-                    flash(f"Lỗi upload ảnh: {file.filename} - {e}", 'danger')
-                    continue
-        db.session.commit()
-        flash('Đã cập nhật bài viết!', 'success')
-        return redirect(url_for('main.activities'))
-    mobile = is_mobile()
-    return render_template('edit_activity.html', post=post, title='Chỉnh sửa hoạt động', mobile=mobile)
 
 @main.route('/bmi-index', methods=['GET', 'POST'])
 def bmi_index():
@@ -1404,14 +1422,27 @@ def export_menu_template():
 
 @main.route('/activities/<int:id>/delete-image/<int:image_id>', methods=['POST'])
 def delete_activity_image(id, image_id):
-    if session.get('role') not in ['admin', 'teacher']:
-        return redirect_no_permission()
-    img = ActivityImage.query.get_or_404(image_id)
-    # Xoá file vật lý
-    img_path = os.path.join('app', 'static', img.filepath)
-    if os.path.exists(img_path):
-        os.remove(img_path)
-    db.session.delete(img)
-    db.session.commit()
-    flash('Đã xoá ảnh hoạt động!', 'success')
-    return redirect(url_for('main.edit_activity', id=id))
+    try:
+        if session.get('role') not in ['admin', 'teacher']:
+            print(f"[LOG] Không có quyền xoá ảnh hoạt động")
+            return redirect_no_permission()
+        img = ActivityImage.query.get_or_404(image_id)
+        print(f"[LOG] Đang xoá ảnh: id={image_id}, filepath={img.filepath}")
+        # Xoá file vật lý
+        img_path = os.path.join('app', 'static', img.filepath)
+        if os.path.exists(img_path):
+            os.remove(img_path)
+            print(f"[LOG] Đã xoá file vật lý: {img_path}")
+        else:
+            print(f"[LOG] File vật lý không tồn tại: {img_path}")
+        db.session.delete(img)
+        db.session.commit()
+        print(f"[LOG] Đã xoá bản ghi ActivityImage id={image_id} khỏi DB")
+        flash('Đã xoá ảnh hoạt động!', 'success')
+        return redirect(url_for('main.edit_activity', id=id))
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi xoá ảnh hoạt động: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Lỗi khi xoá ảnh hoạt động: {e}", 'danger')
+        return redirect(url_for('main.edit_activity', id=id))

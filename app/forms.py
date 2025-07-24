@@ -20,13 +20,20 @@ class EditProfileForm(FlaskForm):
     confirm = PasswordField('Xác nhận mật khẩu mới', validators=[Optional(), EqualTo('password', message='Mật khẩu xác nhận không khớp')])
     submit = SubmitField('Lưu thay đổi')
 
-class ActivityForm(FlaskForm):
+class ActivityCreateForm(FlaskForm):
     title = StringField('Tiêu đề', validators=[DataRequired()])
     description = TextAreaField('Nội dung', validators=[DataRequired()])
     date = StringField('Ngày', validators=[DataRequired()])
     background = FileField('Ảnh nền', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'])])
     images = MultipleFileField('Ảnh hoạt động', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'], 'Chỉ cho phép file ảnh!'), Optional()])
     submit = SubmitField('Đăng bài')
+
+class ActivityEditForm(FlaskForm):
+    title = StringField('Tiêu đề', validators=[DataRequired()])
+    description = TextAreaField('Nội dung', validators=[DataRequired()])
+    background = FileField('Ảnh nền', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'])])
+    images = MultipleFileField('Ảnh hoạt động', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'], 'Chỉ cho phép file ảnh!'), Optional()])
+    submit = SubmitField('Lưu thay đổi')
 
 class DeleteActivityForm(FlaskForm):
     pass
