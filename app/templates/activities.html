@@ -24,7 +24,7 @@
     <div class="row g-4">
         {% for post in activities %}
         <div class="col-12 col-md-6 col-lg-4">
-            <a href="/activities/{{ post.title|replace(' ', '-') }}" style="text-decoration:none; color:inherit;">
+            <a href="/activities/{{ post.id }}" style="text-decoration:none; color:inherit;">
             <div class="card h-100 shadow activity-card-mobile border-0 rounded-4">
                 {% if post.image %}
                 <img src="{{ post.image }}" class="card-img-top rounded-top-4 img-fluid {% if mobile %}activity-img-mobile{% else %}activity-img-desktop{% endif %}" alt="Ảnh hoạt động">
@@ -50,8 +50,8 @@
                     {% if session['role'] in ['admin', 'teacher'] %}
                     {% if mobile %}
                     <div class="d-flex flex-column gap-2 mt-2">
-                        <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-warning btn-sm w-100"><i class="bi bi-pencil-square"></i> Sửa</a>
-                        <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                        <a href="/activities/{{ post.id }}/edit" class="btn btn-warning btn-sm w-100"><i class="bi bi-pencil-square"></i> Sửa</a>
+                        <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;">
                             {{ form.hidden_tag() }}
                             <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
                                 <i class="bi bi-trash"></i> Xoá
@@ -59,8 +59,8 @@
                         </form>
                     </div>
                     {% else %}
-                    <a href="/activities/{{ post.title|replace(' ', '-') }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
-                    <form method="POST" action="/activities/{{ post.title|replace(' ', '-') }}/delete" style="display:inline;">
+                    <a href="/activities/{{ post.id }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
+                    <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;">
                         {{ form.hidden_tag() }}
                         <button type="submit" class="btn btn-sm btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
                             <i class="bi bi-trash"></i> Xoá
