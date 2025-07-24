@@ -142,21 +142,19 @@ def delete_activity(id):
     mobile = is_mobile()
     return redirect(url_for('main.activities', mobile=mobile))
 
-@main.route('/activities/<title>')
-def activity_detail(title):
-    from urllib.parse import unquote
-    title = unquote(title.replace('-', ' '))
-    post = Activity.query.filter_by(title=title).first()
+@main.route('/activities/<int:id>')
+def activity_detail(id):
+    post = Activity.query.get_or_404(id)
     if not post:
         flash('Không tìm thấy bài viết!', 'danger')
         return redirect(url_for('main.activities'))
-    print('DEBUG: Gallery images:', post.images)
     activity = {
+        'id': post.id,
         'title': post.title,
         'content': post.description,
         'image': post.image,
         'date_posted': post.date.strftime('%Y-%m-%d'),
-        'gallery': post.images  # Thêm danh sách ảnh gallery
+        'gallery': post.images
     }
     mobile = is_mobile()
     from app.forms import DeleteActivityForm
