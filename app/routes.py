@@ -761,18 +761,33 @@ def edit_profile():
 def student_list():
     students = Child.query.all()
     mobile = is_mobile()
-    show_sensitive = session.get('role') == 'admin'
+    role = session.get('role')
+    user_id = session.get('user_id')
     def mask_student(s):
+        if role == 'parent':
+            # Phụ huynh chỉ xem được thông tin con mình
+            if s.id != user_id:
+                return None
+            return {
+                'id': s.id,
+                'name': s.name,
+                'email': s.email,
+                'phone': s.phone,
+                'student_code': s.student_code,
+                'class_name': s.class_name,
+                'parent_contact': s.parent_contact,
+            }
+        # Giáo viên và admin xem được tất cả thông tin
         return {
             'id': s.id,
             'name': s.name,
-            'email': s.email if show_sensitive else 'Ẩn',
-            'phone': s.phone if show_sensitive else 'Ẩn',
-            'student_code': s.student_code if show_sensitive else 'Ẩn',
-            'class_name': s.class_name if show_sensitive else 'Ẩn',
-            'parent_contact': s.parent_contact if show_sensitive else 'Ẩn',
+            'email': s.email,
+            'phone': s.phone,
+            'student_code': s.student_code,
+            'class_name': s.class_name,
+            'parent_contact': s.parent_contact,
         }
-    masked_students = [mask_student(s) for s in students]
+    masked_students = [m for m in (mask_student(s) for s in students) if m]
     return render_template('student_list.html', students=masked_students, title='Danh sách học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
