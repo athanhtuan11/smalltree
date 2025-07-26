@@ -697,30 +697,40 @@ def profile():
     user = None
     role = session.get('role')
     user_id = session.get('user_id')
-    show_sensitive = role == 'admin'
     if role == 'parent':
         user = Child.query.get(user_id)
         role_display = 'Phụ huynh'
         full_name = user.parent_contact if user else ''
-    elif role == 'teacher':
-        user = Staff.query.get(user_id)
-        role_display = 'Giáo viên'
-        full_name = user.name if user else ''
-    elif role == 'admin':
-        user = None
-        role_display = 'Admin'
-        full_name = 'Admin'
-    if not user and role != 'admin':
+        info = {
+            'full_name': full_name,
+            'email': user.email if user else '',
+            'phone': user.phone if user else '',
+            'role_display': role_display,
+            'student_code': user.student_code if user else '',
+            'class_name': user.class_name if user else '',
+            'birth_date': user.birth_date if user else '',
+            'parent_contact': user.parent_contact if user else '',
+        }
+    elif role == 'teacher' or role == 'admin':
+        # Giáo viên và admin xem được tất cả thông tin của bản thân
+        user = Staff.query.get(user_id) if role == 'teacher' else None
+        role_display = 'Giáo viên' if role == 'teacher' else 'Admin'
+        full_name = user.name if user else 'Admin'
+        info = {
+            'full_name': full_name,
+            'email': user.email if user else '',
+            'phone': user.phone if user else '',
+            'role_display': role_display,
+            'student_code': '',
+            'class_name': getattr(user, 'position', '') if user else '',
+            'birth_date': '',
+            'parent_contact': '',
+        }
+    else:
         flash('Không tìm thấy thông tin tài khoản!', 'danger')
         return redirect(url_for('main.about'))
     mobile = is_mobile()
-    # Hide sensitive info for non-admins
-    return render_template('profile.html', user={
-        'full_name': full_name,
-        'email': user.email if user and show_sensitive else 'Ẩn',
-        'phone': user.phone if user and show_sensitive else 'Ẩn',
-        'role_display': role_display
-    }, mobile=mobile)
+    return render_template('profile.html', user=info, mobile=mobile)
 
 @main.route('/profile/edit', methods=['GET', 'POST'])
 def edit_profile():

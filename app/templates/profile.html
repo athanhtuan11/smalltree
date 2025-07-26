@@ -26,6 +26,12 @@
                     <dd class="col-sm-8">{{ user.role_display }}</dd>
                     <dt class="col-sm-4">Mã số học sinh</dt>
                     <dd class="col-sm-8">{{ user.student_code if user.student_code else '-' }}</dd>
+                    <dt class="col-sm-4">Lớp/Chức vụ</dt>
+                    <dd class="col-sm-8">{{ user.class_name if user.class_name else '-' }}</dd>
+                    <dt class="col-sm-4">Ngày sinh</dt>
+                    <dd class="col-sm-8">{{ user.birth_date if user.birth_date else '-' }}</dd>
+                    <dt class="col-sm-4">Phụ huynh</dt>
+                    <dd class="col-sm-8">{{ user.parent_contact if user.parent_contact else '-' }}</dd>
                 </dl>
             </div>
             <div class="card-footer text-end rounded-bottom-4">
