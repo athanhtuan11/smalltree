@@ -54,7 +54,9 @@ def about():
 @main.route('/gallery')
 def gallery():
     mobile = is_mobile()
-    return render_template('gallery.html', title='Gallery', mobile=mobile)
+    from app.models import ActivityImage
+    images = ActivityImage.query.order_by(ActivityImage.upload_date.desc()).all()
+    return render_template('gallery.html', title='Gallery', mobile=mobile, images=images)
 
 @main.route('/contact')
 def contact():
