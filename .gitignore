@@ -1,0 +1,2 @@
+# Ignore SQLite database
+app/site.db
