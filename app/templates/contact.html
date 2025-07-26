@@ -29,7 +29,7 @@
                         <a href="https://www.facebook.com/pemay95/" target="_blank">
                             <img src="/static/images/facebook_logo.png" alt="Facebook" class="rounded-circle border shadow {% if mobile %}contact-icon-mobile{% else %}contact-icon-desktop{% endif %}">
                         </a>
-                        <a href="#">
+                        <a href="#" onclick="showZaloQR(event)">
                             <img src="/static/images/zalo_logo.png" alt="Zalo" class="rounded-circle border shadow {% if mobile %}contact-icon-mobile{% else %}contact-icon-desktop{% endif %}">
                         </a>
                     </div>
@@ -43,10 +43,31 @@
                     <iframe src="https://www.google.com/maps?q=1+Rchai+2,+Đức+Trọng,+Lâm+Đồng&output=embed" width="100%" class="rounded shadow border {% if mobile %}contact-map-mobile{% else %}contact-map-desktop{% endif %}" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
                     <h5 class="mt-4 card-title text-primary {% if mobile %}contact-title-mobile{% else %}contact-title-desktop{% endif %}">Media</h5>
                     <img src="/static/images/logo.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow border mb-2 {% if mobile %}contact-logo-mobile{% else %}contact-logo-desktop{% endif %}">
-                    <img src="/static/images/school.jpg" alt="SmallTree Academy" class="img-fluid rounded shadow mt-3">
                 </div>
             </div>
         </div>
     </div>
 </div>
+<!-- Modal QR Zalo -->
+<div class="modal fade" id="zaloQRModal" tabindex="-1" aria-labelledby="zaloQRLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="zaloQRLabel">Quét mã QR Zalo/SĐT</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img src="/static/images/zalo_qr.png" alt="QR Zalo" style="max-width:220px;" class="mb-2 rounded shadow border">
+        <div class="fw-bold mt-2">Số điện thoại: 091 7618868</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function showZaloQR(e) {
+    e.preventDefault();
+    var modal = new bootstrap.Modal(document.getElementById('zaloQRModal'));
+    modal.show();
+}
+</script>
 {% endblock %}

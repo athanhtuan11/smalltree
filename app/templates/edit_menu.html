@@ -1,39 +1,60 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4">Chỉnh sửa thực đơn tuần {{ week.week_number }}</h2>
-    <form method="POST">
-        <input type="hidden" name="week_number" value="{{ week.week_number }}">
-        <table class="table table-bordered table-striped">
-            <thead class="thead-light">
-                <tr>
-                    <th>Khung giờ</th>
-                    <th>Thứ 2</th>
-                    <th>Thứ 3</th>
-                    <th>Thứ 4</th>
-                    <th>Thứ 5</th>
-                    <th>Thứ 6</th>
-                    <th>Thứ 7</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% set slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon'] %}
-                {% set slot_labels = ['Sáng', 'Ăn nhẹ', 'Tráng miệng', 'Trưa', 'Chiều', 'Ăn xế'] %}
-                {% set days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
-                {% for slot, slot_label in zip(slots, slot_labels) %}
-                <tr>
-                    <td><b>{{ slot_label }}</b></td>
-                    {% for day in days %}
-                    <td>
-                        <input type="text" class="form-control" name="content_{{ day }}_{{ slot }}" value="{{ data[day][slot] if data[day][slot] is defined else '' }}">
-                    </td>
+<style>
+    .menu-textarea { min-width:80px; min-height:2.2em; resize:vertical; font-size:1em; transition:all 0.2s; cursor:pointer; }
+    .menu-textarea:focus { outline:none; }
+    @media (max-width: 576px) {
+        .menu-textarea { min-width:100px; font-size:0.98em; padding:0.35em 0.5em; }
+    }
+</style>
+<div class="container-fluid mt-4 mb-4 px-0">
+    <h2 class="fw-bold mb-4" style="color:#43a047;">Chỉnh sửa thực đơn tuần {{ week.week_number }}</h2>
+    <form method="POST" id="editMenuForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label for="week_number" class="form-label fw-bold">Tuần</label>
+                <input type="text" class="form-control" id="week_number" name="week_number" value="{{ week.week_number }}" readonly>
+            </div>
+        </div>
+        <div class="table-responsive" style="margin-left:-12px; margin-right:-12px;">
+            <table class="table table-bordered align-middle bg-light">
+                <thead class="table-success">
+                    <tr>
+                        <th rowspan="2">Khung giờ</th>
+                        <th colspan="6" class="text-center">Thứ</th>
+                    </tr>
+                    <tr>
+                        <th>Thứ 2</th>
+                        <th>Thứ 3</th>
+                        <th>Thứ 4</th>
+                        <th>Thứ 5</th>
+                        <th>Thứ 6</th>
+                        <th>Thứ 7</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set slots = [
+                        ('Sáng', 'morning'),
+                        ('Phụ sáng', 'snack'),
+                        ('Tráng miệng', 'dessert'),
+                        ('Trưa', 'lunch'),
+                        ('Xế', 'afternoon'),
+                        ('Xế chiều', 'lateafternoon')
+                    ] %}
+                    {% for label, key in slots %}
+                    <tr>
+                        <td class="fw-bold text-success">{{ label }}</td>
+                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                        <td><textarea class="form-control menu-textarea" name="content_{{ day }}_{{ key }}">{{ data[day][key] if data[day][key] is defined else '' }}</textarea></td>
+                        {% endfor %}
+                    </tr>
                     {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <button type="submit" class="btn btn-success">Lưu thay đổi</button>
-        <a href="{{ url_for('main.menu') }}" class="btn btn-secondary">Quay lại</a>
+                </tbody>
+            </table>
+        </div>
+        <button type="submit" class="btn btn-success mt-3">Lưu thay đổi</button>
+        <a href="{{ url_for('main.menu') }}" class="btn btn-secondary mt-3 ms-2">Quay lại</a>
     </form>
 </div>
 {% endblock %}
