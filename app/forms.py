@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, SubmitField, PasswordField
-from wtforms.validators import DataRequired, Email, Optional, EqualTo
+from wtforms import StringField, TextAreaField, SubmitField, PasswordField, SelectField, FloatField, IntegerField
+from wtforms.validators import DataRequired, Email, Optional, EqualTo, Length, NumberRange
 from flask_wtf.file import FileField, FileAllowed, FileRequired
 from wtforms import MultipleFileField
 
@@ -37,3 +37,28 @@ class ActivityEditForm(FlaskForm):
 
 class DeleteActivityForm(FlaskForm):
     pass
+
+class SupplierForm(FlaskForm):
+    name = StringField('Tên cơ sở', validators=[DataRequired(), Length(min=1, max=200)])
+    address = TextAreaField('Địa chỉ', validators=[DataRequired(), Length(min=1, max=500)])
+    phone = StringField('Số điện thoại', validators=[Length(max=20)])
+    contact_person = StringField('Tên người liên hệ/giao hàng', validators=[Length(max=100)])
+    supplier_type = SelectField('Loại nhà cung cấp', 
+                               choices=[('fresh', 'Thực phẩm tươi sống'), ('dry', 'Thực phẩm khô')],
+                               validators=[DataRequired()])
+    registration_number = StringField('Số đăng ký kinh doanh', validators=[Length(max=100)])
+    food_safety_cert = StringField('Giấy chứng nhận ATTP', validators=[Length(max=200)])
+    submit = SubmitField('Lưu nhà cung cấp')
+
+class ProductForm(FlaskForm):
+    name = StringField('Tên sản phẩm', validators=[DataRequired(), Length(min=1, max=200)])
+    category = SelectField('Loại sản phẩm', 
+                          choices=[('fresh', 'Thực phẩm tươi sống'), ('dry', 'Thực phẩm khô')],
+                          validators=[DataRequired()])
+    supplier_id = SelectField('Nhà cung cấp', coerce=int, validators=[DataRequired()])
+    unit = StringField('Đơn vị tính', validators=[DataRequired(), Length(min=1, max=20)])
+    usual_quantity = FloatField('Số lượng thường dùng', validators=[NumberRange(min=0)])
+    storage_condition = StringField('Điều kiện bảo quản', validators=[Length(max=100)])
+    shelf_life_days = IntegerField('Thời hạn sử dụng (ngày)', validators=[NumberRange(min=0)])
+    notes = TextAreaField('Ghi chú')
+    submit = SubmitField('Lưu sản phẩm')

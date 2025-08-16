@@ -1,12 +1,24 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage
-from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product
+from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
+from app.menu_ai import get_ai_menu_suggestions
 from calendar import monthrange
 from datetime import datetime, date, timedelta
-import io, zipfile, os, json, re
+import io, zipfile, os, json, re, secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 from docx import Document
 from docx.shared import Pt
+
+# Enhanced Security imports
+from .security_utils import (
+    sanitize_input, validate_age_group, validate_menu_count, 
+    validate_ip_address, is_sql_injection_attempt, 
+    log_security_event, check_rate_limit, clean_rate_limit_storage
+)
+
+# Rate limiting cho AI endpoints - Security enhancement
+ai_request_timestamps = {}
+AI_RATE_LIMIT_SECONDS = 10  # Chỉ cho phép 1 request AI mỗi 10 giây/user
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -16,6 +28,17 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from PIL import Image
 
 main = Blueprint('main', __name__)
+
+# DEBUG: Test Curriculum AI import ngay khi khởi động
+try:
+    print("🔍 [STARTUP DEBUG] Testing curriculum AI import...")
+    from app.curriculum_ai import curriculum_ai_service
+    print("✅ [STARTUP SUCCESS] Curriculum AI imported successfully!")
+    print(f"📋 [STARTUP INFO] Service type: {type(curriculum_ai_service)}")
+except Exception as e:
+    print(f"❌ [STARTUP ERROR] Failed to import curriculum AI: {e}")
+    import traceback
+    print(f"📋 [STARTUP TRACEBACK] {traceback.format_exc()}")
 
 def redirect_no_permission():
     flash('Bạn không có quyền truy cập chức năng này!', 'danger')
@@ -609,6 +632,43 @@ def logout():
     session.clear()
     flash('Đã đăng xuất!', 'success')
     return redirect(url_for('main.about'))
+
+@main.route('/create-test-account')
+def create_test_account():
+    """Create test account for debugging purposes"""
+    # Check if gv1@gmail.com already exists
+    existing_staff = Staff.query.filter_by(email='gv1@gmail.com').first()
+    
+    if existing_staff:
+        return jsonify({
+            'status': 'exists',
+            'message': f'Account gv1@gmail.com already exists with position: {existing_staff.position}',
+            'staff_id': existing_staff.id
+        })
+    
+    # Create new staff account
+    hashed_password = generate_password_hash('123456')
+    
+    new_staff = Staff(
+        name='Giáo viên 1',
+        position='teacher',
+        contact_info='gv1@gmail.com',
+        email='gv1@gmail.com', 
+        phone='0123456789',
+        password=hashed_password
+    )
+    
+    db.session.add(new_staff)
+    db.session.commit()
+    
+    return jsonify({
+        'status': 'created',
+        'message': 'Test account created successfully',
+        'email': 'gv1@gmail.com',
+        'password': '123456',
+        'position': 'teacher',
+        'staff_id': new_staff.id
+    })
 
 @main.route('/accounts', methods=['GET', 'POST'])
 def accounts():
@@ -1473,3 +1533,1248 @@ def delete_activity_image(id, image_id):
         traceback.print_exc()
         flash(f"Lỗi khi xoá ảnh hoạt động: {e}", 'danger')
         return redirect(url_for('main.edit_activity', id=id))
+
+@main.route('/menu/<int:week_number>/export-food-safety', methods=['GET'])
+def export_food_safety_process(week_number):
+    """Xuất quy trình an toàn thực phẩm 3 bước theo template có sẵn với dữ liệu thực đơn."""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    # Lấy thực đơn của tuần
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    if not week:
+        flash('Không tìm thấy thực đơn!', 'danger')
+        return redirect(url_for('main.menu'))
+    
+    import json
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Border, Side, Alignment, PatternFill
+    from io import BytesIO
+    import zipfile
+    from datetime import datetime, timedelta
+    
+    menu_data = json.loads(week.content)
+    
+    # Tạo danh sách món ăn và nguyên liệu từ thực đơn
+    dishes = []
+    fresh_ingredients = []
+    dry_ingredients = []
+    
+    for day_data in menu_data.values():
+        for meal in day_data.values():
+            if meal:
+                dish_list = [dish.strip() for dish in meal.split(',') if dish.strip()]
+                dishes.extend(dish_list)
+                
+                # Phân loại nguyên liệu (dựa trên tên món)
+                for dish in dish_list:
+                    if any(x in dish.lower() for x in ['rau', 'cà', 'thịt', 'cá', 'tôm', 'trứng']):
+                        fresh_ingredients.append(dish)
+                    elif any(x in dish.lower() for x in ['gạo', 'bún', 'bánh', 'sữa', 'đường']):
+                        dry_ingredients.append(dish)
+    
+    # Loại bỏ trùng lặp
+    dishes = list(set(dishes))
+    fresh_ingredients = list(set(fresh_ingredients))
+    dry_ingredients = list(set(dry_ingredients))
+    
+    zip_buffer = BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w') as zipf:
+        
+        # BƯỚC 1.1: Tiếp nhận thực phẩm tươi - Theo đúng template gốc
+        wb1 = Workbook()
+        ws1 = wb1.active
+        ws1.title = "Kiểm tra thực phẩm tươi"
+        
+        today = datetime.now()
+        week_start = today - timedelta(days=today.weekday())
+        
+        # Định dạng border
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        
+        # Dòng 1: Header chính
+        ws1['A1'] = "Tên cơ sở:"
+        ws1['F1'] = "KIỂM TRA TRƯỚC KHI CHẾ BIẾN THỨC ĂN"
+        ws1['N1'] = "Số: 1246/QĐ - Bộ Y Tế"
+        ws1.merge_cells('F1:L1')
+        ws1['F1'].alignment = Alignment(horizontal='center', vertical='center')
+        ws1['F1'].font = Font(bold=True, size=12)
+        
+        # Dòng 2
+        ws1['A2'] = "Người kiểm tra:"
+        ws1['N2'] = "Mẫu số 1"
+        
+        # Dòng 3  
+        ws1['A3'] = f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 4
+        ws1['A4'] = "Địa điểm kiểm tra: LỚP MNDL NGÔI SAO NHỎ"
+        
+        # Dòng 6
+        ws1['A6'] = "I. Thực phẩm tươi sống, đông lạnh: thịt, cá, rau, củ, quả..."
+        ws1['N6'] = "Bước 1.1"
+        ws1['A6'].font = Font(bold=True)
+        
+        # Header bảng chính - dòng 7
+        headers_row1 = ['STT', 'Tên thực phẩm', '', 'Thời gian nhập\n(ngày, giờ)', 'Khối lượng\n(kg/lít)', 'Nơi cung cấp', '', 'Số chứng từ/\nSố hóa đơn', 'Giấy đăng ký\nvới thú y', 'Giấy kiểm dịch', 'Kiểm tra cảm quan\n(màu, mùi vị, trạng thái, bảo quản...)', '', 'Xét nghiệm nhanh (nếu có)\n(vi sinh, hóa lý)', '', 'Biện pháp xử lý/\nGhi chú']
+        for i, header in enumerate(headers_row1, 1):
+            cell = ws1.cell(row=7, column=i, value=header)
+            cell.font = Font(bold=True, size=9)
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+            cell.border = thin_border
+        
+        # Merge các cell cần thiết cho header
+        ws1.merge_cells('B7:C7')  # Tên thực phẩm
+        ws1.merge_cells('F7:G7')  # Nơi cung cấp
+        ws1.merge_cells('K7:L7')  # Kiểm tra cảm quan
+        ws1.merge_cells('M7:N7')  # Xét nghiệm nhanh
+        
+        # Sub-headers - dòng 8
+        sub_headers = ['', '', '', '', '', 'Tên cơ sở', 'Địa chỉ, điện thoại', 'Tên người giao hàng', '', '', 'Đạt', 'Không đạt', 'Đạt', 'Không đạt', '']
+        for i, header in enumerate(sub_headers, 1):
+            cell = ws1.cell(row=8, column=i, value=header)
+            cell.font = Font(bold=True, size=9)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="E6F3E6", end_color="E6F3E6", fill_type="solid")
+            cell.border = thin_border
+        
+        # Số thứ tự cột - dòng 9
+        for i in range(1, 16):
+            cell = ws1.cell(row=9, column=i, value=i)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+            cell.border = thin_border
+        
+        # Điền dữ liệu thực phẩm tươi
+        for i, ingredient in enumerate(fresh_ingredients[:20], 1):
+            row_num = 9 + i
+            data_row = [
+                i,  # STT
+                ingredient,  # Tên thực phẩm
+                '',  # Merge với B
+                f"{week_start.strftime('%d/%m/%Y')}, 05h:30",  # Thời gian nhập
+                '',  # Khối lượng - để trống
+                'Thực phẩm tươi sống',  # Tên cơ sở
+                '',  # Địa chỉ - để trống
+                '',  # Tên người giao hàng
+                '',  # Số chứng từ
+                '',  # Giấy đăng ký
+                'X',  # Đạt cảm quan
+                '',  # Không đạt cảm quan
+                '',  # Đạt xét nghiệm
+                '',  # Không đạt xét nghiệm
+                ''   # Ghi chú
+            ]
+            
+            for j, value in enumerate(data_row, 1):
+                cell = ws1.cell(row=row_num, column=j, value=value)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = thin_border
+                if j == 1:  # STT
+                    cell.font = Font(bold=True)
+                if j == 11 and value == 'X':  # Đánh dấu X
+                    cell.font = Font(bold=True, color="00AA00")
+            
+            # Merge cell cho tên thực phẩm
+            ws1.merge_cells(f'B{row_num}:C{row_num}')
+        
+        # Thiết lập độ rộng cột
+        column_widths = [5, 15, 5, 12, 10, 15, 15, 12, 10, 10, 8, 8, 8, 8, 12]
+        for i, width in enumerate(column_widths, 1):
+            ws1.column_dimensions[chr(64 + i)].width = width
+        
+        # Thiết lập chiều cao dòng
+        ws1.row_dimensions[7].height = 40
+        ws1.row_dimensions[8].height = 25
+        
+        # Chữ ký - dòng cuối
+        signature_row = 32
+        ws1.cell(row=signature_row, column=5, value="Bếp trưởng")
+        ws1.cell(row=signature_row, column=11, value="Chủ trường")
+        ws1.cell(row=signature_row+1, column=5, value="(Ký, ghi họ tên)")
+        ws1.cell(row=signature_row+1, column=11, value="(Ký, ghi họ tên)")
+        ws1.cell(row=signature_row+4, column=5, value="Nguyễn Thị Minh Tâm")
+        ws1.cell(row=signature_row+4, column=11, value="Nguyễn Thị Minh Tâm")
+        
+        # Định dạng chữ ký
+        for row in [signature_row, signature_row+1, signature_row+4]:
+            for col in [5, 11]:
+                cell = ws1.cell(row=row, column=col)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                if row == signature_row:
+                    cell.font = Font(bold=True)
+        
+        file1_buffer = BytesIO()
+        wb1.save(file1_buffer)
+        file1_buffer.seek(0)
+        zipf.writestr(f"Bước 1.1 - Tiếp nhận thực phẩm tươi - Tuần {week_number}.xlsx", file1_buffer.read())
+        
+        # BƯỚC 1.2: Tiếp nhận thực phẩm khô - Theo đúng template gốc với format đẹp
+        wb2 = Workbook()
+        ws2 = wb2.active
+        ws2.title = "Kiểm tra thực phẩm khô"
+        
+        # Dòng 1: Header chính
+        ws2['A1'] = "Tên cơ sở:"
+        ws2['E1'] = "KIỂM TRA TRƯỚC KHI CHẾ BIẾN THỨC ĂN"
+        ws2['N1'] = "Số: 1246/QĐ - Bộ Y Tế"
+        ws2.merge_cells('E1:L1')
+        ws2['E1'].alignment = Alignment(horizontal='center', vertical='center')
+        ws2['E1'].font = Font(bold=True, size=12)
+        
+        # Dòng 2
+        ws2['A2'] = "Người kiểm tra:"
+        ws2['N2'] = "Mẫu số 1"
+        
+        # Dòng 3  
+        ws2['A3'] = f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 4
+        ws2['A4'] = "Địa điểm kiểm tra: LỚP MNDL NGÔI SAO NHỎ"
+        
+        # Dòng 6
+        ws2['A6'] = "II. Thực phẩm khô và thực phẩm bao gói sẵn, phụ gia thực phẩm"
+        ws2['N6'] = "Bước 1.2"
+        ws2['A6'].font = Font(bold=True)
+        
+        # Header bảng chính - dòng 7
+        headers2_row1 = ['STT', 'Tên thực phẩm', '', 'Tên cơ sở\nsản xuất', 'Địa chỉ\nsản xuất', 'Thời gian nhập\n(ngày, giờ)', 'Khối lượng\n(kg/lít)', 'Nơi cung cấp', '', '', 'Hạn sử dụng', 'Điều kiện bảo quản\n(T° thường/ lạnh...)', 'Chứng từ,\nhóa đơn', 'Kiểm tra cảm quan\n(nhãn, bao bì, bảo quản, hạn sử dụng...)', '', 'Biện pháp xử lý/\nGhi chú']
+        for i, header in enumerate(headers2_row1, 1):
+            cell = ws2.cell(row=7, column=i, value=header)
+            cell.font = Font(bold=True, size=9)
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+            cell.border = thin_border
+        
+        # Merge các cell cần thiết cho header
+        ws2.merge_cells('B7:C7')  # Tên thực phẩm
+        ws2.merge_cells('H7:J7')  # Nơi cung cấp
+        ws2.merge_cells('N7:O7')  # Kiểm tra cảm quan
+        
+        # Sub-headers - dòng 8
+        sub_headers2 = ['', '', '', '', '', '', '', 'Tên cơ sở', 'Tên chủ giao hàng', 'Địa chỉ,\nđiện thoại', '', '', '', 'Đạt', 'Không đạt', '']
+        for i, header in enumerate(sub_headers2, 1):
+            cell = ws2.cell(row=8, column=i, value=header)
+            cell.font = Font(bold=True, size=9)
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.fill = PatternFill(start_color="E6F3E6", end_color="E6F3E6", fill_type="solid")
+            cell.border = thin_border
+        
+        # Số thứ tự cột - dòng 9
+        for i in range(1, 17):
+            cell = ws2.cell(row=9, column=i, value=i)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+            cell.border = thin_border
+        
+        # Điền dữ liệu thực phẩm khô
+        for i, ingredient in enumerate(dry_ingredients[:20], 1):
+            row_num = 9 + i
+            data_row = [
+                i,  # STT
+                ingredient,  # Tên thực phẩm
+                '',  # Merge với B
+                '',  # Tên cơ sở sản xuất - để trống
+                'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng',  # Địa chỉ sản xuất
+                f"{week_start.strftime('%d/%m/%Y')}, 07:00",  # Thời gian nhập
+                '',  # Khối lượng - để trống
+                'Tạp hoá Tám Loan',  # Tên cơ sở cung cấp
+                'Nguyễn Khắc Tám',  # Tên chủ giao hàng
+                'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng',  # Địa chỉ
+                'Đảm bảo',  # Hạn sử dụng
+                'Kho lương thực',  # Điều kiện bảo quản
+                '',  # Chứng từ - để trống
+                '',  # Đạt - để trống cho người dùng tick
+                '',  # Không đạt - để trống
+                ''   # Ghi chú
+            ]
+            
+            for j, value in enumerate(data_row, 1):
+                cell = ws2.cell(row=row_num, column=j, value=value)
+                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                cell.border = thin_border
+                if j == 1:  # STT
+                    cell.font = Font(bold=True)
+            
+            # Merge cell cho tên thực phẩm
+            ws2.merge_cells(f'B{row_num}:C{row_num}')
+        
+        # Thiết lập độ rộng cột
+        column_widths2 = [5, 12, 5, 12, 15, 12, 10, 12, 12, 15, 10, 12, 8, 8, 8, 12]
+        for i, width in enumerate(column_widths2, 1):
+            ws2.column_dimensions[chr(64 + i)].width = width
+        
+        # Thiết lập chiều cao dòng
+        ws2.row_dimensions[7].height = 40
+        ws2.row_dimensions[8].height = 25
+        
+        # Chữ ký - dòng cuối
+        signature_row2 = 32
+        ws2.cell(row=signature_row2, column=5, value="Bếp trưởng")
+        ws2.cell(row=signature_row2, column=11, value="Chủ trường")
+        ws2.cell(row=signature_row2+1, column=5, value="(Ký, ghi họ tên)")
+        ws2.cell(row=signature_row2+1, column=11, value="(Ký, ghi họ tên)")
+        ws2.cell(row=signature_row2+4, column=5, value="Nguyễn Thị Minh Tâm")
+        ws2.cell(row=signature_row2+4, column=11, value="Nguyễn Thị Minh Tâm")
+        
+        # Định dạng chữ ký
+        for row in [signature_row2, signature_row2+1, signature_row2+4]:
+            for col in [5, 11]:
+                cell = ws2.cell(row=row, column=col)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                if row == signature_row2:
+                    cell.font = Font(bold=True)
+        
+        file2_buffer = BytesIO()
+        wb2.save(file2_buffer)
+        file2_buffer.seek(0)
+        zipf.writestr(f"Bước 1.2 - Tiếp nhận thực phẩm khô - Tuần {week_number}.xlsx", file2_buffer.read())
+        
+        # BƯỚC 2.1: Kiểm tra khi chế biến thức ăn - Theo đúng template gốc
+        wb3 = Workbook()
+        ws3 = wb3.active
+        ws3.title = "Kiểm tra chế biến"
+        
+        # Dòng 1: Header chính
+        ws3['A1'] = "Tên cơ sở:"
+        ws3['D1'] = "KIỂM TRA KHI CHẾ BIẾN THỨC ĂN"
+        ws3['K1'] = "Số: 1246/QĐ - Bộ Y Tế"
+        ws3.merge_cells('D1:I1')
+        
+        # Dòng 2
+        ws3['A2'] = "Người kiểm tra:"
+        ws3['K2'] = "Mẫu số 2"
+        
+        # Dòng 3  
+        ws3['A3'] = f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 4
+        ws3['A4'] = "Địa điểm kiểm tra: LỚP MNDL NGÔI SAO NHỎ"
+        
+        # Dòng 5
+        ws3['K5'] = "Bước 2"
+        
+        # Header bảng chính - dòng 6
+        headers3_row1 = ['TT', 'Ca/bữa ăn (Bữa ăn, giờ ăn...)', 'Tên món ăn', 'Nguyên liệu chính để chế biến (tên, số lượng...)', 'Số lượng/ số suất ăn', 'Thời gian sơ chế xong (ngày, giờ)', 'Thời gian chế biến xong (ngày, giờ)', 'Kiểm tra điều kiện vệ sinh (từ thời điểm bắt đầu sơ chế, chế biến cho đến khi thức ăn được chế biến xong)', '', '', 'Kiểm tra cảm quan thức ăn (màu, mùi, vị, trạng thái, bảo quản...)', '', 'Biện pháp xử lý /Ghi chú']
+        for i, header in enumerate(headers3_row1, 1):
+            ws3.cell(row=6, column=i, value=header)
+            ws3.cell(row=6, column=i).font = Font(bold=True)
+        
+        # Sub-headers - dòng 7
+        ws3.cell(row=7, column=8, value="Người tham gia chế biến")
+        ws3.cell(row=7, column=9, value="Trang thiết bị dụng cụ") 
+        ws3.cell(row=7, column=10, value="Khu vực chế biến và phụ trợ")
+        ws3.cell(row=7, column=11, value="Đạt")
+        ws3.cell(row=7, column=12, value="Không đạt")
+        
+        # Số thứ tự cột - dòng 8
+        for i in range(1, 14):
+            ws3.cell(row=8, column=i, value=i)
+            ws3.cell(row=8, column=i).font = Font(bold=True)
+        
+        # Điền dữ liệu món ăn theo ca
+        row_num = 9
+        meal_times = {
+            'morning': ('Sáng', '6:00', '6:30'),
+            'lunch': ('Canh trưa', '9:20', '9:50'), 
+            'snack': ('Mặn trưa', '10:20', '10:50'),
+            'afternoon': ('Xế', '1:30', '2:00'),
+            'lateafternoon': ('Chiều', '3:30', '4:00'),
+            'dessert': ('Tráng miệng', '11:30', '12:00')
+        }
+        
+        stt = 1
+        # Duyệt qua từng ngày trong tuần
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        for day_key in days:
+            if day_key in menu_data:
+                for meal_key, (ca_name, start_time, end_time) in meal_times.items():
+                    if menu_data[day_key].get(meal_key):
+                        dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
+                        for dish in dishes:
+                            ws3.cell(row=row_num, column=1, value=stt)  # TT
+                            ws3.cell(row=row_num, column=2, value=ca_name)  # Ca/bữa ăn
+                            ws3.cell(row=row_num, column=3, value=dish)  # Tên món ăn
+                            ws3.cell(row=row_num, column=4, value="")  # Nguyên liệu - để trống cho người dùng điền
+                            ws3.cell(row=row_num, column=5, value="15")  # Số suất ăn
+                            ws3.cell(row=row_num, column=6, value=start_time)  # Thời gian sơ chế
+                            ws3.cell(row=row_num, column=7, value=end_time)  # Thời gian chế biến xong
+                            ws3.cell(row=row_num, column=8, value="Gọn gàng, sạch sẽ")  # Người tham gia
+                            ws3.cell(row=row_num, column=9, value="Đầy đủ, hợp vệ sinh")  # Trang thiết bị
+                            ws3.cell(row=row_num, column=10, value="Đảm bảo vệ sinh")  # Khu vực chế biến
+                            ws3.cell(row=row_num, column=11, value="X")  # Đạt
+                            ws3.cell(row=row_num, column=12, value="")  # Không đạt
+                            ws3.cell(row=row_num, column=13, value="")  # Ghi chú
+                            
+                            row_num += 1
+                            stt += 1
+                            
+                            if row_num > 30:  # Giới hạn số dòng
+                                break
+                    if row_num > 30:
+                        break
+                if row_num > 30:
+                    break
+        
+        # Chữ ký - dòng cuối
+        signature_row3 = max(row_num + 2, 32)
+        ws3.cell(row=signature_row3, column=4, value="Bếp trưởng")
+        ws3.cell(row=signature_row3, column=10, value="Chủ trường")
+        ws3.cell(row=signature_row3+1, column=4, value="(Ký, ghi họ tên)")
+        ws3.cell(row=signature_row3+1, column=10, value="(Ký, ghi họ tên)")
+        ws3.cell(row=signature_row3+4, column=4, value="Nguyễn Thị Minh Tâm")
+        ws3.cell(row=signature_row3+4, column=10, value="Nguyễn Thị Minh Tâm")
+        
+        file3_buffer = BytesIO()
+        wb3.save(file3_buffer)
+        file3_buffer.seek(0)
+        zipf.writestr(f"Bước 2.1 - Kiểm tra khi chế biến - Tuần {week_number}.xlsx", file3_buffer.read())
+        
+        # BƯỚC 2.2: Kiểm tra trước khi ăn - Theo đúng template gốc
+        wb4 = Workbook()
+        ws4 = wb4.active
+        ws4.title = "Kiểm tra trước khi ăn"
+        
+        # Dòng 1: Header chính
+        ws4['A1'] = "Tên cơ sở:"
+        ws4['B1'] = "LỚP MNDL NGÔI SAO NHỎ"
+        ws4['D1'] = "KIỂM TRA TRƯỚC KHI ĂN"
+        ws4['I1'] = "Số: 1246/QĐ - Bộ Y Tế"
+        ws4.merge_cells('D1:H1')
+        
+        # Dòng 2
+        ws4['A2'] = "Người kiểm tra:"
+        ws4['B2'] = "Nguyễn Thị Minh Tâm"
+        ws4['I2'] = "Mẫu số 3"
+        
+        # Dòng 3  
+        ws4['A3'] = f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 4
+        ws4['A4'] = "Địa điểm kiểm tra: LỚP MNDL NGÔI SAO NHỎ"
+        
+        # Dòng 5
+        ws4['I5'] = "Bước 3"
+        
+        # Header bảng chính - dòng 6
+        headers4_row1 = ['TT', 'Ca/bữa ăn (Bữa ăn, giờ ăn...)', 'Tên món ăn', 'Số lượng suất ăn', 'Thời gian chia món ăn xong (ngày, giờ)', 'Thời gian bắt đầu ăn (ngày, giờ)', 'Dụng cụ chia, chứa đựng, che đậy, bảo quản thức ăn', 'Kiểm tra cảm quan món ăn (màu, mùi, vị, trạng thái, bảo quản...)', '', 'Biện pháp xử lý /Ghi chú']
+        for i, header in enumerate(headers4_row1, 1):
+            ws4.cell(row=6, column=i, value=header)
+            ws4.cell(row=6, column=i).font = Font(bold=True)
+        
+        # Sub-headers - dòng 7
+        ws4.cell(row=7, column=8, value="Đạt")
+        ws4.cell(row=7, column=9, value="Không đạt")
+        
+        # Số thứ tự cột - dòng 8
+        for i in range(1, 11):
+            ws4.cell(row=8, column=i, value=i)
+            ws4.cell(row=8, column=i).font = Font(bold=True)
+        
+        # Điền dữ liệu món ăn theo ca
+        row_num = 9
+        meal_times_4 = {
+            'morning': ('Sáng', '6:30', '6:45'),
+            'lunch': ('Canh trưa', '10:00', '10:15'), 
+            'snack': ('Mặn trưa', '10:00', '10:15'),
+            'afternoon': ('Xế', '2:10', '2:30'),
+            'lateafternoon': ('Chiều', '3:30', '3:45'),
+            'dessert': ('Tráng miệng', '11:30', '11:45')
+        }
+        
+        stt = 1
+        # Duyệt qua từng ngày trong tuần
+        for day_key in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']:
+            if day_key in menu_data:
+                for meal_key, (ca_name, chia_time, eat_time) in meal_times_4.items():
+                    if menu_data[day_key].get(meal_key):
+                        dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
+                        for dish in dishes:
+                            ws4.cell(row=row_num, column=1, value=stt)  # TT
+                            ws4.cell(row=row_num, column=2, value=ca_name)  # Ca/bữa ăn
+                            ws4.cell(row=row_num, column=3, value=dish)  # Tên món ăn
+                            ws4.cell(row=row_num, column=4, value="15")  # Số suất ăn
+                            ws4.cell(row=row_num, column=5, value=chia_time)  # Thời gian chia món
+                            ws4.cell(row=row_num, column=6, value=eat_time)  # Thời gian bắt đầu ăn
+                            ws4.cell(row=row_num, column=7, value="Inox")  # Dụng cụ
+                            ws4.cell(row=row_num, column=8, value="X")  # Đạt
+                            ws4.cell(row=row_num, column=9, value="")  # Không đạt
+                            ws4.cell(row=row_num, column=10, value="")  # Ghi chú
+                            
+                            row_num += 1
+                            stt += 1
+                            
+                            if row_num > 30:  # Giới hạn số dòng
+                                break
+                    if row_num > 30:
+                        break
+                if row_num > 30:
+                    break
+        
+        # Chữ ký - dòng cuối
+        signature_row4 = max(row_num + 2, 32)
+        ws4.cell(row=signature_row4, column=3, value="Bếp trưởng")
+        ws4.cell(row=signature_row4, column=8, value="Phó hiệu trưởng")
+        ws4.cell(row=signature_row4+1, column=3, value="(Ký, ghi họ tên)")
+        ws4.cell(row=signature_row4+1, column=8, value="(Ký, ghi họ tên)")
+        ws4.cell(row=signature_row4+4, column=3, value="Nguyễn Thị Minh Tâm")
+        ws4.cell(row=signature_row4+4, column=8, value="Nguyễn Thị Minh Tâm")
+        
+        file4_buffer = BytesIO()
+        wb4.save(file4_buffer)
+        file4_buffer.seek(0)
+        zipf.writestr(f"Bước 2.2 - Kiểm tra trước khi ăn - Tuần {week_number}.xlsx", file4_buffer.read())
+        
+        # BƯỚC 3: Lưu hủy mẫu thực phẩm - Theo đúng template gốc
+        wb5 = Workbook()
+        ws5 = wb5.active
+        ws5.title = "Lưu hủy mẫu thực phẩm"
+        
+        # Dòng 1: Header chính
+        ws5['E1'] = "MẪU BIỂU THEO DÕI LƯU VÀ HỦY MẪU THỨC ĂN LƯU"
+        ws5['L1'] = "Số: 1246/QĐ - Bộ Y Tế"
+        ws5.merge_cells('E1:K1')
+        
+        # Dòng 2
+        ws5['A2'] = "Tên cơ sở:"
+        ws5['C2'] = "LỚP MNDL NGÔI SAO NHỎ"
+        ws5['L2'] = "Mẫu 5"
+        
+        # Dòng 3
+        ws5['A3'] = "Người kiểm tra:"
+        
+        # Dòng 4
+        ws5['A4'] = f"Ngày in: {week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 5
+        ws5['A5'] = "Địa điểm kiểm tra:"
+        ws5['D5'] = "LỚP MNDL NGÔI SAO NHỎ"
+        ws5['H5'] = "Ngày tiếp phẩm:"
+        ws5['J5'] = f"{week_start.strftime('%d/%m/%Y')}"
+        
+        # Dòng 6
+        ws5['L6'] = "Bước 3"
+        
+        # Header bảng chính - dòng 7
+        headers5_row1 = ['TT', 'Tên mẫu thức ăn', '', '', 'Bữa ăn (giờ ăn...)', 'Số lượng suất ăn', 'Khối lượng/ thể tích mẫu (gam/ml)', 'Dụng cụ chứa mẫu thức ăn lưu', 'Nhiệt độ bảo quản mẫu (°C)', 'Thời gian lấy mẫu (giờ, ngày, tháng, năm)', 'Thời gian hủy mẫu (giờ, ngày, tháng, năm)', 'Ghi chú (chất lượng mẫu thức ăn lưu...)', 'Người lưu mẫu (ký và ghi rõ họ tên)', 'Người hủy mẫu (ký và ghi rõ họ tên)']
+        for i, header in enumerate(headers5_row1, 1):
+            ws5.cell(row=7, column=i, value=header)
+            ws5.cell(row=7, column=i).font = Font(bold=True)
+        
+        # Số thứ tự cột - dòng 8
+        for i in range(1, 15):
+            ws5.cell(row=8, column=i, value=i)
+            ws5.cell(row=8, column=i).font = Font(bold=True)
+        
+        # Điền dữ liệu lưu hủy mẫu
+        row_num = 9
+        meal_times_5 = {
+            'morning': 'Sáng',
+            'lunch': 'Canh trưa', 
+            'snack': 'Mặn trưa',
+            'afternoon': 'Xế',
+            'lateafternoon': 'Chiều',
+            'dessert': 'Tráng miệng'
+        }
+        
+        stt = 1
+        # Duyệt qua từng ngày trong tuần
+        for day_key in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']:
+            if day_key in menu_data:
+                # Chỉ lưu mẫu các bữa chính
+                for meal_key in ['morning', 'lunch', 'snack', 'afternoon']:
+                    if menu_data[day_key].get(meal_key):
+                        dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
+                        for dish in dishes:
+                            ws5.cell(row=row_num, column=1, value=stt)  # TT
+                            ws5.cell(row=row_num, column=2, value=dish)  # Tên mẫu thức ăn
+                            ws5.cell(row=row_num, column=5, value=meal_times_5[meal_key])  # Bữa ăn
+                            ws5.cell(row=row_num, column=6, value="15")  # Số lượng suất ăn
+                            ws5.cell(row=row_num, column=7, value="100")  # Khối lượng mẫu
+                            ws5.cell(row=row_num, column=8, value="Hộp Thuỷ Tinh")  # Dụng cụ chứa
+                            ws5.cell(row=row_num, column=9, value="4")  # Nhiệt độ bảo quản
+                            ws5.cell(row=row_num, column=10, value=f"{week_start.strftime('%d/%m/%Y')}, 06:30")  # Thời gian lấy mẫu
+                            ws5.cell(row=row_num, column=11, value=f"{week_start.strftime('%d/%m/%Y')}, 06:30")  # Thời gian hủy mẫu
+                            ws5.cell(row=row_num, column=12, value="Đảm bảo")  # Ghi chú
+                            ws5.cell(row=row_num, column=13, value="Nguyễn Thị Minh Tâm")  # Người lưu mẫu
+                            ws5.cell(row=row_num, column=14, value="Nguyễn Thị Minh Tâm")  # Người hủy mẫu
+                            
+                            row_num += 1
+                            stt += 1
+                            
+                            if row_num > 30:  # Giới hạn số dòng
+                                break
+                    if row_num > 30:
+                        break
+                if row_num > 30:
+                    break
+        
+        # Chữ ký - dòng cuối
+        signature_row5 = max(row_num + 3, 35)
+        ws5.cell(row=signature_row5, column=2, value="Người quản lý cơ sở")
+        ws5.cell(row=signature_row5, column=6, value="Người thực hiện lưu mẫu")
+        ws5.cell(row=signature_row5, column=12, value="Người thực hiện huỷ mẫu")
+        ws5.cell(row=signature_row5+1, column=2, value="(Ký, ghi họ tên)")
+        ws5.cell(row=signature_row5+1, column=6, value="(Ký, ghi họ tên)")
+        ws5.cell(row=signature_row5+1, column=12, value="(Ký, ghi họ tên)")
+        ws5.cell(row=signature_row5+4, column=1, value="Nguyễn Thị Minh Tâm")
+        ws5.cell(row=signature_row5+4, column=6, value="Nguyễn Thị Minh Tâm")
+        ws5.cell(row=signature_row5+4, column=12, value="Nguyễn Thị Minh Tâm")
+        
+        file5_buffer = BytesIO()
+        wb5.save(file5_buffer)
+        file5_buffer.seek(0)
+        zipf.writestr(f"Bước 3 - Lưu hủy mẫu thực phẩm - Tuần {week_number}.xlsx", file5_buffer.read())
+    
+    zip_buffer.seek(0)
+    return send_file(
+        zip_buffer, 
+        download_name=f"Quy_trinh_3_buoc_tuan_{week_number}.zip", 
+        as_attachment=True,
+        mimetype='application/zip'
+    )
+
+# ================== QUẢN LÝ NHÀ CUNG CẤP VÀ SẢN PHẨM ==================
+
+@main.route('/suppliers')
+def suppliers():
+    """Danh sách nhà cung cấp"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    return render_template('suppliers.html', suppliers=suppliers)
+
+@main.route('/suppliers/new', methods=['GET', 'POST'])
+def new_supplier():
+    """Thêm nhà cung cấp mới"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    form = SupplierForm()
+    if form.validate_on_submit():
+        supplier = Supplier(
+            name=form.name.data,
+            address=form.address.data,
+            phone=form.phone.data,
+            contact_person=form.contact_person.data,
+            supplier_type=form.supplier_type.data,
+            registration_number=form.registration_number.data,
+            food_safety_cert=form.food_safety_cert.data,
+            created_date=datetime.utcnow()
+        )
+        db.session.add(supplier)
+        db.session.commit()
+        flash('Thêm nhà cung cấp thành công!', 'success')
+        return redirect(url_for('main.suppliers'))
+    
+    return render_template('new_supplier.html', form=form)
+
+@main.route('/suppliers/<int:supplier_id>/edit', methods=['GET', 'POST'])
+def edit_supplier(supplier_id):
+    """Sửa thông tin nhà cung cấp"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    supplier = Supplier.query.get_or_404(supplier_id)
+    form = SupplierForm(obj=supplier)
+    
+    if form.validate_on_submit():
+        form.populate_obj(supplier)
+        db.session.commit()
+        flash('Cập nhật nhà cung cấp thành công!', 'success')
+        return redirect(url_for('main.suppliers'))
+    
+    return render_template('edit_supplier.html', form=form, supplier=supplier)
+
+@main.route('/suppliers/<int:supplier_id>/delete', methods=['POST'])
+def delete_supplier(supplier_id):
+    """Xóa nhà cung cấp"""
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    
+    supplier = Supplier.query.get_or_404(supplier_id)
+    supplier.is_active = False
+    db.session.commit()
+    flash('Xóa nhà cung cấp thành công!', 'success')
+    return redirect(url_for('main.suppliers'))
+
+@main.route('/products')
+def products():
+    """Danh sách sản phẩm"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    products = Product.query.filter_by(is_active=True).join(Supplier).order_by(Product.category, Product.name).all()
+    return render_template('products.html', products=products)
+
+@main.route('/products/new', methods=['GET', 'POST'])
+def new_product():
+    """Thêm sản phẩm mới"""
+    current_role = session.get('role')
+    print(f"🔐 [DEBUG] User role: {current_role}, Session: {dict(session)}")
+    
+    if session.get('role') not in ['admin', 'teacher']:
+        print(f"🔐 [DEBUG] Access denied for role: {current_role}")
+        return redirect_no_permission()
+    
+    form = ProductForm()
+    # Lấy danh sách nhà cung cấp cho dropdown
+    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    
+    # Nếu chưa có supplier nào, tạo một supplier mẫu
+    if not suppliers:
+        default_supplier = Supplier(
+            name="Nhà cung cấp mặc định",
+            address="Địa chỉ cần cập nhật",
+            phone="0123456789",
+            contact_person="Người liên hệ",
+            supplier_type="fresh",
+            registration_number="",
+            food_safety_cert="",
+            created_date=datetime.utcnow()
+        )
+        db.session.add(default_supplier)
+        db.session.commit()
+        suppliers = [default_supplier]
+        flash('Đã tạo nhà cung cấp mặc định. Vui lòng cập nhật thông tin sau!', 'info')
+    
+    form.supplier_id.choices = [(s.id, s.name) for s in suppliers]
+    
+    if form.validate_on_submit():
+        product = Product(
+            name=form.name.data,
+            category=form.category.data,
+            supplier_id=form.supplier_id.data,
+            unit=form.unit.data,
+            usual_quantity=form.usual_quantity.data,
+            storage_condition=form.storage_condition.data,
+            shelf_life_days=form.shelf_life_days.data,
+            notes=form.notes.data,
+            created_date=datetime.utcnow()
+        )
+        db.session.add(product)
+        db.session.commit()
+        flash('Thêm sản phẩm thành công!', 'success')
+        return redirect(url_for('main.products'))
+    else:
+        # Debug form validation errors
+        if request.method == 'POST':
+            print(f"🔍 [DEBUG] Form validation failed!")
+            for field, errors in form.errors.items():
+                print(f"🔍 [DEBUG] Field '{field}': {errors}")
+            print(f"🔍 [DEBUG] Suppliers count: {len(suppliers)}")
+    
+    return render_template('new_product.html', form=form)
+
+@main.route('/products/<int:product_id>/edit', methods=['GET', 'POST'])
+def edit_product(product_id):
+    """Sửa thông tin sản phẩm"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    product = Product.query.get_or_404(product_id)
+    form = ProductForm(obj=product)
+    
+    # Lấy danh sách nhà cung cấp cho dropdown
+    suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
+    form.supplier_id.choices = [(s.id, s.name) for s in suppliers]
+    
+    if form.validate_on_submit():
+        form.populate_obj(product)
+        db.session.commit()
+        flash('Cập nhật sản phẩm thành công!', 'success')
+        return redirect(url_for('main.products'))
+    
+    return render_template('edit_product.html', form=form, product=product)
+
+@main.route('/products/<int:product_id>/delete', methods=['POST'])
+def delete_product(product_id):
+    """Xóa sản phẩm"""
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    
+    product = Product.query.get_or_404(product_id)
+    product.is_active = False
+    db.session.commit()
+    flash('Xóa sản phẩm thành công!', 'success')
+    return redirect(url_for('main.products'))
+
+# ============== AI Routes với LLM Farm ==============
+
+@main.route('/ai/menu-suggestions', methods=['POST'])
+def ai_menu_suggestions():
+    """API endpoint để lấy gợi ý thực đơn từ Gemini AI - SECURED & OPTIMIZED"""
+    
+    # Khôi phục role check với caching để tăng tốc
+    user_role = session.get('role')
+    if user_role not in ['admin', 'teacher']:
+        return jsonify({
+            'success': False,
+            'error': 'Không có quyền truy cập. Vui lòng đăng nhập với tài khoản admin hoặc giáo viên.'
+        }), 403
+    
+    # Enhanced Rate Limiting với security utils
+    user_ip = validate_ip_address(request.remote_addr)
+    rate_allowed, wait_seconds = check_rate_limit(f"ai_menu_{user_ip}", AI_RATE_LIMIT_SECONDS)
+    
+    if not rate_allowed:
+        log_security_event('RATE_LIMIT_EXCEEDED', f'User: {user_role}, Wait: {wait_seconds}s', user_ip)
+        return jsonify({
+            'success': False,
+            'error': f'Vui lòng chờ {wait_seconds} giây trước khi tạo thực đơn tiếp theo.'
+        }), 429
+    
+    # Clean up old rate limit entries periodically
+    clean_rate_limit_storage()
+    
+    print(f"� [SECURITY] Menu suggestions API called by {user_role} from {user_ip}")
+    
+    try:
+        # Input validation và sanitization  
+        if not request.json:
+            return jsonify({
+                'success': False,
+                'error': 'Dữ liệu request không hợp lệ'
+            }), 400
+            
+        # Sanitize và validate inputs
+        age_group = str(request.json.get('age_group', '2-3 tuổi')).strip()
+        available_ingredients = str(request.json.get('available_ingredients', '')).strip()
+        dietary_requirements = str(request.json.get('dietary_requirements', '')).strip()
+        
+        # Length limits để tránh abuse
+        if len(available_ingredients) > 1000:
+            return jsonify({
+                'success': False,
+                'error': 'Danh sách nguyên liệu quá dài (tối đa 1000 ký tự)'
+            }), 400
+            
+        if len(dietary_requirements) > 500:
+            return jsonify({
+                'success': False,
+                'error': 'Yêu cầu đặc biệt quá dài (tối đa 500 ký tự)'
+            }), 400
+        
+        # Validate age group
+        valid_age_groups = ['6-12 tháng', '1-2 tuổi', '2-3 tuổi', '3-4 tuổi', '4-5 tuổi', '1-5 tuổi']
+        if age_group not in valid_age_groups:
+            age_group = '2-3 tuổi'  # Default fallback
+        
+        count = 5  # Fixed count for consistency
+        
+        suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
+        
+        # Log successful operation
+        print(f"✅ [SUCCESS] Menu generated for {user_role} - Age: {age_group}, Ingredients: {len(available_ingredients)} chars")
+        
+        return jsonify({
+            'success': True,
+            'suggestions': suggestions,
+            'age_group': age_group,
+            'security_info': f"Generated securely for {user_role}"
+        })
+    except Exception as e:
+        # Enhanced error logging với security context
+        error_msg = str(e)
+        print(f"❌ [ERROR] Menu generation failed for {user_role} from {user_ip}: {error_msg}")
+        
+        # Don't expose internal errors to client
+        return jsonify({
+            'success': False,
+            'error': 'Đã xảy ra lỗi khi tạo thực đơn. Vui lòng thử lại sau.'
+        }), 500
+
+@main.route('/ai/create-menu-from-suggestions', methods=['POST'])
+def create_menu_from_ai_suggestions():
+    """Tạo thực đơn mới từ gợi ý AI"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'error': 'Không có quyền truy cập'}), 403
+    
+    try:
+        # Lấy data từ AI
+        ai_data = request.json
+        if not ai_data or not ai_data.get('success'):
+            return jsonify({'error': 'Dữ liệu AI không hợp lệ'}), 400
+            
+        # Tính tuần hiện tại
+        from datetime import datetime
+        now = datetime.now()
+        week_number = now.isocalendar()[1]  # Tuần trong năm
+        
+        # Kiểm tra tham số overwrite
+        overwrite = ai_data.get('overwrite', False)
+        
+        # Kiểm tra xem tuần này đã có thực đơn chưa
+        existing_menu = Curriculum.query.filter_by(week_number=week_number).first()
+        if existing_menu and not overwrite:
+            return jsonify({
+                'error': f'Tuần {week_number} đã có thực đơn. Bạn có muốn ghi đè không?',
+                'week_number': week_number,
+                'existing': True
+            }), 409
+        
+        # Trích xuất dữ liệu thực đơn từ AI suggestions
+        suggestions = ai_data.get('suggestions', [])
+        weekly_menu = extract_weekly_menu_from_suggestions(suggestions)
+        
+        if existing_menu and overwrite:
+            # Cập nhật thực đơn hiện có
+            existing_menu.content = json.dumps(weekly_menu, ensure_ascii=False)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Đã cập nhật thực đơn tuần {week_number} thành công',
+                'week_number': week_number,
+                'overwritten': True
+            })
+        else:
+            # Tạo thực đơn mới
+            new_menu = Curriculum(
+                week_number=week_number,
+                content=json.dumps(weekly_menu, ensure_ascii=False)
+            )
+            
+            db.session.add(new_menu)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Đã tạo thực đơn tuần {week_number} thành công',
+                'week_number': week_number
+            })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Create Menu Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def extract_weekly_menu_from_suggestions(suggestions):
+    """Trích xuất và chuyển đổi suggestions thành format menu database"""
+    menu_data = {}
+    days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+    
+    # Initialize empty menu
+    for day in days:
+        menu_data[day] = {}
+        for slot in slots:
+            menu_data[day][slot] = "Món ăn dinh dưỡng"
+    
+    current_day = None
+    current_day_index = -1
+    
+    for suggestion in suggestions:
+        suggestion = suggestion.strip()
+        
+        # Tìm ngày
+        if '**Thứ' in suggestion:
+            if 'Thứ 2' in suggestion:
+                current_day = 'mon'
+                current_day_index = 0
+            elif 'Thứ 3' in suggestion:
+                current_day = 'tue' 
+                current_day_index = 1
+            elif 'Thứ 4' in suggestion:
+                current_day = 'wed'
+                current_day_index = 2
+            elif 'Thứ 5' in suggestion:
+                current_day = 'thu'
+                current_day_index = 3
+            elif 'Thứ 6' in suggestion:
+                current_day = 'fri'
+                current_day_index = 4
+            elif 'Thứ 7' in suggestion:
+                current_day = 'sat'
+                current_day_index = 5
+            continue
+            
+        # Tìm món ăn theo khung giờ
+        if current_day and suggestion.startswith('•'):
+            suggestion = suggestion[1:].strip()  # Bỏ bullet point
+            
+            if suggestion.startswith('Sáng:'):
+                menu_data[current_day]['morning'] = suggestion[5:].strip()
+            elif suggestion.startswith('Phụ sáng:'):
+                menu_data[current_day]['snack'] = suggestion[9:].strip()
+            elif suggestion.startswith('Tráng miệng:'):
+                menu_data[current_day]['dessert'] = suggestion[12:].strip()
+            elif suggestion.startswith('Trưa:'):
+                menu_data[current_day]['lunch'] = suggestion[5:].strip()
+            elif suggestion.startswith('Xế:'):
+                menu_data[current_day]['afternoon'] = suggestion[3:].strip()
+            elif suggestion.startswith('Xế chiều:'):
+                menu_data[current_day]['lateafternoon'] = suggestion[9:].strip()
+    
+    return menu_data
+
+
+# ============== CURRICULUM AI Routes ==============
+
+@main.route('/ai/curriculum-suggestions', methods=['POST'])
+def ai_curriculum_suggestions():
+    """API endpoint để lấy gợi ý chương trình học từ Gemini AI"""
+    
+    # Role check
+    user_role = session.get('role')
+    if user_role not in ['admin', 'teacher']:
+        return jsonify({
+            'success': False,
+            'error': 'Không có quyền truy cập. Vui lòng đăng nhập với tài khoản admin hoặc giáo viên.'
+        }), 403
+    
+    # Rate Limiting
+    user_ip = validate_ip_address(request.remote_addr)
+    rate_allowed, wait_seconds = check_rate_limit(f"ai_curriculum_{user_ip}", AI_RATE_LIMIT_SECONDS)
+    
+    if not rate_allowed:
+        log_security_event('RATE_LIMIT_EXCEEDED', f'Curriculum User: {user_role}, Wait: {wait_seconds}s', user_ip)
+        return jsonify({
+            'success': False,
+            'error': f'Quá nhiều yêu cầu. Vui lòng chờ {wait_seconds} giây trước khi thử lại.'
+        }), 429
+    
+    try:
+        # Get and validate input
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Không có dữ liệu đầu vào'}), 400
+        
+        # Sanitize inputs
+        age_group = sanitize_input(data.get('age_group', '2-3 tuổi'))
+        week_number = int(data.get('week_number', 1))
+        themes = sanitize_input(data.get('themes', ''))
+        special_focus = sanitize_input(data.get('special_focus', ''))
+        
+        # Length limits để tránh abuse
+        if len(themes) > 500:
+            return jsonify({
+                'success': False,
+                'error': 'Chủ đề quá dài (tối đa 500 ký tự)'
+            }), 400
+            
+        if len(special_focus) > 500:
+            return jsonify({
+                'success': False,
+                'error': 'Trọng tâm đặc biệt quá dài (tối đa 500 ký tự)'
+            }), 400
+        
+        # Validate age group - sử dụng cùng logic như Menu AI
+        valid_age_groups = ['1-2 tuổi', '2-3 tuổi', '3-4 tuổi', '4-5 tuổi']
+        if age_group not in valid_age_groups:
+            age_group = '2-3 tuổi'  # Default fallback
+        
+        # Validate week number
+        if not (1 <= week_number <= 53):
+            return jsonify({'success': False, 'error': 'Số tuần phải từ 1-53'}), 400
+        
+        # Log security event
+        log_security_event('CURRICULUM_AI_REQUEST', f'User: {user_role}, Age: {age_group}, Week: {week_number}', user_ip)
+        
+        # Import curriculum AI service
+        from app.curriculum_ai import curriculum_ai_service
+        
+        # Generate curriculum
+        curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
+            age_group=age_group,
+            week_number=week_number,
+            themes=themes if themes else None,
+            special_focus=special_focus if special_focus else None
+        )
+        
+        # Log success
+        print(f"✅ [SUCCESS] Curriculum generated for {user_role} - Age: {age_group}, Week: {week_number}")
+        
+        return jsonify({
+            'success': True,
+            'curriculum_data': curriculum_data,
+            'age_group': age_group,
+            'week_number': week_number
+        })
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"❌ [ERROR] Curriculum generation failed for {user_role} from {user_ip}: {error_msg}")
+        log_security_event('CURRICULUM_AI_ERROR', f'Error: {error_msg}', user_ip)
+        
+        # Enhanced error handling like Menu AI
+        if "quota" in error_msg.lower() or "429" in error_msg:
+            return jsonify({
+                'success': False,
+                'error': 'API đã hết quota. Vui lòng thử lại sau hoặc kiểm tra cấu hình API key.'
+            }), 429
+        else:
+            # Don't expose internal errors to client
+            return jsonify({
+                'success': False,
+                'error': 'Đã xảy ra lỗi khi tạo chương trình học. Vui lòng thử lại sau.'
+            }), 500
+
+
+@main.route('/ai/create-curriculum-from-suggestions', methods=['POST'])
+def ai_create_curriculum_from_suggestions():
+    """API endpoint để tạo chương trình học từ suggestions AI"""
+    
+    # Role check
+    user_role = session.get('role')
+    if user_role not in ['admin', 'teacher']:
+        return jsonify({
+            'success': False,
+            'error': 'Không có quyền truy cập'
+        }), 403
+    
+    try:
+        data = request.get_json()
+        if not data or 'curriculum_data' not in data:
+            return jsonify({'success': False, 'error': 'Không có dữ liệu chương trình học'}), 400
+        
+        curriculum_data = data['curriculum_data']
+        week_number = curriculum_data.get('week_info', {}).get('week_number', 1)
+        
+        # Check if week already exists
+        existing = Curriculum.query.filter_by(week_number=week_number).first()
+        
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': f'Tuần {week_number} đã tồn tại. Vui lòng chọn tuần khác hoặc xóa tuần cũ trước.'
+            }), 409
+        else:
+            # Convert AI curriculum data to database format
+            curriculum_content = curriculum_data.get('curriculum', {})
+            
+            # Create new curriculum
+            new_curriculum = Curriculum(
+                week_number=week_number,
+                content=json.dumps(curriculum_content, ensure_ascii=False)
+            )
+            
+            db.session.add(new_curriculum)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'Đã tạo chương trình học tuần {week_number} thành công',
+                'week_number': week_number
+            })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Create Curriculum Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@main.route('/debug-curriculum')
+def debug_curriculum():
+    """Debug curriculum AI import"""
+    try:
+        # Step 1: Test import
+        print("🔍 [DEBUG] Step 1: Testing import...")
+        from app.curriculum_ai import curriculum_ai_service
+        print("✅ [DEBUG] Import successful")
+        
+        # Step 2: Test service object
+        print("🔍 [DEBUG] Step 2: Testing service object...")
+        service_type = type(curriculum_ai_service).__name__
+        print(f"✅ [DEBUG] Service type: {service_type}")
+        
+        return f"""
+        <h2>🔍 Curriculum AI Debug</h2>
+        <p>✅ Import thành công</p>
+        <p>✅ Service type: {service_type}</p>
+        <p><a href='/test-curriculum-ai'>Test chức năng AI</a></p>
+        <p><a href='/login'>Đăng nhập để test full</a></p>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"❌ [DEBUG ERROR] {str(e)}")
+        print(f"📋 [TRACEBACK] {error_detail}")
+        
+        return f"""
+        <h2>❌ Curriculum AI Debug Error</h2>
+        <p><strong>Error:</strong> {str(e)}</p>
+        <p><strong>Type:</strong> {type(e).__name__}</p>
+        <pre>{error_detail}</pre>
+        """
+
+@main.route('/test-curriculum-ai')
+def test_curriculum_ai():
+    """Test curriculum AI service trực tiếp"""
+    try:
+        # Import curriculum AI service
+        from app.curriculum_ai import curriculum_ai_service
+        
+        print("🧪 [TEST] Testing curriculum AI service...")
+        
+        # Test với parameters đơn giản
+        result = curriculum_ai_service.generate_weekly_curriculum(
+            age_group="2-3 tuổi",
+            week_number=1,
+            themes="Động vật",
+            special_focus="Phát triển ngôn ngữ"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Curriculum AI service hoạt động bình thường',
+            'result_keys': list(result.keys()) if result else None
+        })
+        
+    except Exception as e:
+        print(f"❌ [TEST ERROR] {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_type': type(e).__name__
+        }), 500
+
+@main.route('/create-test-teacher')
+def create_test_teacher():
+    """Tạo tài khoản giáo viên test"""
+    from werkzeug.security import generate_password_hash
+    
+    # Kiểm tra xem đã có giáo viên test chưa
+    existing = Staff.query.filter_by(email='gv1@gmail.com').first()
+    if existing:
+        return f"Tài khoản gv1@gmail.com đã tồn tại! ID: {existing.id}, Position: {existing.position}"
+    
+    # Tạo giáo viên mới
+    teacher = Staff(
+        name='Giáo viên Test',
+        position='teacher',
+        contact_info='gv1@gmail.com',
+        email='gv1@gmail.com',
+        phone='0123456789',
+        password=generate_password_hash('123456')
+    )
+    
+    db.session.add(teacher)
+    db.session.commit()
+    
+    return f"✅ Đã tạo tài khoản giáo viên test:<br>Email: gv1@gmail.com<br>Password: 123456<br>ID: {teacher.id}<br><a href='/login'>Đăng nhập ngay</a>"
+
+@main.route('/ai-dashboard')
+def ai_dashboard():
+    """Trang dashboard AI với các tính năng LLM Farm"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    return render_template('ai_dashboard.html')

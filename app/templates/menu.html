@@ -31,6 +31,12 @@
             <button type="submit" class="btn btn-primary">Import Excel</button>
         </form>
         <a href="/menu/export" class="btn btn-success">Export Excel</a>
+        <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning">
+            <i class="bi bi-truck"></i> Quản lý nhà cung cấp
+        </a>
+        <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info">
+            <i class="fas fa-robot"></i> AI Dashboard
+        </a>
     </div>
     {% endif %}
     <script>
@@ -52,6 +58,7 @@
             {% if session.get('role') in ['admin', 'teacher'] %}
                 <div class="d-flex flex-column flex-md-row gap-2 menu-btn-group-mobile">
                     <a href="{{ url_for('main.edit_menu', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}menu-btn-mobile{% endif %}">Chỉnh sửa</a>
+                    <a href="{{ url_for('main.export_food_safety_process', week_number=week.week_number) }}" class="btn btn-outline-info btn-sm {% if mobile %}menu-btn-mobile{% endif %}">Xuất quy trình 3 bước</a>
                     <form method="POST" action="{{ url_for('main.delete_menu', week_number=week.week_number) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá thực đơn này?');">
                          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm {% if mobile %}menu-btn-mobile{% endif %}">Xoá</button>

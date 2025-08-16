@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Quản lý nhà cung cấp & sản phẩm{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-truck"></i> Quản lý nhà cung cấp & sản phẩm</h2>
+                <div class="btn-group">
+                    <a href="{{ url_for('main.new_supplier') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Thêm nhà cung cấp
+                    </a>
+                    <a href="{{ url_for('main.products') }}" class="btn btn-success">
+                        <i class="fas fa-box"></i> Quản lý sản phẩm
+                    </a>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Danh sách nhà cung cấp</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>STT</th>
+                                    <th>Tên cơ sở</th>
+                                    <th>Loại</th>
+                                    <th>Điện thoại</th>
+                                    <th>Người liên hệ</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for supplier in suppliers %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ supplier.name }}</strong>
+                                        <br><small class="text-muted">{{ supplier.address[:50] }}...</small>
+                                    </td>
+                                    <td>
+                                        {% if supplier.supplier_type == 'fresh' %}
+                                            <span class="badge bg-success">Tươi sống</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Khô</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ supplier.phone or '-' }}</td>
+                                    <td>{{ supplier.contact_person or '-' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('main.edit_supplier', supplier_id=supplier.id) }}" 
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% if session.role == 'admin' %}
+                                            <form method="POST" action="{{ url_for('main.delete_supplier', supplier_id=supplier.id) }}" 
+                                                  style="display: inline;"
+                                                  onsubmit="return confirm('Bạn có chắc muốn xóa nhà cung cấp này?')">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                                        <p class="text-muted mb-0">Chưa có nhà cung cấp. <a href="{{ url_for('main.new_supplier') }}">Thêm ngay</a>.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Hướng dẫn:</h6>
+                        <p class="mb-0 small">
+                            1. Thêm nhà cung cấp trước<br>
+                            2. Sau đó thêm sản phẩm cho từng nhà cung cấp<br>
+                            3. Thông tin sẽ tự động điền vào file Excel xuất ra
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body text-center p-3">
+                            <h6><i class="fas fa-chart-pie"></i> Thống kê</h6>
+                            <div class="row">
+                                <div class="col-6">
+                                    <h4 class="text-success mb-0">{{ suppliers|selectattr('supplier_type', 'equalto', 'fresh')|list|length }}</h4>
+                                    <small>Tươi sống</small>
+                                </div>
+                                <div class="col-6">
+                                    <h4 class="text-info mb-0">{{ suppliers|selectattr('supplier_type', 'equalto', 'dry')|list|length }}</h4>
+                                    <small>Khô</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

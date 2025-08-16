@@ -58,3 +58,31 @@ class BmiRecord(db.Model):
     weight = db.Column(db.Float, nullable=False)
     height = db.Column(db.Float, nullable=False)
     bmi = db.Column(db.Float, nullable=False)
+
+class Supplier(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # Tên cơ sở
+    address = db.Column(db.String(500), nullable=False)  # Địa chỉ
+    phone = db.Column(db.String(20))  # Số điện thoại
+    contact_person = db.Column(db.String(100))  # Tên người liên hệ/giao hàng
+    supplier_type = db.Column(db.String(50), nullable=False)  # 'fresh' hoặc 'dry'
+    registration_number = db.Column(db.String(100))  # Số đăng ký kinh doanh
+    food_safety_cert = db.Column(db.String(200))  # Giấy chứng nhận ATTP
+    created_date = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+
+class Product(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # Tên sản phẩm
+    category = db.Column(db.String(50), nullable=False)  # 'fresh' hoặc 'dry'
+    supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=False)
+    unit = db.Column(db.String(20), nullable=False)  # kg, lít, gói...
+    usual_quantity = db.Column(db.Float)  # Số lượng thường dùng
+    storage_condition = db.Column(db.String(100))  # Điều kiện bảo quản
+    shelf_life_days = db.Column(db.Integer)  # Thời hạn sử dụng (ngày)
+    notes = db.Column(db.Text)  # Ghi chú
+    created_date = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    
+    # Relationship
+    supplier = db.relationship('Supplier', backref=db.backref('products', lazy=True))
