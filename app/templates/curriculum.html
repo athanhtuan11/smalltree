@@ -71,7 +71,7 @@
                     <thead class="table-success">
                         <tr>
                             <th rowspan="2">Khung giờ</th>
-                            <th colspan="6" class="text-center">Thứ</th>
+                            <th colspan="5" class="text-center">Thứ</th>
                         </tr>
                         <tr>
                             <th>Thứ 2</th>
@@ -79,11 +79,10 @@
                             <th>Thứ 4</th>
                             <th>Thứ 5</th>
                             <th>Thứ 6</th>
-                            <th>Thứ 7</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi sáng</td></tr>
+                        <tr class="table-info"><td colspan="6" class="fw-bold text-success text-center">Buổi sáng</td></tr>
                         {% set morning_slots = [
                             ('7-8h', 'morning_1'),
                             ('8h-8h30', 'morning_2'),
@@ -95,12 +94,12 @@
                         {% for label, key in morning_slots %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
                             <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
                             {% endfor %}
                         </tr>
                         {% endfor %}
-                        <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi chiều</td></tr>
+                        <tr class="table-info"><td colspan="6" class="fw-bold text-success text-center">Buổi chiều</td></tr>
                         {% set afternoon_slots = [
                             ('14h15-15h', 'afternoon_1'),
                             ('15h-15h30', 'afternoon_2'),
@@ -110,7 +109,7 @@
                         {% for label, key in afternoon_slots %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
                             <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
                             {% endfor %}
                         </tr>

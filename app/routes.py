@@ -9,6 +9,23 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from docx import Document
 from docx.shared import Pt
 
+# Enhanced AI imports - Multi-AI support
+try:
+    from app.enhanced_menu_ai import get_ai_menu_suggestions_enhanced
+    ENHANCED_MENU_AI_AVAILABLE = True
+    print("✅ Enhanced Menu AI imported successfully")
+except ImportError as e:
+    ENHANCED_MENU_AI_AVAILABLE = False
+    print(f"⚠️ Enhanced Menu AI not available: {e}")
+
+try:
+    from app.enhanced_curriculum_ai import get_ai_curriculum_suggestions_enhanced  
+    ENHANCED_CURRICULUM_AI_AVAILABLE = True
+    print("✅ Enhanced Curriculum AI imported successfully")
+except ImportError as e:
+    ENHANCED_CURRICULUM_AI_AVAILABLE = False
+    print(f"⚠️ Enhanced Curriculum AI not available: {e}")
+
 # Enhanced Security imports
 from .security_utils import (
     sanitize_input, validate_age_group, validate_menu_count, 
@@ -2372,7 +2389,24 @@ def ai_menu_suggestions():
         
         count = 5  # Fixed count for consistency
         
-        suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
+        # 🚀 TRY ENHANCED MULTI-AI FIRST!
+        try:
+            if ENHANCED_MENU_AI_AVAILABLE:
+                print(f"🚀 [MULTI-AI] Using Enhanced Menu AI with Groq fallback for {user_role}")
+                suggestions = get_ai_menu_suggestions_enhanced(
+                    age_group=age_group,
+                    dietary_requirements=dietary_requirements,
+                    available_ingredients=available_ingredients,
+                    use_multi_ai=True  # Enable Multi-AI fallback
+                )
+                print(f"✅ [MULTI-AI SUCCESS] Enhanced Menu AI completed for {user_role}")
+            else:
+                print(f"🔄 [FALLBACK] Using original Menu AI for {user_role}")
+                suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
+        except Exception as multi_ai_error:
+            print(f"⚠️ [MULTI-AI FALLBACK] Enhanced AI failed: {multi_ai_error}")
+            print(f"🔄 [FALLBACK] Trying original Menu AI for {user_role}")
+            suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
         
         # Log successful operation
         print(f"✅ [SUCCESS] Menu generated for {user_role} - Age: {age_group}, Ingredients: {len(available_ingredients)} chars")
@@ -2524,6 +2558,125 @@ def extract_weekly_menu_from_suggestions(suggestions):
 
 # ============== CURRICULUM AI Routes ==============
 
+def convert_structured_to_frontend_format(ai_result, age_group, week_number, themes, special_focus):
+    """
+    Convert new structured curriculum format to frontend-compatible format
+    Tạo output tương tự menu AI - list của strings dễ đọc
+    """
+    try:
+        print(f"🔍 [DEBUG] Starting frontend format conversion")
+        print(f"🔍 [DEBUG] AI result keys: {list(ai_result.keys()) if isinstance(ai_result, dict) else 'Not a dict'}")
+        
+        structured_data = ai_result.get('data', {})
+        provider = ai_result.get('provider', 'unknown')
+        
+        print(f"🔍 [DEBUG] Structured data keys: {list(structured_data.keys()) if isinstance(structured_data, dict) else 'Not a dict'}")
+        print(f"🔍 [DEBUG] Provider: {provider}")
+        
+        # Tạo list activities tương tự menu AI format
+        curriculum_items = []
+        
+        # Header thông tin
+        curriculum_items.extend([
+            f"📚 **CHƯƠNG TRÌNH HỌC TUẦN {week_number}**",
+            f"👶 **Độ tuổi:** {age_group}",
+            f"🎯 **Chủ đề:** {themes if themes else 'Chủ đề phát triển toàn diện'}",
+            f"⭐ **Trọng tâm:** {special_focus if special_focus else 'Phát triển đa dạng kỹ năng'}",
+            ""
+        ])
+        
+        # Day mapping
+        day_names = {
+            'mon': 'Thứ 2', 'tue': 'Thứ 3', 'wed': 'Thứ 4',
+            'thu': 'Thứ 5', 'fri': 'Thứ 6'
+        }
+        
+        # Time slot mapping với emoji
+        time_slots = {
+            'morning_1': '🌅 7h-8h: Đón trẻ & Ăn sáng',
+            'morning_2': '🏃 8h-8h30: Thể dục & Trò chuyện',
+            'morning_3': '🌳 8h30-9h: Hoạt động ngoài trời',
+            'morning_4': '🇬🇧 9h-9h30: English & Bữa phụ',
+            'morning_5': '📚 9h30-10h: Học tập chính',
+            'morning_6': '🍚 10h30-14h: Ăn trưa & Nghỉ trưa',
+            'afternoon_1': '🧩 14h15-15h: Lego/Giáo cụ',
+            'afternoon_2': '🥤 15h-15h30: Uống nước & Ăn xế',
+            'afternoon_3': '🧘 15h45-16h: Yoga/Hoạt động sáng tạo',
+            'afternoon_4': '👋 16h-17h: Tự do & Đón trẻ'
+        }
+        
+        # Process each day
+        daily_activities = []  # Format for JavaScript compatibility
+        
+        for day_code in ['mon', 'tue', 'wed', 'thu', 'fri']:
+            if day_code not in structured_data:
+                continue
+                
+            day_name = day_names[day_code]
+            day_data = structured_data[day_code]
+            
+            # Create activities array for this day
+            activities = []
+            
+            # Add activities for each time slot
+            for slot_code in ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6',
+                             'afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']:
+                
+                if slot_code in day_data and day_data[slot_code]:
+                    activity_content = day_data[slot_code]
+                    time_label = time_slots.get(slot_code, f'{slot_code}:').replace('🌅 ', '').replace('🏃 ', '').replace('🌳 ', '').replace('🇬🇧 ', '').replace('📚 ', '').replace('🍚 ', '').replace('🧩 ', '').replace('🥤 ', '').replace('🧘 ', '').replace('👋 ', '')
+                    
+                    activities.append({
+                        'time': time_label,
+                        'activity': activity_content[:50] + ('...' if len(activity_content) > 50 else ''),
+                        'description': activity_content
+                    })
+            
+            # Special formatting for Wednesday (Thứ 4 vui vẻ)
+            if day_code == 'wed':
+                day_display_name = f"{day_name} - THỨ 4 VUI VẺ"
+            else:
+                day_display_name = day_name
+                
+            daily_activities.append({
+                'day': day_display_name,
+                'activities': activities
+            })
+        
+        # Return format compatible with frontend JavaScript
+        return {
+            'week_number': week_number,
+            'age_group': age_group,
+            'themes': themes or 'Chủ đề phát triển toàn diện',
+            'special_focus': special_focus or 'Phát triển đa dạng kỹ năng',
+            'daily_activities': daily_activities,  # JavaScript-compatible format
+            'materials': [
+                'Đồ chơi giáo dục phù hợp độ tuổi',
+                'Sách tranh và flashcard chủ đề',
+                'Vật liệu tô vẽ và sáng tạo',
+                'Đồ chơi Lego và giáo cụ',
+                'Thảm yoga và nhạc cụ'
+            ],
+            'provider': provider,
+            'structured_data': structured_data,  # Keep for create curriculum endpoint
+            'curriculum': structured_data  # For database storage
+        }
+        
+    except Exception as e:
+        print(f"❌ [DEBUG] Error converting structured format: {e}")
+        print(f"❌ [DEBUG] Error type: {type(e)}")
+        print(f"❌ [DEBUG] AI result received: {ai_result}")
+        return {
+            'week_number': week_number,
+            'age_group': age_group,
+            'themes': themes or 'Lỗi xử lý dữ liệu',
+            'special_focus': special_focus or 'Lỗi xử lý dữ liệu',
+            'daily_activities': [],
+            'materials': [],
+            'provider': 'error',
+            'error': str(e)
+        }
+
 @main.route('/ai/curriculum-suggestions', methods=['POST'])
 def ai_curriculum_suggestions():
     """API endpoint để lấy gợi ý chương trình học từ Gemini AI"""
@@ -2584,16 +2737,60 @@ def ai_curriculum_suggestions():
         # Log security event
         log_security_event('CURRICULUM_AI_REQUEST', f'User: {user_role}, Age: {age_group}, Week: {week_number}', user_ip)
         
-        # Import curriculum AI service
-        from app.curriculum_ai import curriculum_ai_service
-        
-        # Generate curriculum
-        curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
-            age_group=age_group,
-            week_number=week_number,
-            themes=themes if themes else None,
-            special_focus=special_focus if special_focus else None
-        )
+        # 🚀 TRY ENHANCED MULTI-AI FIRST!
+        try:
+            if ENHANCED_CURRICULUM_AI_AVAILABLE:
+                print(f"🚀 [MULTI-AI] Using Enhanced Curriculum AI with Groq fallback for {user_role}")
+                ai_result = get_ai_curriculum_suggestions_enhanced(
+                    age_group=age_group,
+                    week_number=week_number,
+                    use_multi_ai=True  # Enable Multi-AI fallback
+                )
+                print(f"✅ [MULTI-AI SUCCESS] Enhanced Curriculum AI completed for {user_role}")
+                print(f"🔍 [DEBUG] AI Result type: {type(ai_result)}")
+                print(f"🔍 [DEBUG] AI Result success: {ai_result.get('success') if isinstance(ai_result, dict) else 'Not dict'}")
+                
+                # Handle the new structured format
+                if isinstance(ai_result, dict) and ai_result.get('success'):
+                    # Convert structured data to frontend format
+                    print(f"🔍 [DEBUG] Converting structured data to frontend format")
+                    curriculum_data = convert_structured_to_frontend_format(
+                        ai_result, age_group, week_number, themes, special_focus
+                    )
+                    print(f"✅ [DEBUG] Frontend format conversion completed")
+                else:
+                    print(f"⚠️ [DEBUG] AI result not successful, using fallback format")
+                    # Fallback for old format
+                    curriculum_data = {
+                        'week_number': week_number,
+                        'age_group': age_group,
+                        'themes': themes,
+                        'special_focus': special_focus,
+                        'daily_activities': ai_result if isinstance(ai_result, list) else [],
+                        'materials': [],
+                        'provider': 'enhanced_fallback'
+                    }
+            else:
+                print(f"🔄 [FALLBACK] Using original Curriculum AI for {user_role}")
+                # Import original curriculum AI service
+                from app.curriculum_ai import curriculum_ai_service
+                curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
+                    age_group=age_group,
+                    week_number=week_number,
+                    themes=themes if themes else None,
+                    special_focus=special_focus if special_focus else None
+                )
+        except Exception as multi_ai_error:
+            print(f"⚠️ [MULTI-AI FALLBACK] Enhanced Curriculum AI failed: {multi_ai_error}")
+            print(f"🔄 [FALLBACK] Trying original Curriculum AI for {user_role}")
+            # Import original curriculum AI service
+            from app.curriculum_ai import curriculum_ai_service
+            curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
+                age_group=age_group,
+                week_number=week_number,
+                themes=themes if themes else None,
+                special_focus=special_focus if special_focus else None
+            )
         
         # Log success
         print(f"✅ [SUCCESS] Curriculum generated for {user_role} - Age: {age_group}, Week: {week_number}")
@@ -2608,6 +2805,11 @@ def ai_curriculum_suggestions():
     except Exception as e:
         error_msg = str(e)
         print(f"❌ [ERROR] Curriculum generation failed for {user_role} from {user_ip}: {error_msg}")
+        print(f"❌ [DEBUG] Exception type: {type(e)}")
+        print(f"❌ [DEBUG] Full traceback:")
+        import traceback
+        traceback.print_exc()
+        
         log_security_event('CURRICULUM_AI_ERROR', f'Error: {error_msg}', user_ip)
         
         # Enhanced error handling like Menu AI
@@ -2620,7 +2822,7 @@ def ai_curriculum_suggestions():
             # Don't expose internal errors to client
             return jsonify({
                 'success': False,
-                'error': 'Đã xảy ra lỗi khi tạo chương trình học. Vui lòng thử lại sau.'
+                'error': f'Đã xảy ra lỗi khi tạo chương trình học: {error_msg}'
             }), 500
 
 
@@ -2642,7 +2844,21 @@ def ai_create_curriculum_from_suggestions():
             return jsonify({'success': False, 'error': 'Không có dữ liệu chương trình học'}), 400
         
         curriculum_data = data['curriculum_data']
-        week_number = curriculum_data.get('week_info', {}).get('week_number', 1)
+        
+        # Handle both old and new format
+        if 'week_info' in curriculum_data:
+            # Old format
+            week_number = curriculum_data.get('week_info', {}).get('week_number', 1)
+            curriculum_content = curriculum_data.get('curriculum', {})
+        else:
+            # New format - get week_number directly and use structured_data
+            week_number = curriculum_data.get('week_number', 1)
+            if 'structured_data' in curriculum_data:
+                curriculum_content = curriculum_data['structured_data']
+            elif 'curriculum' in curriculum_data:
+                curriculum_content = curriculum_data['curriculum']
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy dữ liệu chương trình học hợp lệ'}), 400
         
         # Check if week already exists
         existing = Curriculum.query.filter_by(week_number=week_number).first()
@@ -2653,10 +2869,7 @@ def ai_create_curriculum_from_suggestions():
                 'error': f'Tuần {week_number} đã tồn tại. Vui lòng chọn tuần khác hoặc xóa tuần cũ trước.'
             }), 409
         else:
-            # Convert AI curriculum data to database format
-            curriculum_content = curriculum_data.get('curriculum', {})
-            
-            # Create new curriculum
+            # Create new curriculum with structured content
             new_curriculum = Curriculum(
                 week_number=week_number,
                 content=json.dumps(curriculum_content, ensure_ascii=False)
@@ -2664,6 +2877,8 @@ def ai_create_curriculum_from_suggestions():
             
             db.session.add(new_curriculum)
             db.session.commit()
+            
+            print(f"✅ [SUCCESS] Created curriculum week {week_number} with structured format")
             
             return jsonify({
                 'success': True,
@@ -2673,7 +2888,7 @@ def ai_create_curriculum_from_suggestions():
         
     except Exception as e:
         db.session.rollback()
-        print(f"Create Curriculum Error: {e}")
+        print(f"❌ [ERROR] Create Curriculum Error: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

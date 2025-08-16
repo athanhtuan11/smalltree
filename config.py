@@ -19,3 +19,24 @@ class Config:
     # 2. Tạo API key mới  
     # 3. Thay thế key bên dưới
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY') or 'AIzaSyChKUMAlHaOj29YXh4POZbgzPRvCmCa9pQ'
+    
+    # 🎯 COHERE AI Configuration (Excellent for Education)
+    # Cohere API Key từ: https://dashboard.cohere.ai/
+    # Free tier: 1,000 calls/month, quality tốt cho educational content
+    # PASTE COHERE API KEY CỦA BẠN VÀO ĐÂY ⬇️
+    COHERE_API_KEY = os.environ.get('COHERE_API_KEY') or 'J4NQeZN0iLquKjAJnOsEd0pjLbS0hGKPsmFaE4C3'
+    
+    # 🚀 GROQ AI Configuration (Free + Fast)
+    # Groq API Key từ: https://console.groq.com/
+    # Free tier: 5,000 requests/day, tốc độ cực nhanh
+    # PASTE GROQ API KEY CỦA BẠN VÀO ĐÂY ⬇️
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY') or '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'
+    GROQ_MODEL = os.environ.get('GROQ_MODEL') or 'llama-3.1-8b-instant'  # Updated model
+    
+    # 🤖 OpenAI Configuration (Optional - High Quality)
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY') or ''
+    OPENAI_MODEL = os.environ.get('OPENAI_MODEL') or 'gpt-4o-mini'
+    
+    # 🛡️ Anthropic Claude Configuration (Optional - Safety Focused)  
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY') or ''
+    ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL') or 'claude-3-5-sonnet-20241022'
