@@ -36,10 +36,10 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# 1. System Setup
-print_info "Updating system..."
-apt update && apt install -y nginx python3 python3-pip python3-venv sqlite3 curl
-print_status "System updated"
+# 1. System Setup & SSL
+print_info "Updating system and installing packages..."
+apt update && apt install -y nginx python3 python3-pip python3-venv sqlite3 curl certbot python3-certbot-nginx
+print_status "System updated with SSL support"
 
 # 2. Create user
 if ! id "smalltree" &>/dev/null; then
@@ -81,10 +81,17 @@ chown root:root $PROJECT_PATH/.env
 chmod 600 $PROJECT_PATH/.env
 print_status "Environment created for root"
 
-# 6. Database (Root mode)
-print_info "Setting up database as root..."
+# 6. AI Services & Database Setup
+print_info "Installing AI packages and setting up database..."
 cd $PROJECT_PATH
 source venv/bin/activate
+
+# Install AI packages
+print_info "Installing AI services (Cohere, Groq, Gemini, etc)..."
+pip install cohere groq google-generativeai anthropic openai requests
+print_status "AI packages installed"
+
+# Setup database
 mkdir -p app
 python3 -c "
 import sys, os
@@ -98,6 +105,8 @@ try:
         print('✓ Database created')
 except Exception as e:
     print(f'❌ Database error: {e}')
+    sys.exit(1)
+"
     sys.exit(1)
 "
 print_status "Database ready"
@@ -157,7 +166,32 @@ systemctl enable smalltree nginx
 systemctl restart smalltree nginx
 print_status "Services started"
 
-# 10. Verify
+# 10. SSL Certificate Setup
+print_info "Setting up SSL certificate with Certbot..."
+if [ "$DOMAIN" != "localhost" ] && [ "$DOMAIN" != "127.0.0.1" ]; then
+    # Verify domain resolves to this server
+    if dig +short $DOMAIN | grep -q "$(curl -s ifconfig.me)"; then
+        print_info "Domain resolves correctly, setting up SSL..."
+        certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos --email admin@$DOMAIN --redirect
+        
+        if [ $? -eq 0 ]; then
+            print_success "SSL certificate installed successfully"
+            
+            # Setup auto-renewal
+            (crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
+            print_status "SSL auto-renewal configured"
+        else
+            print_warning "SSL setup failed, continuing with HTTP"
+        fi
+    else
+        print_warning "Domain doesn't resolve to this server, skipping SSL"
+        print_warning "Please update DNS records to point $DOMAIN to $(curl -s ifconfig.me)"
+    fi
+else
+    print_warning "Local domain detected, skipping SSL setup"
+fi
+
+# 11. Verify Deployment
 print_info "Verifying deployment..."
 sleep 3
 
@@ -180,9 +214,19 @@ fi
 echo ""
 echo "🎉 Deployment Complete!"
 echo "Website: http://$DOMAIN"
+if [ "$DOMAIN" != "localhost" ] && [ "$DOMAIN" != "127.0.0.1" ]; then
+    echo "HTTPS: https://$DOMAIN (if SSL was successful)"
+fi
 echo "Local: http://$(hostname -I | cut -d' ' -f1)"
+echo ""
+echo "🤖 AI Services Available:"
+echo "  - Cohere AI (Education-focused)"
+echo "  - Groq AI (High-speed inference)" 
+echo "  - Google Gemini (Fallback)"
+echo "  - OpenAI & Anthropic (Optional)"
 echo ""
 echo "Commands:"
 echo "  sudo systemctl status smalltree"
 echo "  sudo journalctl -u smalltree -f"
+echo "  sudo certbot certificates (check SSL)"
 echo ""
