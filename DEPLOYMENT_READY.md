@@ -1,6 +1,11 @@
-# 🌱 SmallTree Academy - Clean Linux Deployment
+# 🚀 SmallTree Academy - PRODUCTION READY
 
-## ✅ Workspace đã được clean up hoàn toàn!
+**Domain:** mamnoncaynho.com  
+**Server IP:** 180.93.136.198  
+**Platform:** Linux (Ubuntu/Debian)  
+**Deploy Date:** August 17, 2025
+
+## ✅ Production Configuration Complete!
 
 ### 🗂️ Files đã xóa (Windows-only):
 - ❌ quick_start.bat
@@ -20,9 +25,10 @@
 ## 🚀 Ready for Linux Server Deployment
 
 ### 1. Upload to Linux Server:
+
 ```bash
-# Upload all files to your server
-scp -r . user@your-server:/var/www/smalltree/
+# Upload all files to your server  
+scp -r . root@180.93.136.198:/var/www/smalltree/
 ```
 
 ### 2. Auto Setup (Run as ROOT):

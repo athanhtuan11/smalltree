@@ -13,6 +13,8 @@ NC='\033[0m'
 
 # Configuration
 PROJECT_NAME="smalltree-website"
+DOMAIN="mamnoncaynho.com"
+SERVER_IP="180.93.136.198"
 PROJECT_PATH="/var/www/$PROJECT_NAME"
 SERVICE_NAME="smalltree-gunicorn"
 VENV_PATH="$PROJECT_PATH/venv"

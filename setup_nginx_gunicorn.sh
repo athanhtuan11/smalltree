@@ -13,7 +13,8 @@ NC='\033[0m' # No Color
 
 # Configuration variables
 PROJECT_NAME="smalltree-website"
-DOMAIN="localhost"  # Change this to your domain
+DOMAIN="mamnoncaynho.com"  # Production domain
+SERVER_IP="180.93.136.198"
 PROJECT_PATH="/var/www/$PROJECT_NAME"
 VENV_PATH="$PROJECT_PATH/venv"
 SERVICE_NAME="smalltree-gunicorn"
