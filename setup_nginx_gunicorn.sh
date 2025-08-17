@@ -90,30 +90,14 @@ sudo -u smalltree bash -c "
 "
 print_status "Virtual environment created"
 
-# Install Python dependencies
-print_info "Installing Python dependencies..."
-sudo -u smalltree bash -c "
-    cd $PROJECT_PATH
-    source venv/bin/activate
-    pip install --upgrade pip
-    
-    # Core packages (must succeed)
-    pip install Flask==2.0.3 Flask-WTF==0.15.1 Flask-SQLAlchemy==2.5.1
-    pip install Flask-Migrate==3.1.0 Jinja2==3.0.3 Werkzeug==2.0.3
-    pip install gunicorn==20.1.0
-    pip install email_validator==1.3.1 WTForms==3.0.1
-    
-    # Document processing
-    pip install python-docx==1.0.1 || echo 'python-docx failed'
-    pip install openpyxl || echo 'openpyxl failed'
-    
-    # Optional packages (skip if build fails)
-    pip install Pillow 2>/dev/null || echo 'Pillow build failed - skipping'
-    pip install WeasyPrint 2>/dev/null || echo 'WeasyPrint build failed - skipping'
-    
-    echo 'Dependencies installation completed!'
-"
-print_status "Dependencies installed"
+# Install Python dependencies (minimal set for fast deployment)
+print_info "Skipping automatic package installation (as requested)..."
+print_info "Manual installation required:"
+print_info "  Core: Flask==2.0.3 Flask-WTF==0.15.1 Flask-SQLAlchemy==2.5.1"
+print_info "  Migration: Flask-Migrate==3.1.0"
+print_info "  Server: gunicorn==20.1.0"
+print_info "  Environment: python-dotenv==0.19.2"
+print_status "Dependencies installation skipped"
 
 # Create environment file
 print_info "Creating environment configuration..."
@@ -143,46 +127,54 @@ sudo -u smalltree bash -c "
         echo 'Database upgrade failed, initializing new database...'
         if ! flask db init 2>/dev/null; then
             echo 'Database init failed, creating manually...'
-            python3 -c 'from app import create_app; from app.models import db; app = create_app(); app.app_context().push(); db.create_all(); print(\"Database created manually\")'
-        else
-            flask db migrate -m 'Initial migration' 2>/dev/null || echo 'Migration creation failed'
-            flask db upgrade 2>/dev/null || echo 'Database upgrade after init failed'
-        fi
-    fi
+# Initialize database (simplified for speed)
+print_info "Setting up database (manual Python method)..."
+sudo -u smalltree bash -c "
+    cd $PROJECT_PATH
+    source venv/bin/activate
+    export FLASK_APP=run.py
     
-    # Run database debug script
-    echo 'Running database debug...'
-    python3 debug_database.py
+    # Create database directory if not exists
+    mkdir -p app
+    
+    # Simple database creation (fastest method)
+    python3 -c \"
+from app import create_app
+from app.models import db
+print('Creating Flask app...')
+app = create_app()
+print('Setting up database...')
+with app.app_context():
+    db.create_all()
+    print('✓ Database tables created successfully')
+\"
 "
 print_status "Database initialized"
 
-# Create Gunicorn configuration
+# Create Gunicorn configuration (optimized for slower servers)
 print_info "Creating Gunicorn configuration..."
 cat > $PROJECT_PATH/gunicorn.conf.py << 'EOF'
-# Gunicorn configuration for SmallTree Academy
+# Gunicorn configuration for SmallTree Academy (optimized for slower servers)
 import multiprocessing
 
 # Server socket
 bind = "127.0.0.1:5000"
-backlog = 2048
+backlog = 512
 
-# Worker processes
-workers = multiprocessing.cpu_count() * 2 + 1
+# Worker processes (reduced for slower servers)
+workers = max(1, multiprocessing.cpu_count())
 worker_class = "sync"
-worker_connections = 1000
-timeout = 30
-keepalive = 2
+worker_connections = 500
+timeout = 60  # Increased timeout for slower servers
+keepalive = 5
 
 # Security
-max_requests = 1000
-max_requests_jitter = 50
+max_requests = 500  # Reduced for slower servers
+max_requests_jitter = 25
 preload_app = True
 
-# Logging
-accesslog = "/var/log/smalltree/access.log"
-errorlog = "/var/log/smalltree/error.log"
-loglevel = "info"
-access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Logging (simplified)
+loglevel = "warning"  # Reduced logging for performance
 
 # Process naming
 proc_name = "smalltree-gunicorn"
