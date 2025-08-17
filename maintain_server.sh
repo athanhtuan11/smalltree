@@ -44,18 +44,25 @@ update_code() {
     
     # Backup current state
     print_info "Creating backup before update..."
-    sudo /usr/local/bin/smalltree-backup.sh
+    /usr/local/bin/smalltree-backup.sh
     
     # Pull latest code
     git pull origin master
     
     # Activate virtual environment and update dependencies
-    source $VENV_PATH/bin/activate
-    pip install -r requirements.txt --upgrade
+    sudo -u www-data bash -c "
+        cd $PROJECT_PATH
+        source $VENV_PATH/bin/activate
+        pip install -r requirements.txt --upgrade
+    "
     
     # Run migrations if any
-    export FLASK_APP=run.py
-    flask db upgrade
+    sudo -u www-data bash -c "
+        cd $PROJECT_PATH
+        source $VENV_PATH/bin/activate
+        export FLASK_APP=run.py
+        flask db upgrade
+    "
     
     # Restart services
     restart_services
@@ -65,8 +72,8 @@ update_code() {
 
 restart_services() {
     print_info "Restarting services..."
-    sudo systemctl restart $SERVICE_NAME
-    sudo systemctl restart nginx
+    systemctl restart $SERVICE_NAME
+    systemctl restart nginx
     sleep 3
     
     if check_services; then
@@ -78,8 +85,8 @@ restart_services() {
 }
 
 check_services() {
-    local gunicorn_status=$(sudo systemctl is-active $SERVICE_NAME)
-    local nginx_status=$(sudo systemctl is-active nginx)
+    local gunicorn_status=$(systemctl is-active $SERVICE_NAME)
+    local nginx_status=$(systemctl is-active nginx)
     
     if [ "$gunicorn_status" = "active" ] && [ "$nginx_status" = "active" ]; then
         return 0
@@ -93,11 +100,11 @@ show_status() {
     echo
     
     echo -e "${YELLOW}Gunicorn Status:${NC}"
-    sudo systemctl status $SERVICE_NAME --no-pager -l
+    systemctl status $SERVICE_NAME --no-pager -l
     echo
     
     echo -e "${YELLOW}Nginx Status:${NC}"
-    sudo systemctl status nginx --no-pager -l
+    systemctl status nginx --no-pager -l
     echo
     
     echo -e "${YELLOW}Disk Usage:${NC}"
@@ -117,16 +124,16 @@ show_logs() {
     echo
     
     echo -e "${YELLOW}Gunicorn Logs (last 50 lines):${NC}"
-    sudo journalctl -u $SERVICE_NAME -n 50 --no-pager
+    journalctl -u $SERVICE_NAME -n 50 --no-pager
     echo
     
     echo -e "${YELLOW}Nginx Error Logs:${NC}"
-    sudo tail -n 20 /var/log/nginx/error.log
+    tail -n 20 /var/log/nginx/error.log
     echo
     
     echo -e "${YELLOW}Application Logs:${NC}"
     if [ -f "/var/log/smalltree/gunicorn_error.log" ]; then
-        sudo tail -n 20 /var/log/smalltree/gunicorn_error.log
+        tail -n 20 /var/log/smalltree/gunicorn_error.log
     else
         echo "No application logs found"
     fi
@@ -134,7 +141,7 @@ show_logs() {
 
 manual_backup() {
     print_info "Starting manual backup..."
-    sudo /usr/local/bin/smalltree-backup.sh
+    /usr/local/bin/smalltree-backup.sh
     print_status "Manual backup completed"
     
     echo -e "${YELLOW}Backup files:${NC}"
@@ -174,7 +181,7 @@ health_check() {
     fi
     
     # Check logs for errors
-    local error_count=$(sudo journalctl -u $SERVICE_NAME --since "1 hour ago" | grep -i error | wc -l)
+    local error_count=$(journalctl -u $SERVICE_NAME --since "1 hour ago" | grep -i error | wc -l)
     if [ $error_count -eq 0 ]; then
         print_status "No recent errors in logs"
     else
@@ -186,8 +193,8 @@ install_ssl() {
     print_info "Installing SSL certificate with Let's Encrypt..."
     
     # Install certbot
-    sudo apt update
-    sudo apt install -y certbot python3-certbot-nginx
+    apt update
+    apt install -y certbot python3-certbot-nginx
     
     # Get domain from nginx config
     local domain=$(grep server_name /etc/nginx/sites-available/$PROJECT_NAME | awk '{print $2}' | sed 's/;//')
@@ -198,10 +205,10 @@ install_ssl() {
     fi
     
     print_info "Installing SSL for domain: $domain"
-    sudo certbot --nginx -d $domain
+    certbot --nginx -d $domain
     
     # Set up auto-renewal
-    sudo crontab -l | grep -q certbot || (sudo crontab -l; echo "0 12 * * * /usr/bin/certbot renew --quiet") | sudo crontab -
+    crontab -l | grep -q certbot || (crontab -l; echo "0 12 * * * /usr/bin/certbot renew --quiet") | crontab -
     
     print_status "SSL certificate installed and auto-renewal configured"
 }
@@ -209,14 +216,21 @@ install_ssl() {
 update_dependencies() {
     print_info "Updating Python dependencies..."
     cd $PROJECT_PATH
-    source $VENV_PATH/bin/activate
     
-    pip install --upgrade pip
-    pip install -r requirements.txt --upgrade
+    sudo -u www-data bash -c "
+        cd $PROJECT_PATH
+        source $VENV_PATH/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt --upgrade
+    "
     
     # Check for security vulnerabilities
-    pip install safety
-    safety check
+    sudo -u www-data bash -c "
+        cd $PROJECT_PATH
+        source $VENV_PATH/bin/activate
+        pip install safety
+        safety check
+    "
     
     restart_services
     print_status "Dependencies updated"
@@ -231,7 +245,7 @@ clean_system() {
     
     # Rotate logs
     if [ -f "/var/log/smalltree/gunicorn_access.log" ]; then
-        sudo logrotate -f /etc/logrotate.d/smalltree 2>/dev/null || true
+        logrotate -f /etc/logrotate.d/smalltree 2>/dev/null || true
     fi
     
     # Clean old backups (keep last 30 days)
@@ -239,8 +253,8 @@ clean_system() {
     find /var/backups/smalltree -name "*.tar.gz" -mtime +30 -delete 2>/dev/null || true
     
     # Clean package cache
-    sudo apt autoremove -y
-    sudo apt autoclean
+    apt autoremove -y
+    apt autoclean
     
     print_status "System cleaned"
 }

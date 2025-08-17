@@ -25,13 +25,16 @@
 scp -r . user@your-server:/var/www/smalltree/
 ```
 
-### 2. Auto Setup:
+### 2. Auto Setup (Run as ROOT):
 ```bash
+# Login as root or use sudo
+sudo su -
+cd /var/www/smalltree/
 chmod +x setup_nginx_gunicorn.sh
 ./setup_nginx_gunicorn.sh
 ```
 
-### 3. Management:
+### 3. Management (Run as ROOT):
 ```bash
 # Update code
 ./maintain_server.sh update

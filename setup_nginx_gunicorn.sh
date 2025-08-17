@@ -40,51 +40,62 @@ print_info() {
     echo -e "${BLUE}ℹ️  $1${NC}"
 }
 
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-   print_error "This script should not be run as root for security reasons"
-   print_info "Please run as a regular user with sudo privileges"
+# Check if running as root (required for system-wide installation)
+if [[ $EUID -ne 0 ]]; then
+   print_error "This script must be run as root for system-wide installation"
+   print_info "Please run with: sudo ./setup_nginx_gunicorn.sh"
    exit 1
 fi
 
+print_info "Running as root - proceeding with system-wide installation..."
+
 # Update system packages
 print_info "Updating system packages..."
-sudo apt update && sudo apt upgrade -y
+apt update && apt upgrade -y
 print_status "System updated"
 
 # Install required packages
 print_info "Installing required packages..."
-sudo apt install -y python3 python3-pip python3-venv nginx supervisor git
+apt install -y python3 python3-pip python3-venv nginx supervisor git curl
 print_status "Required packages installed"
 
 # Create project directory
 print_info "Setting up project directory..."
-sudo mkdir -p $PROJECT_PATH
-sudo chown $USER:$USER $PROJECT_PATH
+mkdir -p $PROJECT_PATH
 print_status "Project directory created: $PROJECT_PATH"
 
 # Copy project files (if not already there)
 if [ ! -f "$PROJECT_PATH/run.py" ]; then
     print_info "Copying project files..."
-    cp -r . $PROJECT_PATH/
+    # Copy from current directory to project path
+    cp -r ./* $PROJECT_PATH/
     print_status "Project files copied"
 else
     print_info "Project files already exist, updating..."
-    rsync -av --exclude 'venv' --exclude '__pycache__' . $PROJECT_PATH/
+    # Update files while preserving venv and database
+    rsync -av --exclude 'venv' --exclude '__pycache__' --exclude '*.db' ./* $PROJECT_PATH/
     print_status "Project files updated"
 fi
 
-# Create virtual environment
+# Set proper ownership for www-data
+chown -R www-data:www-data $PROJECT_PATH
+
+# Create virtual environment as root, then change ownership
 print_info "Creating Python virtual environment..."
 cd $PROJECT_PATH
 python3 -m venv venv
-source venv/bin/activate
+chown -R www-data:www-data venv
 print_status "Virtual environment created"
 
 # Install Python dependencies
 print_info "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+# Activate venv and install as www-data user
+sudo -u www-data bash -c "
+    cd $PROJECT_PATH
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+"
 print_status "Dependencies installed"
 
 # Create environment file
@@ -100,8 +111,13 @@ print_status "Environment file created"
 
 # Initialize database
 print_info "Initializing database..."
-export FLASK_APP=run.py
-flask db upgrade || flask db init && flask db migrate -m "Initial migration" && flask db upgrade
+cd $PROJECT_PATH
+sudo -u www-data bash -c "
+    cd $PROJECT_PATH
+    source venv/bin/activate
+    export FLASK_APP=run.py
+    flask db upgrade || (flask db init && flask db migrate -m 'Initial migration' && flask db upgrade)
+"
 print_status "Database initialized"
 
 # Create Gunicorn configuration
@@ -150,15 +166,15 @@ print_status "Gunicorn configuration created"
 
 # Create log directories
 print_info "Creating log directories..."
-sudo mkdir -p /var/log/smalltree
-sudo mkdir -p /var/run/smalltree
-sudo chown www-data:www-data /var/log/smalltree
-sudo chown www-data:www-data /var/run/smalltree
+mkdir -p /var/log/smalltree
+mkdir -p /var/run/smalltree
+chown www-data:www-data /var/log/smalltree
+chown www-data:www-data /var/run/smalltree
 print_status "Log directories created"
 
 # Create systemd service for Gunicorn
 print_info "Creating systemd service..."
-sudo tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null << EOF
+tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null << EOF
 [Unit]
 Description=Gunicorn instance to serve smalltree Website
 After=network.target
@@ -177,13 +193,13 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable $SERVICE_NAME
+systemctl daemon-reload
+systemctl enable $SERVICE_NAME
 print_status "Systemd service created and enabled"
 
 # Configure Nginx
 print_info "Configuring Nginx..."
-sudo tee /etc/nginx/sites-available/$PROJECT_NAME > /dev/null << EOF
+tee /etc/nginx/sites-available/$PROJECT_NAME > /dev/null << EOF
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
@@ -248,25 +264,25 @@ server {
 EOF
 
 # Enable the site
-sudo ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 print_status "Nginx configured"
 
 # Test Nginx configuration
 print_info "Testing Nginx configuration..."
-sudo nginx -t
+nginx -t
 print_status "Nginx configuration valid"
 
 # Set proper permissions
 print_info "Setting file permissions..."
-sudo chown -R www-data:www-data $PROJECT_PATH
-sudo chmod -R 755 $PROJECT_PATH
-sudo chmod 644 $PROJECT_PATH/.env
+chown -R www-data:www-data $PROJECT_PATH
+chmod -R 755 $PROJECT_PATH
+chmod 644 $PROJECT_PATH/.env
 print_status "Permissions set"
 
 # Create backup script
 print_info "Creating backup script..."
-sudo tee /usr/local/bin/smalltree-backup.sh > /dev/null << 'EOF'
+tee /usr/local/bin/smalltree-backup.sh > /dev/null << 'EOF'
 #!/bin/bash
 # Backup script for smalltree Website
 
@@ -289,28 +305,28 @@ find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 echo "Backup completed: $DATE"
 EOF
 
-sudo chmod +x /usr/local/bin/smalltree-backup.sh
+chmod +x /usr/local/bin/smalltree-backup.sh
 print_status "Backup script created"
 
 # Add cron job for daily backups
 print_info "Setting up daily backups..."
-(sudo crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/smalltree-backup.sh") | sudo crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/smalltree-backup.sh") | crontab -
 print_status "Daily backup scheduled"
 
 # Start services
 print_info "Starting services..."
-sudo systemctl restart nginx
-sudo systemctl start $SERVICE_NAME
+systemctl restart nginx
+systemctl start $SERVICE_NAME
 print_status "Services started"
 
 # Check service status
 sleep 3
-if sudo systemctl is-active --quiet $SERVICE_NAME && sudo systemctl is-active --quiet nginx; then
+if systemctl is-active --quiet $SERVICE_NAME && systemctl is-active --quiet nginx; then
     print_status "All services are running successfully!"
 else
     print_error "Some services failed to start. Check logs:"
-    echo "  sudo journalctl -u $SERVICE_NAME"
-    echo "  sudo journalctl -u nginx"
+    echo "  journalctl -u $SERVICE_NAME"
+    echo "  journalctl -u nginx"
 fi
 
 echo
@@ -319,20 +335,20 @@ echo -e "${GREEN}  🎉 DEPLOYMENT COMPLETED SUCCESSFULLY  ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo
 echo -e "${BLUE}📋 Next Steps:${NC}"
-echo -e "1. Update DNS to point to this server"
-echo -e "2. Install SSL certificate (Let's Encrypt recommended)"
-echo -e "3. Configure firewall (ufw enable, ufw allow 80, ufw allow 443)"
+echo -e "1. Update domain in /etc/nginx/sites-available/$PROJECT_NAME"
+echo -e "2. Install SSL certificate: ./maintain_server.sh ssl"
+echo -e "3. Configure firewall: ufw allow 80 && ufw allow 443 && ufw enable"
 echo -e "4. Test the website at: http://$DOMAIN"
 echo
 echo -e "${BLUE}🔧 Management Commands:${NC}"
-echo -e "• Restart app: sudo systemctl restart $SERVICE_NAME"
-echo -e "• View logs: sudo journalctl -u $SERVICE_NAME -f"
-echo -e "• Backup data: sudo /usr/local/bin/smalltree-backup.sh"
-echo -e "• Update code: cd $PROJECT_PATH && git pull && sudo systemctl restart $SERVICE_NAME"
+echo -e "• Restart app: systemctl restart $SERVICE_NAME"
+echo -e "• View logs: journalctl -u $SERVICE_NAME -f"
+echo -e "• Backup data: /usr/local/bin/smalltree-backup.sh"
+echo -e "• Update code: ./maintain_server.sh update"
 echo
 echo -e "${YELLOW}⚠️  Important:${NC}"
-echo -e "• Change default passwords and API keys"
-echo -e "• Update the DOMAIN variable in this script for production"
+echo -e "• Change default passwords and API keys in .env"
+echo -e "• Update the DOMAIN variable for production"
 echo -e "• Review and customize gunicorn.conf.py for your needs"
 echo -e "• Set up SSL for production use"
 echo
