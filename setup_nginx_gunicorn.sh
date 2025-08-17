@@ -85,12 +85,10 @@ if [ ! -f "$PROJECT_PATH/run.py" ]; then
 fi
 
 if [ ! -d "$PROJECT_PATH/venv" ]; then
-    print_warning "Virtual environment not found, creating one..."
-    sudo -u smalltree bash -c "
-        cd $PROJECT_PATH
-        python3 -m venv venv
-    "
-    print_status "Virtual environment created"
+    print_error "Virtual environment not found at $PROJECT_PATH/venv"
+    print_error "Please ensure your venv is setup at: $PROJECT_PATH/venv"
+    print_info "Expected structure: $PROJECT_PATH/venv/bin/activate"
+    exit 1
 fi
 
 print_status "Project structure verified"
@@ -101,26 +99,12 @@ chown -R smalltree:smalltree $PROJECT_PATH
 chmod +x $PROJECT_PATH/venv/bin/activate
 print_status "Permissions set"
 
-# Install minimal requirements
-print_info "Installing minimal Python requirements..."
-sudo -u smalltree bash -c "
-    cd $PROJECT_PATH
-    source venv/bin/activate
-    pip install --upgrade pip
-    
-    # Install core packages only
-    pip install Flask==2.0.3
-    pip install Flask-SQLAlchemy==2.5.1
-    pip install Flask-Migrate==3.1.0
-    pip install Flask-WTF==0.15.1
-    pip install gunicorn==20.1.0
-    pip install python-dotenv==0.19.2
-    pip install WTForms==3.0.1
-    pip install email_validator==1.3.1
-    
-    echo 'Core packages installed successfully'
-"
-print_status "Dependencies installed"
+# Skip package installation (user has own venv setup)
+print_info "Skipping package installation (user has configured venv)"
+print_warning "Ensure these packages are installed in your venv:"
+print_warning "  Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-WTF"
+print_warning "  gunicorn, python-dotenv, WTForms, email_validator"
+print_status "Package installation skipped"
 
 # Create environment file
 print_info "Creating environment configuration..."
