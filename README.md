@@ -1,4 +1,4 @@
-# 🌱 SmallTree Academy - Nursery Management System
+# 🌱 SmallTree Academy - smalltree Management System
 
 Hệ thống quản lý mầm non hiện đại với tích hợp AI, giúp quản lý chương trình học, thực đơn, điểm danh và nhiều chức năng khác.
 
@@ -15,32 +15,33 @@ Hệ thống quản lý mầm non hiện đại với tích hợp AI, giúp qu�
 ## 🚀 Cài đặt và chạy
 
 ### Yêu cầu hệ thống
-- Python 3.7+
+- Python 3.8+
+- Linux/Unix server
 - Flask và các dependencies trong `requirements.txt`
 
-### Cách 1: Chạy nhanh
-```bash
-# Double-click file quick_start.bat
-# Hoặc chạy từ terminal:
-quick_start.bat
-```
-
-### Cách 2: Cài đặt thủ công
+### Cách 1: Development (Local)
 ```bash
 # Clone repository
-git clone <repository-url>
-cd nursery-website
+git clone https://github.com/athanhtuan11/smalltree.git
+cd smalltree
+
+# Tạo virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
 # Cài đặt dependencies
 pip install -r requirements.txt
 
-# Chạy ứng dụng
+# Chạy ứng dụng development
 python run.py
 ```
 
-### Cách 3: Sử dụng VS Code
-1. Mở project trong VS Code
-2. Nhấn `Ctrl+Shift+P` → "Tasks: Run Task" → "Run Flask App"
+### Cách 2: Production Deployment (Linux Server)
+```bash
+# Tự động setup với Nginx + Gunicorn
+chmod +x setup_nginx_gunicorn.sh
+./setup_nginx_gunicorn.sh
+```
 
 ## 🔧 Cấu hình
 
@@ -66,7 +67,7 @@ GEMINI_API_KEY=your-gemini-key
 ## 📁 Cấu trúc project
 
 ```
-nursery-website/
+smalltree-website/
 ├── app/
 │   ├── __init__.py              # Flask app factory
 │   ├── routes.py                # Routes và endpoints
@@ -106,43 +107,41 @@ nursery-website/
 
 ## 🚀 Production Deployment
 
-### Lần đầu triển khai
-1. Clone repository trên server
-2. Tạo file `.env.production` từ `.env.example`
-3. Cấu hình database và API keys
-4. Chạy `python run.py`
+### Lần đầu triển khai (Linux Server)
 
-### Cập nhật code an toàn (giữ nguyên data)
-
-**Windows:**
 ```bash
-deploy_safe.bat
+# Clone repository trên server
+git clone https://github.com/athanhtuan11/smalltree.git
+cd smalltree
+
+# Chạy script tự động setup
+chmod +x setup_nginx_gunicorn.sh
+./setup_nginx_gunicorn.sh
+
+# Script sẽ tự động:
+# - Cài đặt Nginx, Gunicorn, Python dependencies
+# - Tạo systemd service
+# - Cấu hình Nginx reverse proxy
+# - Setup SSL (Let's Encrypt) 
+# - Tạo backup cron job
 ```
 
-**Linux/Unix:**
-```bash
-chmod +x deploy_safe.sh
-./deploy_safe.sh
-```
+### Cập nhật code an toàn (Linux)
 
-**Thủ công:**
 ```bash
-backup_data.bat              # Backup data trước (Windows)
-./backup_data.sh             # Backup data trước (Linux)
-git stash                    # Lưu thay đổi local
-git pull origin master      # Pull code mới
-git stash pop               # Restore thay đổi local (nếu cần)
-pip install -r requirements.txt --upgrade
+# Sử dụng maintenance script
+chmod +x maintain_server.sh
+./maintain_server.sh update
 ```
 
 ### Backup dữ liệu định kỳ
 
 ```bash
-# Windows
-backup_data.bat
+# Chạy backup thủ công
+sudo /usr/local/bin/smalltree-backup.sh
 
-# Linux/Mac  
-./backup_data.sh
+# Hoặc sử dụng maintenance script
+./maintain_server.sh backup
 ```
 
 ### Cấu hình số học sinh (cho tính toán khối lượng thực phẩm)
@@ -185,21 +184,50 @@ Hệ thống sẽ tự động:
 └── requirements.txt         # Dependencies
 ```
 
-## 🛠️ Development
+## 🛠️ Development & Management
 
 ### Database Migrations
 ```bash
 # Tạo migration mới
+export FLASK_APP=run.py
 flask db migrate -m "Description"
 
 # Apply migrations
 flask db upgrade
 ```
 
+### Server Management (Production)
+```bash
+# Xem status services
+./maintain_server.sh status
+
+# Restart services
+./maintain_server.sh restart
+
+# Xem logs
+./maintain_server.sh logs
+
+# Health check
+./maintain_server.sh health
+
+# Update dependencies
+./maintain_server.sh deps
+
+# Clean system
+./maintain_server.sh clean
+
+# Install SSL certificate
+./maintain_server.sh ssl
+```
+
 ### Testing
 ```bash
-# Chạy tests (nếu có)
-python -m pytest
+# Test requirements
+chmod +x test_requirements.sh
+./test_requirements.sh
+
+# Test Flask app
+python -c "from app import create_app; app = create_app(); print('✅ App OK')"
 ```
 
 ## 📝 License
@@ -219,32 +247,47 @@ MIT License - xem file LICENSE để biết thêm chi tiết.
 Nếu có vấn đề, hãy tạo issue trên GitHub repository.
 
 ---
+
 **SmallTree Academy** - *Ngôi nhà thứ hai của bé* 🌳
-│       ├── index.html
-│       ├── about.html
-│       ├── classes.html
-│       ├── gallery.html
-│       └── contact.html
-├── config.py
-├── requirements.txt
-├── run.py
-└── README.md
+
+## 🌟 Quick Start Summary
+
+### Development (Local)
+```bash
+git clone https://github.com/athanhtuan11/smalltree.git
+cd smalltree && python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && python run.py
+```
+
+### Production (Linux Server)
+```bash
+chmod +x setup_nginx_gunicorn.sh && ./setup_nginx_gunicorn.sh
+```
+
+### Management
+```bash
+./maintain_server.sh [update|restart|status|logs|backup|health|ssl]
+```
+
+---
+
+*MIT License - See LICENSE file for details*
 ```
 
 ## Features
 
-- **Home Page**: An overview of the nursery and its mission.
-- **About Page**: Information about the nursery, its staff, and philosophy.
+- **Home Page**: An overview of the smalltree and its mission.
+- **About Page**: Information about the smalltree, its staff, and philosophy.
 - **Classes Page**: Details about the different classes offered for children.
-- **Gallery Page**: A collection of images showcasing activities and events at the nursery.
+- **Gallery Page**: A collection of images showcasing activities and events at the smalltree.
 - **Contact Page**: A form for parents to reach out with inquiries.
 
 ## Installation
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/nursery-website.git
-   cd nursery-website
+   git clone https://github.com/yourusername/smalltree-website.git
+   cd smalltree-website
    ```
 
 2. Install the required packages:

@@ -7,7 +7,7 @@ echo
 
 # Check if we're in the right directory
 if [ ! -f "run.py" ]; then
-    echo "❌ Not in project directory! Please cd to nursery-website folder"
+    echo "❌ Not in project directory! Please cd to smalltree-website folder"
     exit 1
 fi
 

@@ -21,7 +21,7 @@ class CurriculumAIService:
 
     def generate_weekly_curriculum(self, age_group, week_number, themes=None, special_focus=None):
         """
-        Generate comprehensive weekly curriculum for nursery
+        Generate comprehensive weekly curriculum for smalltree
         
         Args:
             age_group: Age group (e.g., "1-2 tuổi", "2-3 tuổi", "3-4 tuổi")
