@@ -1589,28 +1589,101 @@ def export_food_safety_process(week_number):
     
     menu_data = json.loads(week.content)
     
-    # Tạo danh sách món ăn và nguyên liệu từ thực đơn
+    # Lấy thông tin suppliers và số học sinh
+    from app.models import Supplier
+    suppliers = Supplier.query.all()
+    supplier_dict = {}
+    for supplier in suppliers:
+        supplier_dict[supplier.name] = {
+            'address': supplier.address,
+            'phone': supplier.phone,
+            'contact_person': supplier.contact_person,
+            'food_safety_cert': supplier.food_safety_cert or ''
+        }
+    
+    # Ước tính số học sinh từ config hoặc mặc định
+    def get_student_count():
+        import os
+        import json
+        config_file = 'student_config.json'
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get('student_count', 25)
+            except:
+                pass
+        return 25  # Mặc định
+    
+    student_count = get_student_count()
+    
+    # Tạo danh sách món ăn và nguyên liệu từ thực đơn với tính toán khối lượng
     dishes = []
-    fresh_ingredients = []
-    dry_ingredients = []
+    fresh_ingredients_with_qty = []
+    dry_ingredients_with_qty = []
+    
+    # Bảng tính toán khối lượng cơ bản (gram/học sinh/bữa)
+    ingredient_portions = {
+        # Thực phẩm tươi
+        'thịt': 50, 'cá': 60, 'tôm': 40, 'trứng': 50,
+        'rau xanh': 80, 'rau củ': 100, 'cà chua': 30,
+        'khoai': 80, 'củ': 70, 'quả': 100,
+        # Thực phẩm khô
+        'gạo': 80, 'bún': 60, 'mì': 50, 'bánh mì': 100,
+        'sữa': 200, 'đường': 10, 'muối': 2, 'dầu ăn': 5,
+        'bột': 20, 'gia vị': 5
+    }
+    
+    ingredient_count = {}
     
     for day_data in menu_data.values():
-        for meal in day_data.values():
+        for meal_type, meal in day_data.items():
             if meal:
                 dish_list = [dish.strip() for dish in meal.split(',') if dish.strip()]
                 dishes.extend(dish_list)
                 
-                # Phân loại nguyên liệu (dựa trên tên món)
+                # Phân tích và tính toán nguyên liệu
                 for dish in dish_list:
-                    if any(x in dish.lower() for x in ['rau', 'cà', 'thịt', 'cá', 'tôm', 'trứng']):
-                        fresh_ingredients.append(dish)
-                    elif any(x in dish.lower() for x in ['gạo', 'bún', 'bánh', 'sữa', 'đường']):
-                        dry_ingredients.append(dish)
+                    dish_lower = dish.lower()
+                    
+                    # Đếm số lần xuất hiện
+                    for ingredient_key, portion in ingredient_portions.items():
+                        if ingredient_key in dish_lower:
+                            if ingredient_key not in ingredient_count:
+                                ingredient_count[ingredient_key] = 0
+                            ingredient_count[ingredient_key] += 1
     
-    # Loại bỏ trùng lặp
+    # Tính toán khối lượng thực tế và phân loại
+    for ingredient_key, count in ingredient_count.items():
+        # Tính khối lượng: số lần xuất hiện × khẩu phần × số học sinh
+        total_weight = count * ingredient_portions[ingredient_key] * student_count
+        weight_kg = round(total_weight / 1000, 2)  # Chuyển sang kg
+        
+        # Tìm supplier phù hợp
+        suitable_supplier = None
+        for supplier_name, supplier_info in supplier_dict.items():
+            if any(keyword in supplier_name.lower() for keyword in ['thực phẩm', 'tươi sống', 'rau củ']):
+                suitable_supplier = supplier_name
+                break
+        
+        if not suitable_supplier and supplier_dict:
+            suitable_supplier = list(supplier_dict.keys())[0]  # Lấy supplier đầu tiên
+        
+        ingredient_info = {
+            'name': ingredient_key.title(),
+            'weight_kg': weight_kg,
+            'supplier': suitable_supplier,
+            'supplier_info': supplier_dict.get(suitable_supplier, {})
+        }
+        
+        # Phân loại nguyên liệu
+        if ingredient_key in ['thịt', 'cá', 'tôm', 'trứng', 'rau xanh', 'rau củ', 'cà chua', 'khoai', 'củ', 'quả']:
+            fresh_ingredients_with_qty.append(ingredient_info)
+        else:
+            dry_ingredients_with_qty.append(ingredient_info)
+    
+    # Loại bỏ trùng lặp món ăn
     dishes = list(set(dishes))
-    fresh_ingredients = list(set(fresh_ingredients))
-    dry_ingredients = list(set(dry_ingredients))
     
     zip_buffer = BytesIO()
     
@@ -1687,25 +1760,26 @@ def export_food_safety_process(week_number):
             cell.fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
             cell.border = thin_border
         
-        # Điền dữ liệu thực phẩm tươi
-        for i, ingredient in enumerate(fresh_ingredients[:20], 1):
+        # Điền dữ liệu thực phẩm tươi với thông tin supplier và khối lượng
+        for i, ingredient_info in enumerate(fresh_ingredients_with_qty[:20], 1):
             row_num = 9 + i
+            supplier_info = ingredient_info.get('supplier_info', {})
             data_row = [
                 i,  # STT
-                ingredient,  # Tên thực phẩm
+                ingredient_info['name'],  # Tên thực phẩm
                 '',  # Merge với B
                 f"{week_start.strftime('%d/%m/%Y')}, 05h:30",  # Thời gian nhập
-                '',  # Khối lượng - để trống
-                'Thực phẩm tươi sống',  # Tên cơ sở
-                '',  # Địa chỉ - để trống
-                '',  # Tên người giao hàng
+                f"{ingredient_info['weight_kg']} kg",  # Khối lượng tính toán
+                ingredient_info.get('supplier', 'Nhà cung cấp'),  # Tên cơ sở
+                supplier_info.get('address', ''),  # Địa chỉ
+                supplier_info.get('contact_person', ''),  # Tên người giao hàng
                 '',  # Số chứng từ
-                '',  # Giấy đăng ký
+                supplier_info.get('food_safety_cert', ''),  # Giấy đăng ký
                 'X',  # Đạt cảm quan
                 '',  # Không đạt cảm quan
                 '',  # Đạt xét nghiệm
                 '',  # Không đạt xét nghiệm
-                ''   # Ghi chú
+                f"Cho {student_count} học sinh"   # Ghi chú
             ]
             
             for j, value in enumerate(data_row, 1):
@@ -1810,26 +1884,27 @@ def export_food_safety_process(week_number):
             cell.fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
             cell.border = thin_border
         
-        # Điền dữ liệu thực phẩm khô
-        for i, ingredient in enumerate(dry_ingredients[:20], 1):
+        # Điền dữ liệu thực phẩm khô với thông tin supplier và khối lượng
+        for i, ingredient_info in enumerate(dry_ingredients_with_qty[:20], 1):
             row_num = 9 + i
+            supplier_info = ingredient_info.get('supplier_info', {})
             data_row = [
                 i,  # STT
-                ingredient,  # Tên thực phẩm
+                ingredient_info['name'],  # Tên thực phẩm
                 '',  # Merge với B
                 '',  # Tên cơ sở sản xuất - để trống
-                'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng',  # Địa chỉ sản xuất
+                supplier_info.get('address', 'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng'),  # Địa chỉ sản xuất
                 f"{week_start.strftime('%d/%m/%Y')}, 07:00",  # Thời gian nhập
-                '',  # Khối lượng - để trống
-                'Tạp hoá Tám Loan',  # Tên cơ sở cung cấp
-                'Nguyễn Khắc Tám',  # Tên chủ giao hàng
-                'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng',  # Địa chỉ
+                f"{ingredient_info['weight_kg']} kg",  # Khối lượng tính toán
+                ingredient_info.get('supplier', 'Tạp hoá Tám Loan'),  # Tên cơ sở cung cấp
+                supplier_info.get('contact_person', 'Nguyễn Khắc Tám'),  # Tên chủ giao hàng
+                supplier_info.get('address', 'Ba Đình2, thị trấn Nam Ban, Lâm Hà, Lâm Đồng'),  # Địa chỉ
                 'Đảm bảo',  # Hạn sử dụng
                 'Kho lương thực',  # Điều kiện bảo quản
                 '',  # Chứng từ - để trống
-                '',  # Đạt - để trống cho người dùng tick
+                'X',  # Đạt - đánh dấu sẵn
                 '',  # Không đạt - để trống
-                ''   # Ghi chú
+                f"Cho {student_count} học sinh"   # Ghi chú
             ]
             
             for j, value in enumerate(data_row, 1):

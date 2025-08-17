@@ -113,12 +113,22 @@ nursery-website/
 4. Chạy `python run.py`
 
 ### Cập nhật code an toàn (giữ nguyên data)
-```bash
-# Chạy script deployment an toàn
-deploy_safe.bat
 
-# Hoặc thủ công:
-backup_data.bat              # Backup data trước
+**Windows:**
+```bash
+deploy_safe.bat
+```
+
+**Linux/Unix:**
+```bash
+chmod +x deploy_safe.sh
+./deploy_safe.sh
+```
+
+**Thủ công:**
+```bash
+backup_data.bat              # Backup data trước (Windows)
+./backup_data.sh             # Backup data trước (Linux)
 git stash                    # Lưu thay đổi local
 git pull origin master      # Pull code mới
 git stash pop               # Restore thay đổi local (nếu cần)
@@ -126,6 +136,7 @@ pip install -r requirements.txt --upgrade
 ```
 
 ### Backup dữ liệu định kỳ
+
 ```bash
 # Windows
 backup_data.bat
@@ -133,6 +144,29 @@ backup_data.bat
 # Linux/Mac  
 ./backup_data.sh
 ```
+
+### Cấu hình số học sinh (cho tính toán khối lượng thực phẩm)
+
+```bash
+# Xem số học sinh hiện tại
+python student_config.py
+
+# Cập nhật số học sinh (ví dụ: 30 học sinh)
+python student_config.py 30
+```
+
+### Quy trình 3 bước tự động tính khối lượng
+
+Hệ thống sẽ tự động:
+- ✅ Phân tích thực đơn và trích xuất nguyên liệu
+- ✅ Tính toán khối lượng dựa trên số học sinh
+- ✅ Ghép thông tin nhà cung cấp từ `/suppliers`
+- ✅ Tạo 5 file Excel theo mẫu Bộ Y Tế với đầy đủ thông tin
+
+**Khẩu phần tính toán:**
+- Thịt: 50g/học sinh, Cá: 60g/học sinh
+- Rau xanh: 80g/học sinh, Rau củ: 100g/học sinh  
+- Gạo: 80g/học sinh, Sữa: 200ml/học sinh
 
 ### Cấu trúc data được bảo vệ
 ```

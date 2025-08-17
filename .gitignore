@@ -138,6 +138,7 @@ app/site.db
 .env.production
 config_production.py
 production_config.py
+student_config.json
 
 # User uploaded files (keep on server)
 app/static/images/activities/
