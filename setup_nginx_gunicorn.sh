@@ -119,7 +119,7 @@ chown smalltree:smalltree $PROJECT_PATH/.env
 chmod 600 $PROJECT_PATH/.env
 print_status "Environment file created"
 
-# Initialize database
+# Initialize database (simplified to avoid SQLAlchemy version conflicts)
 print_info "Setting up database..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
@@ -129,47 +129,66 @@ sudo -u smalltree bash -c "
     # Create database directory
     mkdir -p app
     
-    # Simple database creation
+    # Test basic imports first
+    echo 'Testing basic imports...'
+    python3 -c 'import flask; print(\"✓ Flask import OK\")'
+    python3 -c 'import flask_sqlalchemy; print(\"✓ Flask-SQLAlchemy import OK\")'
+    
+    # Try database creation with better error handling
+    echo 'Creating database...'
     python3 -c \"
+import sys
+import os
+sys.path.insert(0, os.getcwd())
+
 try:
+    print('Importing app modules...')
     from app import create_app
-    from app.models import db
-    print('Creating Flask app...')
+    print('Creating Flask app instance...')
     app = create_app()
-    print('Setting up database...')
+    print('Setting up database context...')
     with app.app_context():
+        from app.models import db
+        print('Creating database tables...')
         db.create_all()
-        print('✓ Database tables created successfully')
+        print('✓ Database setup completed successfully')
+except ImportError as e:
+    print(f'❌ Import error: {e}')
+    print('Please check if all required packages are installed in venv')
+    sys.exit(1)
 except Exception as e:
-    print(f'❌ Database setup failed: {e}')
-    import traceback
-    traceback.print_exc()
+    print(f'❌ Database setup error: {e}')
+    print('This may be due to SQLAlchemy version conflicts')
+    print('Try: pip install SQLAlchemy==1.4.46 Flask-SQLAlchemy==2.5.1')
+    sys.exit(1)
 \"
 "
 print_status "Database initialized"
 
-# Test Flask app before Gunicorn setup
+# Test Flask app before Gunicorn setup  
 print_info "Testing Flask application..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
+    
+    echo 'Testing Flask app import...'
     python3 -c \"
 try:
     from app import create_app
     app = create_app()
     print('✓ Flask app can be imported and created')
-    
-    # Test if gunicorn can load the app
-    import subprocess
-    result = subprocess.run(['python3', '-c', 'from run import app; print(\"✓ Gunicorn can import app from run.py\")'], 
-                          capture_output=True, text=True, timeout=10)
-    if result.returncode == 0:
-        print(result.stdout.strip())
-    else:
-        print(f'❌ App import test failed: {result.stderr}')
-        exit(1)
 except Exception as e:
     print(f'❌ Flask app test failed: {e}')
+    exit(1)
+\"
+
+    echo 'Testing run.py import...'
+    python3 -c \"
+try:
+    from run import app
+    print('✓ run.py import successful')
+except Exception as e:
+    print(f'❌ run.py import failed: {e}')
     exit(1)
 \"
 "

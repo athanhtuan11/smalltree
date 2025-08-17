@@ -70,6 +70,17 @@ def debug_database():
     try:
         # Import and test Flask app
         print("\n10. Testing Flask app import...")
+        
+        # Test SQLAlchemy compatibility first
+        try:
+            import sqlalchemy
+            import flask_sqlalchemy
+            print(f"    ✓ SQLAlchemy version: {sqlalchemy.__version__}")
+            print(f"    ✓ Flask-SQLAlchemy version: {flask_sqlalchemy.__version__}")
+        except ImportError as e:
+            print(f"    ❌ SQLAlchemy import error: {e}")
+            return False
+        
         from app import create_app
         print("    ✓ Flask app imported successfully")
         
@@ -92,6 +103,19 @@ def debug_database():
             children_count = Child.query.count()
             print(f"    ✓ Database query successful: {children_count} children in database")
             
+    except ImportError as e:
+        print(f"\n❌ Import error: {e}")
+        print("💡 Try running: bash fix_sqlalchemy.sh")
+        return False
+    except AttributeError as e:
+        if "'__all__'" in str(e):
+            print(f"\n❌ SQLAlchemy version conflict: {e}")
+            print("💡 This is a known issue with SQLAlchemy 2.x and Flask-SQLAlchemy 2.5.1")
+            print("💡 Run: bash fix_sqlalchemy.sh to fix this")
+            return False
+        else:
+            print(f"\n❌ Attribute error: {e}")
+            return False
     except Exception as e:
         print(f"\n❌ Error testing Flask app: {e}")
         import traceback
