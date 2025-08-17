@@ -1,13 +1,40 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
-from app.menu_ai import get_ai_menu_suggestions
 from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re, secrets
-from werkzeug.security import generate_password_hash, check_password_hash
-from docx import Document
-from docx.shared import Pt
+
+# Import optional dependencies with error handling
+try:
+    from docx import Document
+    from docx.shared import Pt
+    DOCX_AVAILABLE = True
+except ImportError:
+    print("Warning: python-docx not available")
+    DOCX_AVAILABLE = False
+    Document = None
+    Pt = None
+
+# Import AI services with error handling
+try:
+    from app.menu_ai import get_ai_menu_suggestions
+except ImportError:
+    print("Warning: menu_ai not available")
+    def get_ai_menu_suggestions(*args, **kwargs):
+        return "AI service not available"
+
+try:
+    from werkzeug.security import generate_password_hash, check_password_hash
+    WERKZEUG_AVAILABLE = True
+except ImportError:
+    print("Warning: werkzeug.security not available, using fallback")
+    import hashlib
+    WERKZEUG_AVAILABLE = False
+    def generate_password_hash(password):
+        return hashlib.sha256(password.encode()).hexdigest()
+    def check_password_hash(hash_password, password):
+        return hash_password == hashlib.sha256(password.encode()).hexdigest()
 
 # Enhanced AI imports - Multi-AI support
 try:
@@ -36,13 +63,41 @@ from .security_utils import (
 # Rate limiting cho AI endpoints - Security enhancement
 ai_request_timestamps = {}
 AI_RATE_LIMIT_SECONDS = 10  # Chỉ cho phép 1 request AI mỗi 10 giây/user
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from docx.shared import RGBColor
-from openpyxl import load_workbook, Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from PIL import Image
+
+# More optional imports with error handling
+try:
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.shared import RGBColor
+except ImportError:
+    WD_ALIGN_PARAGRAPH = None
+    OxmlElement = None
+    qn = None
+    RGBColor = None
+
+try:
+    from openpyxl import load_workbook, Workbook
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    print("Warning: openpyxl not available")
+    OPENPYXL_AVAILABLE = False
+    load_workbook = None
+    Workbook = None
+    PatternFill = None
+    Font = None
+    Alignment = None
+    Border = None
+    Side = None
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    print("Warning: PIL (Pillow) not available")
+    PIL_AVAILABLE = False
+    Image = None
 
 main = Blueprint('main', __name__)
 
@@ -399,8 +454,12 @@ def invoice():
                         logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo.jpg')
                         if os.path.exists(logo_path):
                             run_logo = left_cell.paragraphs[0].add_run()
-                            from docx.shared import Inches
-                            run_logo.add_picture(logo_path, width=Inches(1.2))
+                            if DOCX_AVAILABLE:
+                                try:
+                                    from docx.shared import Inches
+                                    run_logo.add_picture(logo_path, width=Inches(1.2))
+                                except ImportError:
+                                    pass
                             left_cell.paragraphs[0].alignment = 0  # Left
                         # School info on the right
                         right_paragraph = right_cell.paragraphs[0]
@@ -926,7 +985,6 @@ def change_admin_password():
         elif new_password != confirm_password:
             flash('Mật khẩu mới nhập lại không khớp!', 'danger')
         else:
-            from werkzeug.security import generate_password_hash
             admin.password = generate_password_hash(new_password)
             db.session.commit()
             flash('Đổi mật khẩu admin thành công!', 'success')
@@ -961,7 +1019,6 @@ def create_account():
         email = request.form.get('email')
         phone = request.form.get('phone')
         password = request.form.get('password')
-        from werkzeug.security import generate_password_hash
         if role == 'admin':
             flash('Không thể tạo tài khoản admin qua form này!', 'danger')
             return render_template('create_account.html', title='Tạo tài khoản mới')
@@ -1019,7 +1076,6 @@ def edit_account(user_id):
             user.position = request.form.get('position')
         password = request.form.get('password')
         if password:
-            from werkzeug.security import generate_password_hash
             user.password = generate_password_hash(password)
         db.session.commit()
         flash('Đã cập nhật thông tin tài khoản!', 'success')
@@ -3056,7 +3112,6 @@ def test_curriculum_ai():
 @main.route('/create-test-teacher')
 def create_test_teacher():
     """Tạo tài khoản giáo viên test"""
-    from werkzeug.security import generate_password_hash
     
     # Kiểm tra xem đã có giáo viên test chưa
     existing = Staff.query.filter_by(email='gv1@gmail.com').first()
