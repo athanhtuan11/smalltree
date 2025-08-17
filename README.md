@@ -104,6 +104,53 @@ nursery-website/
 - Touch-friendly buttons (44px minimum)
 - Mobile-first CSS design
 
+## 🚀 Production Deployment
+
+### Lần đầu triển khai
+1. Clone repository trên server
+2. Tạo file `.env.production` từ `.env.example`
+3. Cấu hình database và API keys
+4. Chạy `python run.py`
+
+### Cập nhật code an toàn (giữ nguyên data)
+```bash
+# Chạy script deployment an toàn
+deploy_safe.bat
+
+# Hoặc thủ công:
+backup_data.bat              # Backup data trước
+git stash                    # Lưu thay đổi local
+git pull origin master      # Pull code mới
+git stash pop               # Restore thay đổi local (nếu cần)
+pip install -r requirements.txt --upgrade
+```
+
+### Backup dữ liệu định kỳ
+```bash
+# Windows
+backup_data.bat
+
+# Linux/Mac  
+./backup_data.sh
+```
+
+### Cấu trúc data được bảo vệ
+```
+📁 Được GIT bỏ qua (an toàn):
+├── app/site.db              # Database chính
+├── app/static/uploads/      # File upload của user
+├── app/static/images/activities/  # Ảnh hoạt động
+├── .env.production          # Config production
+├── backups/                 # Các file backup
+└── logs/                    # Log files
+
+📁 Được GIT quản lý (sẽ thay đổi):
+├── app/*.py                 # Source code
+├── app/templates/           # Templates
+├── app/static/css/          # CSS files
+└── requirements.txt         # Dependencies
+```
+
 ## 🛠️ Development
 
 ### Database Migrations

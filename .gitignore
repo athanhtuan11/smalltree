@@ -128,11 +128,36 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project specific
+# Project specific - Production Data Protection
 app/site.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Production Configuration Files (keep on server)
+.env.production
+config_production.py
+production_config.py
+
+# User uploaded files (keep on server)
+app/static/images/activities/
+app/static/uploads/
+uploads/
+media/
+
+# Backup files (keep on server)
+*.backup
+*.bak
+backups/
+
+# Log files (keep on server)
+*.log
+logs/
+app.log
+error.log
+
+# Instance folder (production specific data)
+instance/
 
 # OS generated files
 .DS_Store
