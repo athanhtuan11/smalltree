@@ -2,11 +2,19 @@ from flask import Flask, request, session, jsonify
 from app.models import db, Activity
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
+import os
+from dotenv import load_dotenv
 
 def create_app():
+    # Load environment variables from .env file
+    load_dotenv()
+    
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = 'your-secret-key'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+    
+    # Use environment DATABASE_URL if available, otherwise fallback to default
+    database_url = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     migrate = Migrate(app, db)

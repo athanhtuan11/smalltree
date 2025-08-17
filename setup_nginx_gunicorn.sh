@@ -121,7 +121,7 @@ cat > $PROJECT_PATH/.env << EOF
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 FLASK_ENV=production
 FLASK_DEBUG=0
-DATABASE_URL=sqlite:///$PROJECT_PATH/app/site.db
+DATABASE_URL=sqlite:///app/site.db
 DOMAIN=$DOMAIN
 EOF
 chown smalltree:smalltree $PROJECT_PATH/.env
@@ -137,13 +137,22 @@ sudo -u smalltree bash -c "
     # Create database directory if not exists
     mkdir -p app
     
-    # Initialize or upgrade database
-    flask db upgrade 2>/dev/null || (
-        echo 'Initializing new database...'
-        flask db init
-        flask db migrate -m 'Initial migration' 
-        flask db upgrade
-    )
+    # Initialize or upgrade database with better error handling
+    echo 'Attempting database upgrade...'
+    if ! flask db upgrade 2>/dev/null; then
+        echo 'Database upgrade failed, initializing new database...'
+        if ! flask db init 2>/dev/null; then
+            echo 'Database init failed, creating manually...'
+            python3 -c 'from app import create_app; from app.models import db; app = create_app(); app.app_context().push(); db.create_all(); print(\"Database created manually\")'
+        else
+            flask db migrate -m 'Initial migration' 2>/dev/null || echo 'Migration creation failed'
+            flask db upgrade 2>/dev/null || echo 'Database upgrade after init failed'
+        fi
+    fi
+    
+    # Run database debug script
+    echo 'Running database debug...'
+    python3 debug_database.py
 "
 print_status "Database initialized"
 
