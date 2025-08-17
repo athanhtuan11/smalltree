@@ -61,33 +61,32 @@ if [ ! -d "$PROJECT_PATH" ] || [ ! -f "$PROJECT_PATH/run.py" ] || [ ! -d "$PROJE
 fi
 print_status "Project verified"
 
-# 4. Fix ownership
-print_info "Setting permissions..."
-chown -R smalltree:smalltree $PROJECT_PATH
+# 4. Fix ownership (Root mode)
+print_info "Setting permissions for root..."
+chown -R root:root $PROJECT_PATH
 find $PROJECT_PATH -type d -exec chmod 755 {} \;
 find $PROJECT_PATH -type f -exec chmod 644 {} \;
 chmod +x $PROJECT_PATH/*.sh 2>/dev/null || true
-print_status "Permissions set"
+print_status "Permissions set for root"
 
-# 5. Environment
-print_info "Creating environment..."
+# 5. Environment (Root mode)
+print_info "Creating environment for root..."
 cat > $PROJECT_PATH/.env << EOF
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 FLASK_ENV=production
 DATABASE_URL=sqlite:///$PROJECT_PATH/app/site.db
 DOMAIN=$DOMAIN
 EOF
-chown smalltree:smalltree $PROJECT_PATH/.env
+chown root:root $PROJECT_PATH/.env
 chmod 600 $PROJECT_PATH/.env
-print_status "Environment created"
+print_status "Environment created for root"
 
-# 6. Database
-print_info "Setting up database..."
-sudo -u smalltree bash -c "
-    cd $PROJECT_PATH
-    source venv/bin/activate
-    mkdir -p app
-    python3 -c \"
+# 6. Database (Root mode)
+print_info "Setting up database as root..."
+cd $PROJECT_PATH
+source venv/bin/activate
+mkdir -p app
+python3 -c "
 import sys, os
 sys.path.insert(0, os.getcwd())
 try:
@@ -100,7 +99,6 @@ try:
 except Exception as e:
     print(f'❌ Database error: {e}')
     sys.exit(1)
-\"
 "
 print_status "Database ready"
 
@@ -112,9 +110,9 @@ Description=SmallTree Academy
 After=network.target
 
 [Service]
-Type=exec
-User=smalltree
-Group=smalltree
+Type=simple
+User=root
+Group=root
 WorkingDirectory=$PROJECT_PATH
 Environment="PATH=$PROJECT_PATH/venv/bin"
 ExecStart=$PROJECT_PATH/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 60 run:app
