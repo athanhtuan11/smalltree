@@ -1215,9 +1215,26 @@ def menu():
     menu = []
     for week in weeks:
         try:
-            data = json.loads(week.content)
-        except Exception:
+            data = json.loads(week.content) if week.content else {}
+            # Ensure all days and slots exist
+            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+            slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+            for day in days:
+                if day not in data:
+                    data[day] = {}
+                for slot in slots:
+                    if slot not in data[day]:
+                        data[day][slot] = ''
+        except Exception as e:
+            print(f"Error parsing JSON for week {week.week_number}: {e}")
             data = {}
+            # Initialize empty structure
+            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+            slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
+            for day in days:
+                data[day] = {}
+                for slot in slots:
+                    data[day][slot] = ''
         menu.append({
             'week_number': week.week_number,
             'data': data

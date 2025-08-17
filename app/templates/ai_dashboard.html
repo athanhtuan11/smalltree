@@ -6,11 +6,167 @@
 <!-- CSRF Token for JavaScript -->
 <meta name="csrf-token" content="{{ csrf_token() }}">
 
+<!-- Mobile Responsive CSS -->
+<style>
+    /* Mobile Optimization */
+    @media (max-width: 768px) {
+        .container {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        /* Responsive tabs */
+        .nav-tabs {
+            flex-wrap: wrap;
+        }
+        
+        .nav-tabs .nav-link {
+            font-size: 14px;
+            padding: 8px 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+        
+        /* Responsive cards */
+        .card {
+            margin-bottom: 15px;
+        }
+        
+        .card-header h5 {
+            font-size: 16px;
+            margin-bottom: 0;
+        }
+        
+        /* Responsive form elements */
+        .form-control, .form-select {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+        
+        /* Responsive buttons */
+        .btn {
+            font-size: 14px;
+            padding: 10px 15px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .btn-group-mobile {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        /* Hide long text on mobile */
+        .mobile-hide {
+            display: none;
+        }
+        
+        /* Responsive progress bars */
+        .progress {
+            height: 25px;
+        }
+        
+        /* Responsive list items */
+        .list-group-item {
+            font-size: 14px;
+            padding: 8px 12px;
+        }
+        
+        /* Responsive info sections */
+        .info-section {
+            font-size: 13px;
+        }
+        
+        .info-section ul li {
+            margin-bottom: 5px;
+        }
+        
+        /* Better spacing for mobile */
+        .mt-4 {
+            margin-top: 20px !important;
+        }
+        
+        .mb-3 {
+            margin-bottom: 15px !important;
+        }
+        
+        /* Responsive text */
+        h2 {
+            font-size: 24px;
+        }
+        
+        h5 {
+            font-size: 16px;
+        }
+        
+        h6 {
+            font-size: 14px;
+        }
+        
+        /* Mobile-specific layout */
+        .mobile-col {
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+        
+        /* Responsive textarea */
+        textarea.form-control {
+            min-height: 80px;
+            font-size: 14px;
+        }
+        
+        /* Better touch targets */
+        .nav-link {
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Responsive alerts */
+        .alert {
+            font-size: 14px;
+            padding: 10px;
+        }
+    }
+    
+    /* Small mobile devices */
+    @media (max-width: 576px) {
+        .nav-tabs .nav-link {
+            font-size: 12px;
+            padding: 6px 8px;
+            max-width: 140px;
+        }
+        
+        .nav-tabs .nav-link i {
+            display: none; /* Hide icons on very small screens */
+        }
+        
+        h2 {
+            font-size: 20px;
+        }
+        
+        .card-header h5 {
+            font-size: 14px;
+        }
+    }
+    
+    /* Landscape mobile optimization */
+    @media (max-width: 768px) and (orientation: landscape) {
+        .nav-tabs .nav-link {
+            font-size: 13px;
+            padding: 6px 10px;
+        }
+    }
+</style>
+
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
-            <h2><i class="fas fa-robot"></i> AI Dashboard - LLM Farm</h2>
-            <p class="text-muted">Sử dụng trí tuệ nhân tạo để hỗ trợ quản lý mầm non</p>
+            <h2><i class="fas fa-robot"></i> AI Dashboard <span class="mobile-hide">- LLM Farm</span></h2>
+            <p class="text-muted">Sử dụng AI để hỗ trợ quản lý mầm non</p>
         </div>
     </div>
 
@@ -21,22 +177,21 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link active" id="menu-tab" data-bs-toggle="tab" data-bs-target="#menu-ai" 
                             type="button" role="tab" aria-controls="menu-ai" aria-selected="true">
-                        <i class="fas fa-utensils"></i> Menu AI
+                        <i class="fas fa-utensils"></i> <span class="d-none d-sm-inline">Menu AI</span><span class="d-sm-none">Menu</span>
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="curriculum-tab" data-bs-toggle="tab" data-bs-target="#curriculum-ai" 
                             type="button" role="tab" aria-controls="curriculum-ai" aria-selected="false">
-                        <i class="fas fa-graduation-cap"></i> Chương trình học AI
+                        <i class="fas fa-graduation-cap"></i> <span class="d-none d-sm-inline">Chương trình học AI</span><span class="d-sm-none">Chương trình</span>
                     </button>
                 </li>
             </ul>
-            
             <div class="tab-content" id="aiTabsContent">
                 <!-- Menu AI Tab -->
                 <div class="tab-pane fade show active" id="menu-ai" role="tabpanel" aria-labelledby="menu-tab">
                     <div class="row mt-3">
-                        <div class="col-md-6">
+                        <div class="col-lg-6 col-12 mobile-col">
                             <div class="card">
                                 <div class="card-header bg-primary text-white">
                                     <h5><i class="fas fa-utensils"></i> Gợi ý thực đơn AI</h5>
@@ -54,17 +209,19 @@
                                         <div class="mb-3">
                                             <label for="availableIngredients" class="form-label">Thực phẩm có sẵn</label>
                                             <textarea class="form-control" id="availableIngredients" rows="3" 
-                                                      placeholder="Nhập các thực phẩm có sẵn, mỗi loại một dòng...&#10;VD: Thịt heo&#10;    Cà rốt&#10;    Cơm&#10;    Trứng gà"></textarea>
-                                            <small class="form-text text-muted">AI sẽ tạo thực đơn từ các nguyên liệu bạn có sẵn</small>
+                                                      placeholder="Nhập thực phẩm có sẵn, mỗi loại một dòng...&#10;VD: Thịt heo, Cà rốt, Cơm, Trứng gà"></textarea>
+                                            <small class="form-text text-muted">AI sẽ tạo thực đơn từ nguyên liệu có sẵn</small>
                                         </div>
                                         <div class="mb-3">
                                             <label for="dietaryRequirements" class="form-label">Yêu cầu đặc biệt</label>
                                             <input type="text" class="form-control" id="dietaryRequirements" 
                                                    placeholder="VD: không gluten, chay, dị ứng sữa...">
                                         </div>
-                                        <button type="submit" class="btn btn-primary" id="menuSubmitBtn">
-                                            <i class="fas fa-magic"></i> Tạo thực đơn tuần từ AI
-                                        </button>
+                                        <div class="d-grid">
+                                            <button type="submit" class="btn btn-primary" id="menuSubmitBtn">
+                                                <i class="fas fa-magic"></i> Tạo thực đơn AI
+                                            </button>
+                                        </div>
                                     </form>
                                     
                                     <!-- Progress Bar for Menu -->
@@ -88,9 +245,9 @@
                                         <ul id="menuList" class="list-group"></ul>
                                         
                                         <!-- Nút tạo thực đơn mới -->
-                                        <div class="mt-3 d-grid gap-2">
+                                        <div class="mt-3 d-grid">
                                             <button type="button" class="btn btn-success" id="createMenuBtn" style="display: none;">
-                                                <i class="fas fa-plus"></i> Tạo thực đơn mới cho tuần hiện tại
+                                                <i class="fas fa-plus"></i> Tạo thực đơn mới
                                             </button>
                                         </div>
                                     </div>
@@ -99,31 +256,30 @@
                         </div>
 
                         <!-- Menu System Info -->
-                        <div class="col-md-6">
+                        <div class="col-lg-6 col-12 mobile-col">
                             <div class="card">
                                 <div class="card-header bg-info text-white">
-                                    <h5><i class="fas fa-info-circle"></i> Hướng dẫn Menu AI</h5>
+                                    <h5><i class="fas fa-info-circle"></i> Hướng dẫn</h5>
                                 </div>
-                                <div class="card-body">
-                                    <h6><i class="fas fa-utensils"></i> Gợi ý thực đơn AI:</h6>
+                                <div class="card-body info-section">
+                                    <h6><i class="fas fa-utensils"></i> Menu AI:</h6>
                                     <ul class="mb-3">
-                                        <li>Chọn độ tuổi của trẻ</li>
+                                        <li>Chọn độ tuổi trẻ</li>
                                         <li>Nhập nguyên liệu có sẵn</li>
-                                        <li>AI sẽ tạo thực đơn chi tiết cho cả tuần (36 bữa ăn)</li>
-                                        <li>Bấm nút "Tạo thực đơn mới" để lưu vào database</li>
+                                        <li>AI tạo thực đơn chi tiết (36 bữa)</li>
+                                        <li>Bấm "Tạo thực đơn mới" để lưu</li>
                                     </ul>
                                     
                                     <h6><i class="fas fa-calendar-week"></i> Thực đơn tuần:</h6>
                                     <ul class="mb-3">
                                         <li><strong>6 ngày:</strong> Thứ 2 → Thứ 7</li>
-                                        <li><strong>6 khung giờ:</strong> Sáng, Phụ sáng, Tráng miệng, Trưa, Xế, Xế chiều</li>
-                                        <li><strong>Tổng cộng:</strong> 36 bữa ăn chi tiết</li>
+                                        <li><strong>6 khung giờ/ngày</strong></li>
+                                        <li><strong>Tổng:</strong> 36 bữa ăn</li>
                                     </ul>
                                     
-                                    <h6><i class="fas fa-brain"></i> Gemini AI Model:</h6>
-                                    <ul>
+                                    <h6 class="d-none d-md-block"><i class="fas fa-brain"></i> Gemini AI:</h6>
+                                    <ul class="d-none d-md-block">
                                         <li><strong>Version:</strong> gemini-1.5-pro</li>
-                                        <li><strong>Đặc điểm:</strong> Thông minh, nhanh, hiện đại</li>
                                         <li><strong>Khả năng:</strong> Tạo thực đơn cân bằng dinh dưỡng</li>
                                     </ul>
                                 </div>
@@ -135,10 +291,10 @@
                 <!-- Curriculum AI Tab -->
                 <div class="tab-pane fade" id="curriculum-ai" role="tabpanel" aria-labelledby="curriculum-tab">
                     <div class="row mt-3">
-                        <div class="col-md-6">
+                        <div class="col-lg-6 col-12 mobile-col">
                             <div class="card">
                                 <div class="card-header bg-success text-white">
-                                    <h5><i class="fas fa-graduation-cap"></i> Gợi ý chương trình học AI</h5>
+                                    <h5><i class="fas fa-graduation-cap"></i> Chương trình học AI</h5>
                                 </div>
                                 <div class="card-body">
                                     <form id="curriculumSuggestionForm">
@@ -157,18 +313,20 @@
                                                    min="1" max="53" value="1" placeholder="Nhập số tuần (1-53)">
                                         </div>
                                         <div class="mb-3">
-                                            <label for="themes" class="form-label">Chủ đề tuần (không bắt buộc)</label>
+                                            <label for="themes" class="form-label">Chủ đề tuần <span class="text-muted">(tùy chọn)</span></label>
                                             <input type="text" class="form-control" id="themes" name="themes" 
                                                    placeholder="VD: Động vật, Màu sắc, Số đếm...">
                                         </div>
                                         <div class="mb-3">
-                                            <label for="specialFocus" class="form-label">Trọng tâm đặc biệt (không bắt buộc)</label>
+                                            <label for="specialFocus" class="form-label">Trọng tâm đặc biệt <span class="text-muted">(tùy chọn)</span></label>
                                             <input type="text" class="form-control" id="specialFocus" name="special_focus" 
                                                    placeholder="VD: Phát triển ngôn ngữ, Kỹ năng vận động...">
                                         </div>
-                                        <button type="submit" class="btn btn-success" id="curriculumSubmitBtn">
-                                            <i class="fas fa-brain"></i> Tạo chương trình học từ AI
-                                        </button>
+                                        <div class="d-grid">
+                                            <button type="submit" class="btn btn-success" id="curriculumSubmitBtn">
+                                                <i class="fas fa-brain"></i> Tạo chương trình AI
+                                            </button>
+                                        </div>
                                     </form>
                                     
                                     <!-- Progress Bar for Curriculum -->
@@ -184,10 +342,10 @@
                         </div>
                         
                         <!-- Curriculum Results -->
-                        <div class="col-md-6">
+                        <div class="col-lg-6 col-12 mobile-col">
                             <div class="card">
                                 <div class="card-header bg-info text-white">
-                                    <h5><i class="fas fa-list-alt"></i> Kết quả chương trình học</h5>
+                                    <h5><i class="fas fa-list-alt"></i> Kết quả</h5>
                                 </div>
                                 <div class="card-body">
                                     <div id="curriculumResults" class="d-none">
@@ -198,7 +356,7 @@
                                         
                                         <div class="mb-3">
                                             <h6><i class="fas fa-calendar-week"></i> Hoạt động từng ngày:</h6>
-                                            <div id="curriculumActivities" style="max-height: 300px; overflow-y: auto;"></div>
+                                            <div id="curriculumActivities" style="max-height: 250px; overflow-y: auto;"></div>
                                         </div>
                                         
                                         <div class="mb-3">
@@ -206,16 +364,18 @@
                                             <div id="curriculumMaterials"></div>
                                         </div>
                                         
-                                        <button class="btn btn-primary" id="createCurriculumBtn" style="display: none;">
-                                            <i class="fas fa-plus"></i> Tạo chương trình học này
-                                        </button>
+                                        <div class="d-grid">
+                                            <button class="btn btn-primary" id="createCurriculumBtn" style="display: none;">
+                                                <i class="fas fa-plus"></i> Tạo chương trình học
+                                            </button>
+                                        </div>
                                         
                                         <div id="curriculumCreateResult" class="mt-3" style="display: none;"></div>
                                     </div>
                                     
                                     <div id="curriculumPlaceholder">
-                                        <p class="text-muted"><i class="fas fa-arrow-left"></i> Sử dụng form bên trái để tạo chương trình học bằng AI</p>
-                                        <p><small>AI sẽ tạo chương trình học chi tiết cho 6 ngày (Thứ 2 - Thứ 7) với các hoạt động phù hợp độ tuổi.</small></p>
+                                        <p class="text-muted"><i class="fas fa-arrow-up d-md-none"></i><i class="fas fa-arrow-left d-none d-md-inline"></i> Sử dụng form để tạo chương trình học AI</p>
+                                        <p><small>AI tạo chương trình chi tiết cho 5 ngày (Thứ 2-6) với hoạt động phù hợp độ tuổi.</small></p>
                                     </div>
                                 </div>
                             </div>
@@ -234,34 +394,34 @@
                     <h5><i class="fas fa-link"></i> Liên kết nhanh</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-2">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.menu') }}" class="btn btn-outline-primary w-100 mb-2">
-                                <i class="fas fa-calendar-alt"></i><br>Xem thực đơn
+                                <i class="fas fa-calendar-alt"></i><br><span class="d-none d-sm-inline">Xem </span>Thực đơn
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.new_menu') }}" class="btn btn-outline-success w-100 mb-2">
-                                <i class="fas fa-plus"></i><br>Tạo thực đơn
+                                <i class="fas fa-plus"></i><br><span class="d-none d-sm-inline">Tạo </span>Thực đơn
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.curriculum') }}" class="btn btn-outline-info w-100 mb-2">
-                                <i class="fas fa-graduation-cap"></i><br>Chương trình học
-                                <small class="d-block text-muted">🤖 Có AI</small>
+                                <i class="fas fa-graduation-cap"></i><br>Chương trình
+                                <small class="d-block text-muted d-none d-sm-block">🤖 Có AI</small>
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-outline-warning w-100 mb-2">
-                                <i class="fas fa-plus-circle"></i><br>Tạo chương trình
+                                <i class="fas fa-plus-circle"></i><br><span class="d-none d-sm-inline">Tạo </span>CT mới
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.suppliers') }}" class="btn btn-outline-secondary w-100 mb-2">
-                                <i class="fas fa-truck"></i><br>Nhà cung cấp
+                                <i class="fas fa-truck"></i><br><span class="d-none d-sm-inline">Nhà </span>Cung cấp
                             </a>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-6 col-md-2">
                             <a href="{{ url_for('main.products') }}" class="btn btn-outline-dark w-100 mb-2">
                                 <i class="fas fa-box"></i><br>Sản phẩm
                             </a>

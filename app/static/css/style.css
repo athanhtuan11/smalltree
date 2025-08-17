@@ -127,3 +127,89 @@ p {
     box-shadow: 0 2px 8px rgba(255, 182, 193, 0.2);
     background: #fff0f5;
 }
+
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+    .mobile-btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 1rem;
+    }
+    
+    .mobile-btn-group .btn {
+        width: 100%;
+        min-height: 44px;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    
+    .mobile-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    
+    .mobile-form-control {
+        font-size: 16px; /* Prevents zoom on iOS */
+        min-height: 44px;
+    }
+    
+    .mobile-tab-nav .nav-link {
+        min-height: 44px;
+        font-size: 1rem;
+        padding: 12px 8px;
+    }
+    
+    .navbar-nav .nav-link {
+        padding: 12px 16px !important;
+        min-height: 44px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .navbar-nav .nav-link:last-child {
+        border-bottom: none;
+    }
+    
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+    
+    .btn-sm {
+        min-height: 36px;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .container-fluid {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+    
+    .navbar-brand {
+        font-size: 1.1rem !important;
+    }
+    
+    .mobile-btn-group .btn {
+        font-size: 0.95rem;
+        padding: 10px 12px;
+    }
+    
+    .mobile-form-control {
+        font-size: 16px;
+        padding: 10px 12px;
+    }
+    
+    .card-body {
+        padding: 1rem 0.75rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .btn {
+        font-size: 0.9rem;
+    }
+}

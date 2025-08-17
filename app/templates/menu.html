@@ -1,29 +1,128 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-    .menu-table-mobile { font-size:0.85em; }
+    /* Mobile First Design */
+    .menu-table-mobile { font-size:0.8em; }
     .menu-table-desktop { font-size:1em; }
-    .menu-header-mobile { font-size:1.1em; }
-    .menu-header-desktop { font-size:1.1em; }
-    .menu-btn-mobile { width:100%; margin-bottom:8px; font-size:0.95em; }
+    .menu-header-mobile { font-size:1em; }
+    .menu-header-desktop { font-size:1.2em; }
+    .menu-btn-mobile { width:100%; margin-bottom:8px; font-size:0.9em; padding:8px 12px; }
     .menu-btn-group-mobile { display:flex; flex-direction:column; gap:8px; }
     .menu-table-mobile thead th { position:sticky; top:0; background:#c8e6c9; z-index:2; }
-    .menu-table-mobile td, .menu-table-mobile th { padding:0.18em 0.08em; }
+    .menu-table-mobile td, .menu-table-mobile th { padding:0.15em 0.05em; font-size:0.8em; }
     .menu-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
-    .menu-scroll-hint { font-size:0.92em; color:#388e3c; text-align:center; margin-bottom:3px; }
+    .menu-scroll-hint { font-size:0.85em; color:#388e3c; text-align:center; margin-bottom:3px; }
+    
+    /* Mobile Optimizations */
+    @media (max-width: 768px) {
+        .container-fluid { 
+            padding-left: 10px !important; 
+            padding-right: 10px !important; 
+        }
+        
+        .menu-table-wrapper { 
+            margin-left:-10px; 
+            margin-right:-10px; 
+            border-radius:0; 
+        }
+        
+        /* Mobile button group */
+        .mobile-btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .mobile-btn-group .btn {
+            width: 100%;
+            font-size: 14px;
+            padding: 10px;
+        }
+        
+        /* Mobile form controls */
+        .mobile-form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .mobile-form-row input,
+        .mobile-form-row button {
+            width: 100%;
+            font-size: 14px;
+        }
+        
+        /* Hide less important elements on mobile */
+        .mobile-hide {
+            display: none;
+        }
+        
+        /* Better table on mobile */
+        .table-responsive {
+            border: none;
+            margin: 0 -10px;
+        }
+        
+        .table {
+            font-size: 12px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 4px 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 80px;
+        }
+        
+        /* Mobile header */
+        h2 {
+            font-size: 18px !important;
+            text-align: center;
+        }
+    }
+    
     @media (max-width: 576px) {
-        .menu-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+        .menu-table-wrapper { 
+            margin-left:-16px; 
+            margin-right:-16px; 
+            border-radius:0; 
+        }
+        
+        h2 {
+            font-size: 16px !important;
+        }
+        
+        .table {
+            font-size: 10px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 2px 1px;
+            max-width: 60px;
+        }
     }
 </style>
-<div class="container-fluid mt-4 mb-4 px-0">
+
+<div class="container-fluid mt-4 mb-4">
+    <!-- Header Section -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-2">
-        <h2 class="fw-bold text-center text-md-start mb-2 mb-md-0 {% if mobile %}menu-header-mobile{% else %}menu-header-desktop{% endif %}" style="color:#43a047;">Thực đơn các tuần</h2>
+        <h2 class="fw-bold text-center text-md-start mb-2 mb-md-0 {% if mobile %}menu-header-mobile{% else %}menu-header-desktop{% endif %}" style="color:#43a047;">
+            <span class="d-none d-md-inline">Thực đơn các tuần</span>
+            <span class="d-md-none">Thực đơn</span>
+        </h2>
         {% if session.get('role') in ['admin', 'teacher'] %}
-        <a href="{{ url_for('main.new_menu') }}" class="btn btn-success {% if mobile %}menu-btn-mobile{% endif %}">+ Thêm thực đơn</a>
+        <a href="{{ url_for('main.new_menu') }}" class="btn btn-success {% if mobile %}menu-btn-mobile{% endif %}">
+            <i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Thêm </span>Thực đơn
+        </a>
         {% endif %}
     </div>
+    
+    <!-- Action Buttons Section -->
     {% if session.get('role') in ['admin', 'teacher'] %}
-    <div class="d-flex flex-row gap-2 mb-3">
+    <div class="d-none d-md-flex flex-row gap-2 mb-3">
         <form action="/menu/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="file" name="excel_file" accept=".xlsx" required style="display:inline-block;">
@@ -38,17 +137,42 @@
             <i class="fas fa-robot"></i> AI Dashboard
         </a>
     </div>
+    
+    <!-- Mobile Action Buttons -->
+    <div class="d-md-none mobile-btn-group mb-3">
+        <form action="/menu/import" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mobile-form-row">
+                <input type="file" name="excel_file" accept=".xlsx" required class="form-control">
+                <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Số tuần (1-53)" class="form-control">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Import Excel
+                </button>
+            </div>
+        </form>
+        <a href="/menu/export" class="btn btn-success">
+            <i class="fas fa-download"></i> Export Excel
+        </a>
+        <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning">
+            <i class="fas fa-truck"></i> Nhà cung cấp
+        </a>
+        <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info">
+            <i class="fas fa-robot"></i> AI Dashboard
+        </a>
+    </div>
     {% endif %}
     <script>
     // Auto-fill week number input with current week of year
     document.addEventListener('DOMContentLoaded', function() {
         var weekInput = document.getElementById('import-week-number');
-        if (weekInput) {
-            var now = new Date();
-            var onejan = new Date(now.getFullYear(),0,1);
-            var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
-            weekInput.value = week;
-        }
+        var weekInputMobile = document.getElementById('import-week-number-mobile');
+        
+        var now = new Date();
+        var onejan = new Date(now.getFullYear(),0,1);
+        var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+        
+        if (weekInput) weekInput.value = week;
+        if (weekInputMobile) weekInputMobile.value = week;
     });
     </script>
     {% for week in menu %}
@@ -90,12 +214,12 @@
                         {% for day, label in [('mon', 'Thứ 2'), ('tue', 'Thứ 3'), ('wed', 'Thứ 4'), ('thu', 'Thứ 5'), ('fri', 'Thứ 6'), ('sat', 'Thứ 7')] %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            <td>{{ week.data[day]['morning']|safe }}</td>
-                            <td>{{ week.data[day]['snack']|safe }}</td>
-                            <td>{{ week.data[day]['dessert']|safe }}</td>
-                            <td>{{ week.data[day]['lunch']|safe }}</td>
-                            <td>{{ week.data[day]['afternoon']|safe }}</td>
-                            <td>{{ week.data[day]['lateafternoon']|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('morning', ''))|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('snack', ''))|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('dessert', ''))|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('lunch', ''))|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('afternoon', ''))|safe }}</td>
+                            <td>{{ (week.data.get(day, {}).get('lateafternoon', ''))|safe }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
