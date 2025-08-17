@@ -93,8 +93,17 @@ fi
 
 print_status "Project structure verified"
 
-# Set proper ownership
-print_info "Setting file permissions..."
+# Fix ownership issues (critical for database access)
+print_info "Fixing file ownership and permissions..."
+chown -R smalltree:smalltree $PROJECT_PATH
+find $PROJECT_PATH -type d -exec chmod 755 {} \;
+find $PROJECT_PATH -type f -exec chmod 644 {} \;
+chmod +x $PROJECT_PATH/*.sh 2>/dev/null || true
+chmod +x $PROJECT_PATH/venv/bin/* 2>/dev/null || true
+print_status "Ownership and permissions fixed"
+
+# Set proper ownership (redundant but ensuring)
+print_info "Ensuring proper file permissions..."
 chown -R smalltree:smalltree $PROJECT_PATH
 chmod +x $PROJECT_PATH/venv/bin/activate
 print_status "Permissions set"

@@ -19,7 +19,12 @@ cd $PROJECT_PATH || {
     exit 1
 }
 
-echo "1. Fixing SQLAlchemy version conflicts..."
+echo "1. Fixing file ownership (critical for database access)..."
+chown -R smalltree:smalltree $PROJECT_PATH
+chmod 755 $PROJECT_PATH/app
+echo "✓ Ownership fixed"
+
+echo "2. Fixing SQLAlchemy version conflicts..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
@@ -33,7 +38,7 @@ sudo -u smalltree bash -c "
     echo 'Package versions fixed'
 "
 
-echo "2. Testing database setup with permissions fix..."
+echo "3. Testing database setup with permissions fix..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
@@ -89,7 +94,7 @@ except Exception as e:
 \"
 "
 
-echo "3. Creating environment file..."
+echo "4. Creating environment file..."
 cat > $PROJECT_PATH/.env << EOF
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 FLASK_ENV=production
@@ -97,7 +102,7 @@ DATABASE_URL=sqlite:///app/site.db
 EOF
 chown smalltree:smalltree $PROJECT_PATH/.env
 
-echo "4. Creating systemd service..."
+echo "5. Creating systemd service..."
 cat > /etc/systemd/system/smalltree.service << EOF
 [Unit]
 Description=SmallTree Academy Flask Application
@@ -117,7 +122,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-echo "5. Creating Nginx config..."
+echo "6. Creating Nginx config..."
 cat > /etc/nginx/sites-available/smalltree << EOF
 server {
     listen 80;
@@ -136,7 +141,7 @@ server {
 }
 EOF
 
-echo "6. Enabling services..."
+echo "7. Enabling services..."
 ln -sf /etc/nginx/sites-available/smalltree /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
@@ -144,11 +149,11 @@ systemctl daemon-reload
 systemctl enable smalltree
 systemctl enable nginx
 
-echo "7. Starting services..."
+echo "8. Starting services..."
 systemctl restart smalltree
 systemctl restart nginx
 
-echo "8. Checking status..."
+echo "9. Checking status..."
 sleep 3
 if systemctl is-active --quiet smalltree; then
     echo "✅ SmallTree service is running"
