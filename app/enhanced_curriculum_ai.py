@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class EnhancedCurriculumAI:
     def __init__(self):
         """Initialize Enhanced Curriculum AI với multi-provider support"""
-        self.current_provider = "gemini"  # Default
+        self.current_provider = "cohere"  # Default
         self.multi_ai_service = None
         self._init_multi_ai()
     
@@ -21,18 +21,41 @@ class EnhancedCurriculumAI:
             import sys
             import os
             
-            # Add parent directory to path
+            # Add parent directory to path for config
             current_dir = os.path.dirname(os.path.abspath(__file__))
             parent_dir = os.path.dirname(current_dir)
             if parent_dir not in sys.path:
                 sys.path.append(parent_dir)
             
-            from multi_ai_config import MultiAIConfig
+            from config import Config
             
-            config = MultiAIConfig.get_config()
-            if config:
-                self.multi_ai_service = MultiAIService(config)
-                logger.info("✅ Enhanced Curriculum AI initialized with Multi-AI support")
+            # Validate API keys
+            api_keys = {
+                'cohere': getattr(Config, 'COHERE_API_KEY', None),
+                'groq': getattr(Config, 'GROQ_API_KEY', None),
+                'openai': getattr(Config, 'OPENAI_API_KEY', None),
+                'anthropic': getattr(Config, 'ANTHROPIC_API_KEY', None),
+                'gemini': getattr(Config, 'GEMINI_API_KEY', None)
+            }
+            
+            # Check for any working provider
+            working_providers = [k for k, v in api_keys.items() if v and v.strip()]
+            
+            if working_providers:
+                # Priority order: cohere, groq, openai, anthropic, gemini (last due to quota issues)
+                provider_priority = ["cohere", "groq", "openai", "anthropic", "gemini"]
+                available_providers = [p for p in provider_priority if p in working_providers]
+                
+                if available_providers:
+                    config = {
+                        'providers': api_keys,
+                        'default_provider': available_providers[0]
+                    }
+                    self.multi_ai_service = MultiAIService(config)
+                    self.current_provider = available_providers[0]
+                    logger.info(f"✅ Enhanced Curriculum AI initialized with {available_providers[0]} (fallback: {available_providers[1:]})")
+                else:
+                    logger.warning("⚠️ No working AI providers found")
             else:
                 logger.warning("⚠️ No AI providers configured, using fallback")
         except Exception as e:

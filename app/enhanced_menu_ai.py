@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class EnhancedMenuAI:
     def __init__(self):
         """Initialize Enhanced Menu AI với multi-provider support"""
-        self.current_provider = "gemini"  # Default
+        self.current_provider = "cohere"  # Changed from gemini to cohere
         self.multi_ai_service = None
         self._init_multi_ai()
     
@@ -28,10 +28,19 @@ class EnhancedMenuAI:
             if parent_dir not in sys.path:
                 sys.path.append(parent_dir)
             
-            from multi_ai_config import MultiAIConfig
+            # Use config.py instead of multi_ai_config
+            from config import Config
             
-            config = MultiAIConfig.get_config()
-            if config:
+            config = {
+                "cohere": {"api_key": Config.COHERE_API_KEY, "model": "command-r"},
+                "groq": {"api_key": Config.GROQ_API_KEY, "model": Config.GROQ_MODEL},
+                "openai": {"api_key": Config.OPENAI_API_KEY, "model": Config.OPENAI_MODEL},
+                "anthropic": {"api_key": Config.ANTHROPIC_API_KEY, "model": Config.ANTHROPIC_MODEL},
+                "gemini": {"api_key": Config.GEMINI_API_KEY, "model": "gemini-1.5-pro"},
+                "priority": ["cohere", "groq", "openai", "anthropic", "gemini"]  # Cohere first
+            }
+            
+            if config["cohere"]["api_key"] or config["groq"]["api_key"]:
                 self.multi_ai_service = MultiAIService(config)
                 logger.info("✅ Enhanced Menu AI initialized with Multi-AI support")
             else:
