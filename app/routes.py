@@ -53,6 +53,20 @@ except ImportError as e:
     ENHANCED_CURRICULUM_AI_AVAILABLE = False
     print(f"⚠️ Enhanced Curriculum AI not available: {e}")
 
+# Multi-AI Factory - Fallback cho Gemini hết quota
+try:
+    from app.ai_factory import get_ai_menu_suggestions as ai_menu_fallback
+    from app.ai_factory import get_ai_curriculum_suggestions as ai_curriculum_fallback
+    AI_FACTORY_AVAILABLE = True
+    print("✅ AI Factory (Cohere + Groq) imported successfully")
+except ImportError as e:
+    AI_FACTORY_AVAILABLE = False
+    print(f"⚠️ AI Factory not available: {e}")
+    def ai_menu_fallback(*args, **kwargs):
+        return "AI service không khả dụng"
+    def ai_curriculum_fallback(*args, **kwargs):
+        return "AI service không khả dụng"
+
 # Enhanced Security imports
 from .security_utils import (
     sanitize_input, validate_age_group, validate_menu_count, 
@@ -3319,8 +3333,13 @@ def ai_menu_suggestions():
                 suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
         except Exception as multi_ai_error:
             print(f"⚠️ [MULTI-AI FALLBACK] Enhanced AI failed: {multi_ai_error}")
-            print(f"🔄 [FALLBACK] Trying original Menu AI for {user_role}")
-            suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
+            print(f"🔄 [FALLBACK] Trying AI Factory (Cohere + Groq) for {user_role}")
+            if AI_FACTORY_AVAILABLE:
+                suggestions = ai_menu_fallback(age_group, count, dietary_requirements)
+                print(f"✅ [AI FACTORY SUCCESS] Used Cohere/Groq for {user_role}")
+            else:
+                suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
+                print(f"🔄 [ORIGINAL FALLBACK] Used original AI for {user_role}")
         
         # Log successful operation
         print(f"✅ [SUCCESS] Menu generated for {user_role} - Age: {age_group}, Ingredients: {len(available_ingredients)} chars")
@@ -3696,15 +3715,41 @@ def ai_curriculum_suggestions():
                 )
         except Exception as multi_ai_error:
             print(f"⚠️ [MULTI-AI FALLBACK] Enhanced Curriculum AI failed: {multi_ai_error}")
-            print(f"🔄 [FALLBACK] Trying original Curriculum AI for {user_role}")
-            # Import original curriculum AI service
-            from app.curriculum_ai import curriculum_ai_service
-            curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
-                age_group=age_group,
-                week_number=week_number,
-                themes=themes if themes else None,
-                special_focus=special_focus if special_focus else None
-            )
+            print(f"🔄 [FALLBACK] Trying AI Factory (Cohere + Groq) for {user_role}")
+            if AI_FACTORY_AVAILABLE:
+                try:
+                    ai_content = ai_curriculum_fallback(age_group, themes, 30)
+                    curriculum_data = {
+                        'week_number': week_number,
+                        'age_group': age_group,
+                        'themes': themes,
+                        'special_focus': special_focus,
+                        'daily_activities': [ai_content],
+                        'materials': [],
+                        'provider': 'ai_factory_cohere_groq'
+                    }
+                    print(f"✅ [AI FACTORY SUCCESS] Used Cohere/Groq for {user_role}")
+                except Exception as factory_error:
+                    print(f"⚠️ [AI FACTORY FAILED] {factory_error}")
+                    print(f"🔄 [ORIGINAL FALLBACK] Using original Curriculum AI for {user_role}")
+                    # Import original curriculum AI service
+                    from app.curriculum_ai import curriculum_ai_service
+                    curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
+                        age_group=age_group,
+                        week_number=week_number,
+                        themes=themes if themes else None,
+                        special_focus=special_focus if special_focus else None
+                    )
+            else:
+                print(f"🔄 [ORIGINAL FALLBACK] Using original Curriculum AI for {user_role}")
+                # Import original curriculum AI service
+                from app.curriculum_ai import curriculum_ai_service
+                curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
+                    age_group=age_group,
+                    week_number=week_number,
+                    themes=themes if themes else None,
+                    special_focus=special_focus if special_focus else None
+                )
         
         # Log success
         print(f"✅ [SUCCESS] Curriculum generated for {user_role} - Age: {age_group}, Week: {week_number}")

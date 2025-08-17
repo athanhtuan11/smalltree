@@ -115,7 +115,7 @@ User=root
 Group=root
 WorkingDirectory=$PROJECT_PATH
 Environment="PATH=$PROJECT_PATH/venv/bin"
-ExecStart=$PROJECT_PATH/venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 60 run:app
+ExecStart=$PROJECT_PATH/venv/bin/python -m gunicorn --bind 127.0.0.1:5000 --workers 2 --timeout 60 run:app
 Restart=on-failure
 RestartSec=5
 

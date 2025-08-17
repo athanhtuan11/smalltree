@@ -54,12 +54,12 @@ class MultiAIService:
             "openai": {"api_key": "...", "model": "gpt-4"},
             "anthropic": {"api_key": "...", "model": "claude-3-5-sonnet-20241022"},
             "groq": {"api_key": "...", "model": "llama-3.1-70b-versatile"},
-            "priority": ["cohere", "gemini", "groq", "openai", "anthropic"]  # Thứ tự ưu tiên
+            "priority": ["cohere", "groq", "openai", "anthropic", "gemini"]  # Thứ tự ưu tiên - Gemini cuối vì hết quota
         }
         """
         self.config = config
         self.providers = {}
-        self.priority = config.get("priority", ["cohere", "gemini", "groq", "openai", "anthropic"])
+        self.priority = config.get("priority", ["cohere", "groq", "openai", "anthropic", "gemini"])
         
         # Initialize available providers
         self._init_providers()
