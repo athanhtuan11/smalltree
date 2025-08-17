@@ -33,30 +33,54 @@ sudo -u smalltree bash -c "
     echo 'Package versions fixed'
 "
 
-echo "2. Testing database setup..."
+echo "2. Testing database setup with permissions fix..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
     
-    # Create app directory
+    # Create app directory with proper permissions
     mkdir -p app
+    chmod 755 app
     
-    # Test database with error handling
+    # Check permissions
+    if [ ! -w app ]; then
+        echo '❌ App directory not writable'
+        exit 1
+    fi
+    
+    echo '✓ App directory permissions OK'
+    
+    # Test database with absolute path and permissions
     python3 -c \"
 import sys
 import os
 sys.path.insert(0, os.getcwd())
+
+# Set environment variable for absolute path
+os.environ['DATABASE_URL'] = f'sqlite:///{os.path.abspath(\"app/site.db\")}'
 
 try:
     print('Testing Flask app creation...')
     from app import create_app
     app = create_app()
     
+    print(f'Database URI: {app.config[\"SQLALCHEMY_DATABASE_URI\"]}')
+    
     print('Testing database setup...')
     with app.app_context():
         from app.models import db
         db.create_all()
-        print('✓ Database setup successful')
+        
+        # Verify database file
+        db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        if db_uri.startswith('sqlite:///'):
+            db_path = db_uri.replace('sqlite:///', '')
+            if os.path.exists(db_path):
+                size = os.path.getsize(db_path)
+                print(f'✓ Database setup successful: {db_path} ({size} bytes)')
+            else:
+                print(f'❌ Database file not created: {db_path}')
+                sys.exit(1)
         
 except Exception as e:
     print(f'❌ Still having issues: {e}')

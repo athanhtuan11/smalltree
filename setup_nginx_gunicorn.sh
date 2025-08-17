@@ -112,32 +112,86 @@ cat > $PROJECT_PATH/.env << EOF
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 FLASK_ENV=production
 FLASK_DEBUG=0
-DATABASE_URL=sqlite:///app/site.db
+DATABASE_URL=sqlite:///$PROJECT_PATH/app/site.db
 DOMAIN=$DOMAIN
 EOF
 chown smalltree:smalltree $PROJECT_PATH/.env
 chmod 600 $PROJECT_PATH/.env
 print_status "Environment file created"
 
-# Initialize database (simplified to avoid SQLAlchemy version conflicts)
+# Initialize database with proper permissions
 print_info "Setting up database..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
     export FLASK_APP=run.py
     
-    # Create database directory
+    # Create database directory with proper permissions
     mkdir -p app
+    chmod 755 app
     
     # Test basic imports first
     echo 'Testing basic imports...'
     python3 -c 'import flask; print(\"✓ Flask import OK\")'
     python3 -c 'import flask_sqlalchemy; print(\"✓ Flask-SQLAlchemy import OK\")'
     
-    # Try database creation with better error handling
-    echo 'Creating database...'
+    # Try database creation with absolute path
+    echo 'Creating database with absolute path...'
     python3 -c \"
 import sys
+import os
+sys.path.insert(0, os.getcwd())
+
+# Set absolute database path
+db_dir = os.path.join(os.getcwd(), 'app')
+db_file = os.path.join(db_dir, 'site.db')
+
+print(f'Database directory: {db_dir}')
+print(f'Database file: {db_file}')
+
+# Check directory permissions
+if not os.path.exists(db_dir):
+    print(f'Creating directory: {db_dir}')
+    os.makedirs(db_dir, exist_ok=True)
+
+if not os.access(db_dir, os.W_OK):
+    print(f'❌ Directory not writable: {db_dir}')
+    sys.exit(1)
+
+print(f'✓ Directory writable: {db_dir}')
+
+try:
+    print('Importing app modules...')
+    from app import create_app
+    print('Creating Flask app instance...')
+    app = create_app()
+    print('Setting up database context...')
+    with app.app_context():
+        from app.models import db
+        print('Creating database tables...')
+        db.create_all()
+        print(f'✓ Database created successfully at: {db_file}')
+        
+        # Verify database file was created
+        if os.path.exists(db_file):
+            size = os.path.getsize(db_file)
+            print(f'✓ Database file verified: {size} bytes')
+        else:
+            print('❌ Database file not found after creation')
+            sys.exit(1)
+            
+except ImportError as e:
+    print(f'❌ Import error: {e}')
+    print('Please check if all required packages are installed in venv')
+    sys.exit(1)
+except Exception as e:
+    print(f'❌ Database setup error: {e}')
+    print('This may be due to permissions or SQLAlchemy version conflicts')
+    print('Try: pip install SQLAlchemy==1.4.46 Flask-SQLAlchemy==2.5.1')
+    sys.exit(1)
+\"
+"
+print_status "Database initialized"
 import os
 sys.path.insert(0, os.getcwd())
 
