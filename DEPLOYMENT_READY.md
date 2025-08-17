@@ -43,15 +43,17 @@
 ### 1. Upload to Linux Server:
 
 ```bash
-# Upload all files to your server  
-scp -r . root@180.93.136.198:/var/www/smalltree/
+# Clone repository to correct path
+su - smalltree
+git clone https://github.com/athanhtuan11/smalltree.git /home/smalltree/smalltree
 ```
 
 ### 2. Auto Setup (Run as ROOT):
+
 ```bash
-# Login as root or use sudo
+# Login as root
 sudo su -
-cd /var/www/smalltree/
+cd /home/smalltree/smalltree/
 chmod +x setup_nginx_gunicorn.sh
 ./setup_nginx_gunicorn.sh
 ```

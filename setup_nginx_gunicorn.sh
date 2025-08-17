@@ -1,5 +1,6 @@
 #!/bin/bash
-# Auto Install & Configure Nginx + Gunicorn for smalltree Website
+# Auto Install & Configure Nginx + Gunicorn for SmallTree Academy
+# Domain: mamnoncaynho.com | Path: /home/smalltree/smalltree
 # Created: August 17, 2025
 
 set -e  # Exit on any error
@@ -12,43 +13,34 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration variables
-PROJECT_NAME="smalltree-website"
-DOMAIN="mamnoncaynho.com"  # Production domain
+PROJECT_NAME="smalltree"
+DOMAIN="mamnoncaynho.com"
 SERVER_IP="180.93.136.198"
-PROJECT_PATH="/var/www/$PROJECT_NAME"
+PROJECT_PATH="/home/smalltree/smalltree"  # Git clone location
 VENV_PATH="$PROJECT_PATH/venv"
 SERVICE_NAME="smalltree-gunicorn"
+APP_MODULE="app.run:app"  # Python app module
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  🚀 smalltree WEBSITE DEPLOYMENT SETUP  ${NC}"
+echo -e "${BLUE}  🚀 SmallTree Academy Deployment Setup ${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo
 
 # Function to print colored output
-print_status() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
+print_status() { echo -e "${GREEN}✅ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
+print_error() { echo -e "${RED}❌ $1${NC}"; }
+print_info() { echo -e "${BLUE}ℹ️  $1${NC}"; }
 
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
-print_info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
-}
-
-# Check if running as root (required for system-wide installation)
+# Check if running as root
 if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root"
    print_info "Please run: sudo su - then ./setup_nginx_gunicorn.sh"
    exit 1
 fi
 
-print_info "Running as root - proceeding with system-wide installation..."
+print_info "Starting deployment for domain: $DOMAIN"
+print_info "Project path: $PROJECT_PATH"
 
 # Update system packages
 print_info "Updating system packages..."
@@ -60,64 +52,68 @@ print_info "Installing required packages..."
 apt install -y python3 python3-pip python3-venv nginx supervisor git curl
 print_status "Required packages installed"
 
-# Create project directory
-print_info "Setting up project directory..."
-mkdir -p $PROJECT_PATH
-print_status "Project directory created: $PROJECT_PATH"
-
-# Copy project files (if not already there)
-if [ ! -f "$PROJECT_PATH/run.py" ]; then
-    print_info "Copying project files..."
-    # Copy from current directory to project path
-    cp -r ./* $PROJECT_PATH/
-    print_status "Project files copied"
+# Create smalltree user if not exists
+print_info "Setting up smalltree user..."
+if ! id "smalltree" &>/dev/null; then
+    useradd -m -s /bin/bash smalltree
+    print_status "Created smalltree user"
 else
-    print_info "Project files already exist, updating..."
-    # Update files while preserving venv and database
-    rsync -av --exclude 'venv' --exclude '__pycache__' --exclude '*.db' ./* $PROJECT_PATH/
-    print_status "Project files updated"
+    print_status "smalltree user already exists"
 fi
 
-# Set proper ownership for www-data
-chown -R www-data:www-data $PROJECT_PATH
+# Check if project directory exists
+print_info "Checking project directory..."
+if [ ! -d "$PROJECT_PATH" ]; then
+    print_error "Project directory $PROJECT_PATH not found!"
+    print_info "Please clone the repository first:"
+    print_info "su - smalltree"
+    print_info "git clone https://github.com/athanhtuan11/smalltree.git /home/smalltree/smalltree"
+    exit 1
+fi
 
-# Create virtual environment as root, then change ownership
+if [ ! -f "$PROJECT_PATH/app/run.py" ]; then
+    print_error "app/run.py not found in $PROJECT_PATH"
+    print_info "Please ensure the repository is cloned correctly"
+    exit 1
+fi
+
+print_status "Project directory verified: $PROJECT_PATH"
+
+# Set proper ownership
+chown -R smalltree:smalltree $PROJECT_PATH
+
+# Create virtual environment
 print_info "Creating Python virtual environment..."
-cd $PROJECT_PATH
-python3 -m venv venv
-chown -R www-data:www-data venv
+sudo -u smalltree bash -c "
+    cd $PROJECT_PATH
+    python3 -m venv venv
+"
 print_status "Virtual environment created"
 
-# Install Python dependencies with error handling
-print_info "Installing Python dependencies (minimal set for fast deployment)..."
-sudo -u www-data bash -c "
+# Install Python dependencies
+print_info "Installing Python dependencies..."
+sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
     pip install --upgrade pip
     
-    # Install from minimal requirements first (guaranteed to work)
-    if [ -f requirements_minimal.txt ]; then
-        echo 'Installing minimal requirements...'
-        pip install -r requirements_minimal.txt || echo 'Some minimal packages failed'
-    fi
+    # Core packages (must succeed)
+    pip install Flask==2.0.3 Flask-WTF==0.15.1 Flask-SQLAlchemy==2.5.1
+    pip install Flask-Migrate==3.1.0 Jinja2==3.0.3 Werkzeug==2.0.3
+    pip install gunicorn==20.1.0
+    pip install email_validator==1.3.1 WTForms==3.0.1
     
-    # Try core packages individually
-    echo 'Installing core Flask packages...'
-    pip install Flask==2.0.3 Flask-WTF==0.15.1 Flask-SQLAlchemy==2.5.1 || true
-    pip install Flask-Migrate==3.1.0 Jinja2==3.0.3 Werkzeug==2.0.3 || true
-    pip install gunicorn==20.1.0 || true
-    pip install python-docx==1.0.1 || true
-    pip install openpyxl || true
-    pip install email_validator==1.3.1 WTForms==3.0.1 || true
+    # Document processing
+    pip install python-docx==1.0.1 || echo 'python-docx failed'
+    pip install openpyxl || echo 'openpyxl failed'
     
-    # Optional packages - skip if they fail (common build issues)
-    echo 'Installing optional packages (will skip if build fails)...'
-    pip install Pillow 2>/dev/null || echo 'Pillow build failed - skipping (not critical)'
-    pip install WeasyPrint 2>/dev/null || echo 'WeasyPrint build failed - skipping (not critical)'
+    # Optional packages (skip if build fails)
+    pip install Pillow 2>/dev/null || echo 'Pillow build failed - skipping'
+    pip install WeasyPrint 2>/dev/null || echo 'WeasyPrint build failed - skipping'
     
-    echo 'Package installation completed!'
+    echo 'Dependencies installation completed!'
 "
-print_status "Dependencies installation completed (build-error-free)"
+print_status "Dependencies installed"
 
 # Create environment file
 print_info "Creating environment configuration..."
@@ -128,25 +124,34 @@ FLASK_DEBUG=0
 DATABASE_URL=sqlite:///$PROJECT_PATH/app/site.db
 DOMAIN=$DOMAIN
 EOF
+chown smalltree:smalltree $PROJECT_PATH/.env
 print_status "Environment file created"
 
 # Initialize database
 print_info "Initializing database..."
-cd $PROJECT_PATH
-sudo -u www-data bash -c "
+sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
-    export FLASK_APP=run.py
-    flask db upgrade || (flask db init && flask db migrate -m 'Initial migration' && flask db upgrade)
+    export FLASK_APP=app/run.py
+    
+    # Create database directory if not exists
+    mkdir -p app
+    
+    # Initialize or upgrade database
+    flask db upgrade 2>/dev/null || (
+        echo 'Initializing new database...'
+        flask db init
+        flask db migrate -m 'Initial migration' 
+        flask db upgrade
+    )
 "
 print_status "Database initialized"
 
 # Create Gunicorn configuration
 print_info "Creating Gunicorn configuration..."
 cat > $PROJECT_PATH/gunicorn.conf.py << 'EOF'
-# Gunicorn configuration for smalltree Website
+# Gunicorn configuration for SmallTree Academy
 import multiprocessing
-import os
 
 # Server socket
 bind = "127.0.0.1:5000"
@@ -159,93 +164,94 @@ worker_connections = 1000
 timeout = 30
 keepalive = 2
 
-# Restart workers after this many requests, to help prevent memory leaks
+# Security
 max_requests = 1000
 max_requests_jitter = 50
+preload_app = True
 
 # Logging
-accesslog = "/var/log/smalltree/gunicorn_access.log"
-errorlog = "/var/log/smalltree/gunicorn_error.log"
+accesslog = "/var/log/smalltree/access.log"
+errorlog = "/var/log/smalltree/error.log"
 loglevel = "info"
+access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 
 # Process naming
-proc_name = "smalltree_gunicorn"
+proc_name = "smalltree-gunicorn"
 
 # Server mechanics
-preload_app = True
 daemon = False
 pidfile = "/var/run/smalltree/gunicorn.pid"
-user = "www-data"
-group = "www-data"
+user = "smalltree"
+group = "smalltree"
 tmp_upload_dir = None
-
-# SSL (if needed)
-# keyfile = "/path/to/keyfile"
-# certfile = "/path/to/certfile"
 EOF
+chown smalltree:smalltree $PROJECT_PATH/gunicorn.conf.py
 print_status "Gunicorn configuration created"
 
 # Create log directories
 print_info "Creating log directories..."
 mkdir -p /var/log/smalltree
 mkdir -p /var/run/smalltree
-chown www-data:www-data /var/log/smalltree
-chown www-data:www-data /var/run/smalltree
+chown smalltree:smalltree /var/log/smalltree
+chown smalltree:smalltree /var/run/smalltree
 print_status "Log directories created"
 
-# Create systemd service for Gunicorn
+# Create systemd service
 print_info "Creating systemd service..."
-tee /etc/systemd/system/$SERVICE_NAME.service > /dev/null << EOF
+cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
 [Unit]
-Description=Gunicorn instance to serve smalltree Website
+Description=Gunicorn instance to serve SmallTree Academy
 After=network.target
 
 [Service]
-User=www-data
-Group=www-data
+User=smalltree
+Group=smalltree
 WorkingDirectory=$PROJECT_PATH
 Environment="PATH=$VENV_PATH/bin"
-ExecStart=$VENV_PATH/bin/gunicorn --config gunicorn.conf.py run:app
+ExecStart=$VENV_PATH/bin/gunicorn --config gunicorn.conf.py $APP_MODULE
 ExecReload=/bin/kill -s HUP \$MAINPID
 Restart=always
 RestartSec=3
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target
 EOF
+print_status "Systemd service created"
 
+# Reload systemd and start services
+print_info "Starting Gunicorn service..."
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
-print_status "Systemd service created and enabled"
+systemctl start $SERVICE_NAME
+print_status "Gunicorn service started"
 
 # Configure Nginx
 print_info "Configuring Nginx..."
-tee /etc/nginx/sites-available/$PROJECT_NAME > /dev/null << EOF
+cat > /etc/nginx/sites-available/$PROJECT_NAME << EOF
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
-
+    
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
-
+    
+    # File upload size limit
+    client_max_body_size 10M;
+    
     # Static files
     location /static {
         alias $PROJECT_PATH/app/static;
         expires 30d;
         add_header Cache-Control "public, immutable";
     }
-
-    # Media files
-    location /media {
-        alias $PROJECT_PATH/media;
-        expires 30d;
-    }
-
-    # Main application
+    
+    # Main application proxy
     location / {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host \$host;
@@ -253,123 +259,76 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         
-        # Timeouts
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
-    }
-
-    # Security: Block access to sensitive files
-    location ~ /\. {
-        deny all;
+        
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
     }
     
-    location ~ \.(env|ini|conf|sql|db)$ {
-        deny all;
+    # Health check
+    location /health {
+        access_log off;
+        proxy_pass http://127.0.0.1:5000/health;
     }
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 10240;
-    gzip_proxied expired no-cache no-store private must-revalidate auth;
-    gzip_types
-        text/plain
-        text/css
-        text/xml
-        text/javascript
-        application/javascript
-        application/xml+rss
-        application/json;
+    
+    # Block access to sensitive files
+    location ~ /\\. {
+        deny all;
+        access_log off;
+    }
+    
+    location ~ \\.(env|ini|conf|sql|db|log)\$ {
+        deny all;
+        access_log off;
+    }
 }
 EOF
 
-# Enable the site
+# Enable Nginx site
 ln -sf /etc/nginx/sites-available/$PROJECT_NAME /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
-print_status "Nginx configured"
 
 # Test Nginx configuration
-print_info "Testing Nginx configuration..."
 nginx -t
-print_status "Nginx configuration valid"
-
-# Set proper permissions
-print_info "Setting file permissions..."
-chown -R www-data:www-data $PROJECT_PATH
-chmod -R 755 $PROJECT_PATH
-chmod 644 $PROJECT_PATH/.env
-print_status "Permissions set"
-
-# Create backup script
-print_info "Creating backup script..."
-tee /usr/local/bin/smalltree-backup.sh > /dev/null << 'EOF'
-#!/bin/bash
-# Backup script for smalltree Website
-
-BACKUP_DIR="/var/backups/smalltree"
-PROJECT_PATH="/var/www/smalltree-website"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p $BACKUP_DIR
-
-# Backup database
-cp $PROJECT_PATH/app/site.db $BACKUP_DIR/site_db_$DATE.db
-
-# Backup uploaded files
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz -C $PROJECT_PATH app/static/images/
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "*.db" -mtime +7 -delete
-find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
-
-echo "Backup completed: $DATE"
-EOF
-
-chmod +x /usr/local/bin/smalltree-backup.sh
-print_status "Backup script created"
-
-# Add cron job for daily backups
-print_info "Setting up daily backups..."
-(crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/smalltree-backup.sh") | crontab -
-print_status "Daily backup scheduled"
-
-# Start services
-print_info "Starting services..."
-systemctl restart nginx
-systemctl start $SERVICE_NAME
-print_status "Services started"
-
-# Check service status
-sleep 3
-if systemctl is-active --quiet $SERVICE_NAME && systemctl is-active --quiet nginx; then
-    print_status "All services are running successfully!"
+if [ $? -eq 0 ]; then
+    systemctl restart nginx
+    systemctl enable nginx
+    print_status "Nginx configured and started"
 else
-    print_error "Some services failed to start. Check logs:"
-    echo "  journalctl -u $SERVICE_NAME"
-    echo "  journalctl -u nginx"
+    print_error "Nginx configuration error"
+    exit 1
+fi
+
+# Final status check
+print_info "Checking service status..."
+if systemctl is-active --quiet $SERVICE_NAME; then
+    print_status "Gunicorn service is running"
+else
+    print_error "Gunicorn service failed to start"
+    systemctl status $SERVICE_NAME
+fi
+
+if systemctl is-active --quiet nginx; then
+    print_status "Nginx service is running"
+else
+    print_error "Nginx service failed to start"
 fi
 
 echo
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  🎉 DEPLOYMENT COMPLETED SUCCESSFULLY  ${NC}"
+echo -e "${GREEN}  🎉 DEPLOYMENT COMPLETED SUCCESSFULLY! ${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo
-echo -e "${BLUE}📋 Next Steps:${NC}"
-echo -e "1. Update domain in /etc/nginx/sites-available/$PROJECT_NAME"
-echo -e "2. Install SSL certificate: ./maintain_server.sh ssl"
-echo -e "3. Configure firewall: ufw allow 80 && ufw allow 443 && ufw enable"
-echo -e "4. Test the website at: http://$DOMAIN"
+print_info "Domain: http://$DOMAIN"
+print_info "Project path: $PROJECT_PATH"
+print_info "Service: $SERVICE_NAME"
 echo
-echo -e "${BLUE}🔧 Management Commands:${NC}"
-echo -e "• Restart app: systemctl restart $SERVICE_NAME"
-echo -e "• View logs: journalctl -u $SERVICE_NAME -f"
-echo -e "• Backup data: /usr/local/bin/smalltree-backup.sh"
-echo -e "• Update code: ./maintain_server.sh update"
+print_info "Next steps:"
+echo "1. Test the website: curl -I http://$DOMAIN"
+echo "2. Install SSL: ./ssl_setup.sh"
+echo "3. Manage with: ./maintain_server.sh status"
 echo
-echo -e "${YELLOW}⚠️  Important:${NC}"
-echo -e "• Change default passwords and API keys in .env"
-echo -e "• Update the DOMAIN variable for production"
-echo -e "• Review and customize gunicorn.conf.py for your needs"
-echo -e "• Set up SSL for production use"
-echo
+print_status "SmallTree Academy is now live! 🌳"

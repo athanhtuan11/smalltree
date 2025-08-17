@@ -12,10 +12,10 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-PROJECT_NAME="smalltree-website"
+PROJECT_NAME="smalltree"
 DOMAIN="mamnoncaynho.com"
 SERVER_IP="180.93.136.198"
-PROJECT_PATH="/var/www/$PROJECT_NAME"
+PROJECT_PATH="/home/smalltree/smalltree"  # Git clone location
 SERVICE_NAME="smalltree-gunicorn"
 VENV_PATH="$PROJECT_PATH/venv"
 
