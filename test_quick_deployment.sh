@@ -87,20 +87,45 @@ except Exception as e:
     exit 1
 }
 
-# Test 6: Check if Gunicorn can start
+# Test 6: Check if Gunicorn can start (improved)
 echo "6. Testing Gunicorn startup..."
-timeout 5 gunicorn --bind 127.0.0.1:5001 --workers 1 --timeout 30 run:app --daemon --pid /tmp/test_gunicorn.pid || {
+
+# Test Gunicorn import first
+cd $PROJECT_PATH
+source $VENV_PATH/bin/activate
+python3 -c "
+try:
+    from run import app
+    print('✓ App import for Gunicorn OK')
+except Exception as e:
+    print(f'❌ App import failed: {e}')
+    exit(1)
+" || {
+    echo "❌ Gunicorn app import test failed"
+    exit 1
+}
+
+# Test Gunicorn syntax
+gunicorn --check-config run:app || {
+    echo "❌ Gunicorn config check failed"
+    exit 1
+}
+
+# Test Gunicorn binding
+timeout 10 gunicorn --bind 127.0.0.1:5001 --workers 1 --timeout 30 run:app --daemon --pid /tmp/test_gunicorn.pid || {
     echo "❌ Gunicorn startup failed"
     exit 1
 }
 
-# Kill test gunicorn
+# Check if Gunicorn actually started
 if [ -f /tmp/test_gunicorn.pid ]; then
     kill $(cat /tmp/test_gunicorn.pid) 2>/dev/null
     rm -f /tmp/test_gunicorn.pid
+    echo "✓ Gunicorn startup OK"
+else
+    echo "❌ Gunicorn PID file not created"
+    exit 1
 fi
-
-echo "✓ Gunicorn startup OK"
 
 # Test 7: Check permissions
 echo "7. Checking file permissions..."
