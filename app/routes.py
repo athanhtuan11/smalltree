@@ -1759,6 +1759,73 @@ def export_food_safety_process(week_number):
         else:
             return 'Cân bằng dinh dưỡng'
     
+    def get_sample_note(dish_name):
+        """Trả về ghi chú đặc biệt cho lưu mẫu"""
+        dish_lower = dish_name.lower()
+        
+        if any(liquid in dish_lower for liquid in ['canh', 'súp', 'chào']):
+            return 'Để nguội trước\nkhi lưu mẫu'
+        elif any(fried in dish_lower for fried in ['chiên', 'rán']):
+            return 'Tách riêng\ndầu mỡ'
+        elif any(raw in dish_lower for raw in ['sống', 'tái']):
+            return 'Không lưu mẫu\nthực phẩm sống'
+        elif any(dairy in dish_lower for dairy in ['sữa', 'yaourt']):
+            return 'Bảo quản lạnh\nriêng biệt'
+        else:
+            return 'Bảo quản\ntheo quy chuẩn'
+    
+    def get_heating_equipment(dish_name):
+        """Trả về thiết bị giữ nhiệt phù hợp"""
+        dish_lower = dish_name.lower()
+        
+        if 'cơm' in dish_lower:
+            return 'Nồi cơm điện\ngiữ nhiệt'
+        elif any(soup in dish_lower for soup in ['canh', 'súp']):
+            return 'Nồi inox\nđậy nắp'
+        elif any(fried in dish_lower for fried in ['chiên', 'rán', 'nướng']):
+            return 'Khay inox\nđèn hâm nóng'
+        elif any(drink in dish_lower for drink in ['nước', 'sữa', 'trà']):
+            return 'Bình giữ nhiệt\n2 lớp'
+        else:
+            return 'Tủ giữ nhiệt\nchuyên dụng'
+    
+    def get_actual_portions(dish_name, base_count):
+        """Tính số suất thực tế dựa trên món ăn"""
+        if not dish_name:  # Default case
+            return base_count
+            
+        dish_lower = dish_name.lower()
+        
+        # Món ăn chính: đủ số suất
+        if any(main in dish_lower for main in ['cơm', 'thịt', 'cá', 'canh']):
+            return base_count
+        # Món phụ: ít hơn 10%
+        elif any(side in dish_lower for side in ['rau', 'salad']):
+            return int(base_count * 0.9)
+        # Đồ uống: nhiều hơn 5% (dự phòng)
+        elif any(drink in dish_lower for drink in ['nước', 'sữa']):
+            return int(base_count * 1.05)
+        # Tráng miệng: ít hơn 15%
+        elif any(dessert in dish_lower for dessert in ['trái cây', 'chè', 'yaourt']):
+            return int(base_count * 0.85)
+        else:
+            return base_count
+    
+    def get_serving_note(dish_name):
+        """Trả về ghi chú đặc biệt khi phục vụ"""
+        dish_lower = dish_name.lower()
+        
+        if any(hot in dish_lower for hot in ['canh', 'súp', 'cháo']):
+            return 'Kiểm tra nhiệt độ\ntrước khi phục vụ'
+        elif any(cold in dish_lower for cold in ['trái cây', 'yaourt']):
+            return 'Giữ lạnh\nđến khi phục vụ'
+        elif any(careful in dish_lower for careful in ['xương', 'gai']):
+            return 'Kiểm tra xương/gai\ntrước phục vụ'
+        elif any(portion in dish_lower for portion in ['thịt', 'cá']):
+            return 'Cắt nhỏ phù hợp\nđộ tuổi trẻ'
+        else:
+            return 'Phục vụ ngay\nsau chế biến'
+    
     # Bảng tính toán khối lượng chi tiết theo khoa học dinh dưỡng (gram/học sinh/bữa)
     ingredient_portions = {
         # === NHÓM PROTEIN ===
@@ -1905,6 +1972,7 @@ def export_food_safety_process(week_number):
         
         today = datetime.now()
         week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
         
         # Định dạng border và style chuyên nghiệp
         thin_border = Border(
@@ -2146,7 +2214,7 @@ def export_food_safety_process(week_number):
         info_data2 = [
             (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân - Bếp trưởng", 'O', "Mẫu số 1.2"),
             (4, 'A', f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')} - Tuần {week_number}", 'O', f"Số học sinh: {student_count}"),
-            (5, 'A', "Địa điểm: Kho thực phẩm khô - Trường MN Đầm Long", 'O', "Phiên bản: v2.0")
+            (5, 'A', "Địa điểm: Kho thực phẩm khô - MNĐL Cây Nhỏ", 'O', "Phiên bản: v2.0")
         ]
         
         for row, col_a, text_a, col_o, text_o in info_data2:
@@ -2350,7 +2418,7 @@ def export_food_safety_process(week_number):
         info_data3 = [
             (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân - Bếp trưởng", 'M', "Mẫu số 2.0"),
             (4, 'A', f"Thời gian kiểm tra: {week_start.strftime('%d/%m/%Y')} - Tuần {week_number}", 'M', f"Số học sinh: {student_count}"),
-            (5, 'A', "Địa điểm: Bếp chế biến - Trường MN Đầm Long", 'M', "Phiên bản: v2.0")
+            (5, 'A', "Địa điểm: Bếp chế biến - MNĐL Cây Nhỏ", 'M', "Phiên bản: v2.0")
         ]
         
         for row, col_a, text_a, col_m, text_m in info_data3:
@@ -2546,6 +2614,451 @@ def export_food_safety_process(week_number):
         wb3.save(file3_buffer)
         file3_buffer.seek(0)
         zipf.writestr(f"Bước 2 - Kiểm tra chế biến thức ăn - Tuần {week_number}.xlsx", file3_buffer.read())
+        
+        # BƯỚC 2.1: Kiểm tra mẫu thức ăn lưu mẫu - Format chuyên nghiệp
+        wb21 = Workbook()
+        ws21 = wb21.active
+        ws21.title = "Lưu mẫu thức ăn"
+        
+        # Header chính
+        ws21['A1'] = "TÊN CƠ SỞ: MNĐL Cây Nhỏ"
+        ws21['A1'].font = Font(bold=True, size=12)
+        ws21['A1'].fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+        ws21.merge_cells('A1:P1')
+        
+        ws21['D2'] = "BIỂU MẪU KIỂM TRA MẪU THỨC ĂN LƯU MẪU"
+        ws21['D2'].font = Font(bold=True, size=14, color="0066CC")
+        ws21['D2'].alignment = Alignment(horizontal='center', vertical='center')
+        ws21.merge_cells('D2:L2')
+        
+        ws21['N2'] = "Số: 1247/QĐ - Bộ Y Tế"
+        ws21['N2'].font = Font(bold=True, size=10)
+        ws21['N2'].fill = PatternFill(start_color="CCE6FF", end_color="CCE6FF", fill_type="solid")
+        
+        # Thông tin kiểm tra
+        info_data21 = [
+            (3, 'A', f"Người lưu mẫu: Nguyễn Thị Vân - Bếp trưởng", 'N', "Mẫu số 2.1"),
+            (4, 'A', f"Tuần kiểm tra: Tuần {week_number} ({week_start.strftime('%d/%m/%Y')} - {week_end.strftime('%d/%m/%Y')})", 'N', f"Số suất: {student_count}"),
+            (5, 'A', "Địa điểm lưu mẫu: Tủ lạnh chuyên dụng - Bếp ăn", 'N', "Nhiệt độ: 2-8°C")
+        ]
+        
+        for row, col_a, text_a, col_n, text_n in info_data21:
+            ws21[f'{col_a}{row}'] = text_a
+            ws21[f'{col_a}{row}'].font = Font(bold=True, size=10)
+            ws21[f'{col_n}{row}'] = text_n
+            ws21[f'{col_n}{row}'].font = Font(bold=True, size=10)
+            ws21[f'{col_n}{row}'].fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+        
+        # Tiêu đề phần chính
+        ws21['A7'] = "PHẦN III: KIỂM TRA MẪU THỨC ĂN LƯU MẪU"
+        ws21['A7'].font = Font(bold=True, size=12, color="0066CC")
+        ws21['A7'].fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+        ws21.merge_cells('A7:M7')
+        ws21['P7'] = "BƯỚC 2.1"
+        ws21['P7'].font = Font(bold=True, size=12, color="0066CC")
+        ws21['P7'].fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+        
+        # Header bảng chính
+        headers21 = [
+            'STT', 'NGÀY/BUỔI', 'TÊN MÓN ĂN', 'THỜI GIAN\nLƯU MẪU', 'SỐ LƯỢNG\nMẪU (g)', 
+            'NHIỆT ĐỘ\nLƯU MẪU', 'THỜI GIAN\nBẢO QUẢN', 'ĐÁNH GIÁ CẢM QUAN', '', '',
+            'TÌNH TRẠNG\nMẪU', 'SỐ LÔ\nMẪU', 'GHI CHÚ\nĐẶC BIỆT', 'NGƯỜI\nLƯU MẪU', 'KIỂM TRA\nCUỐI NGÀY'
+        ]
+        
+        for i, header in enumerate(headers21, 1):
+            cell = ws21.cell(row=8, column=i, value=header)
+            cell.font = Font(bold=True, size=9, color="FFFFFF")
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.fill = PatternFill(start_color="0066CC", end_color="0066CC", fill_type="solid")
+            cell.border = thick_border
+        
+        # Sub-headers cho cảm quan
+        sub_headers21 = [
+            '', '', '', '', '', '', '', 'Màu sắc', 'Mùi vị', 'Kết cấu',
+            '', '', '', '', ''
+        ]
+        
+        for i, header in enumerate(sub_headers21, 1):
+            cell = ws21.cell(row=9, column=i, value=header)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="4D94FF", end_color="4D94FF", fill_type="solid")
+            cell.border = thin_border
+        
+        # Merge cells cho headers
+        ws21.merge_cells('H8:J8')  # Đánh giá cảm quan
+        
+        # Số thứ tự cột
+        for i in range(1, 16):
+            cell = ws21.cell(row=10, column=i, value=i)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+            cell.border = thin_border
+        
+        # Điền dữ liệu lưu mẫu
+        row_num = 11
+        stt = 1
+        
+        for day_idx, day_key in enumerate(days):
+            if day_key in menu_data:
+                current_date = week_start + timedelta(days=day_idx)
+                
+                # Chỉ lưu mẫu bữa trưa và bữa phụ chính
+                key_meals = {
+                    'lunch': 'Bữa trưa\n11:00-12:00',
+                    'snack': 'Ăn phụ sáng\n9:00-9:30',
+                    'afternoon': 'Ăn phụ chiều\n14:30-15:00'
+                }
+                
+                for meal_key, meal_name in key_meals.items():
+                    if menu_data[day_key].get(meal_key):
+                        dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
+                        for dish in dishes:
+                            # Chỉ lưu mẫu món chính, không lưu nước uống
+                            if any(keyword in dish.lower() for keyword in ['nước', 'sữa', 'trà', 'chanh']):
+                                continue
+                                
+                            sample_time = '11:45' if meal_key == 'lunch' else ('9:15' if meal_key == 'snack' else '14:45')
+                            lot_number = f"LM{current_date.strftime('%d%m')}{stt:02d}"
+                            
+                            data_row21 = [
+                                stt,  # STT
+                                f"{days_vn[day_idx]}\n{current_date.strftime('%d/%m')}\n{meal_name}",  # Ngày/buổi
+                                dish.title(),  # Tên món ăn
+                                sample_time,  # Thời gian lưu mẫu
+                                "100g",  # Số lượng mẫu
+                                "2-4°C",  # Nhiệt độ lưu mẫu
+                                "48 giờ",  # Thời gian bảo quản
+                                "Bình thường",  # Màu sắc
+                                "Tự nhiên",  # Mùi vị
+                                "Phù hợp",  # Kết cấu
+                                "Đạt chuẩn\nATTP",  # Tình trạng mẫu
+                                lot_number,  # Số lô mẫu
+                                get_sample_note(dish),  # Ghi chú đặc biệt
+                                "N.T.Vân",  # Người lưu mẫu
+                                "✓"  # Kiểm tra cuối ngày
+                            ]
+                            
+                            for j, value in enumerate(data_row21, 1):
+                                cell = ws21.cell(row=row_num, column=j, value=value)
+                                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                                cell.border = thin_border
+                                
+                                # Styling đặc biệt
+                                if j == 1:  # STT
+                                    cell.font = Font(bold=True, color="0066CC")
+                                    cell.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+                                elif j == 3:  # Tên món ăn
+                                    cell.font = Font(bold=True, size=10)
+                                    cell.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+                                elif j == 15 and value == '✓':  # Kiểm tra
+                                    cell.font = Font(bold=True, size=12, color="228B22")
+                                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                                elif j == 12:  # Số lô
+                                    cell.font = Font(bold=True, color="FF6600")
+                            
+                            row_num += 1
+                            stt += 1
+                            
+                            if row_num > 35:  # Giới hạn
+                                break
+                    if row_num > 35:
+                        break
+                if row_num > 35:
+                    break
+        
+        # Thống kê lưu mẫu
+        stats_row21 = row_num + 2
+        ws21[f'A{stats_row21}'] = "THỐNG KÊ LƯU MẪU THỨC ĂN:"
+        ws21[f'A{stats_row21}'].font = Font(bold=True, size=11, color="0066CC")
+        ws21[f'A{stats_row21}'].fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+        
+        total_samples = stt - 1
+        stats_info21 = [
+            f"• Tổng số mẫu lưu trong tuần: {total_samples} mẫu",
+            f"• Thời gian bảo quản: 48 giờ (2 ngày)",
+            f"• Nhiệt độ lưu mẫu: 2-4°C (tủ lạnh chuyên dụng)",
+            f"• Tần suất kiểm tra: 2 lần/ngày (sáng và chiều)"
+        ]
+        
+        for i, stat in enumerate(stats_info21, 1):
+            ws21[f'A{stats_row21 + i}'] = stat
+            ws21[f'A{stats_row21 + i}'].font = Font(size=10)
+        
+        # Quy trình lưu mẫu
+        procedure_row = stats_row21 + 6
+        ws21[f'A{procedure_row}'] = "QUY TRÌNH LƯU MẪU THỨC ĂN:"
+        ws21[f'A{procedure_row}'].font = Font(bold=True, size=11, color="004080")
+        
+        procedure_notes = [
+            "• Lấy mẫu: Ngay sau khi chế biến xong, trước khi phục vụ",
+            "• Dụng cụ: Thìa/muỗng vô trùng, hộp nhựa có nắp đậy kín",
+            "• Ghi nhãn: Tên món, ngày giờ, số lô, người lấy mẫu",
+            "• Bảo quản: Tủ lạnh riêng, không để chung với thực phẩm khác",
+            "• Hủy mẫu: Sau 48 giờ nếu không có sự cố thực phẩm"
+        ]
+        
+        for i, note in enumerate(procedure_notes, 1):
+            ws21[f'A{procedure_row + i}'] = note
+            ws21[f'A{procedure_row + i}'].font = Font(size=9, color="004080")
+        
+        # Chữ ký
+        signature_row21 = procedure_row + 8
+        signature_data21 = [
+            (signature_row21, 'D', "NGƯỜI LƯU MẪU", 'L', "HIỆU TRƯỞNG"),
+            (signature_row21 + 1, 'D', "(Ký, ghi rõ họ tên)", 'L', "(Ký, ghi rõ họ tên)"),
+            (signature_row21 + 5, 'D', "Nguyễn Thị Vân", 'L', "Nguyễn Thị Vân"),
+            (signature_row21 + 6, 'D', f"Ngày {today.day}/{today.month}/{today.year}", 'L', f"Ngày {today.day}/{today.month}/{today.year}")
+        ]
+        
+        for row, col_d, text_d, col_l, text_l in signature_data21:
+            ws21[f'{col_d}{row}'] = text_d
+            ws21[f'{col_l}{row}'] = text_l
+            
+            for col, text in [(col_d, text_d), (col_l, text_l)]:
+                cell = ws21[f'{col}{row}']
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                if row == signature_row21:
+                    cell.font = Font(bold=True, size=12, color="0066CC")
+                    cell.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
+                elif row == signature_row21 + 1:
+                    cell.font = Font(italic=True, size=9)
+                elif row == signature_row21 + 5:
+                    cell.font = Font(bold=True, size=11)
+                else:
+                    cell.font = Font(size=9)
+        
+        file21_buffer = BytesIO()
+        wb21.save(file21_buffer)
+        file21_buffer.seek(0)
+        zipf.writestr(f"Bước 2.1 - Lưu mẫu thức ăn - Tuần {week_number}.xlsx", file21_buffer.read())
+        
+        # BƯỚC 3: Kiểm tra bảo quản và phục vụ thức ăn - Format chuyên nghiệp  
+        wb4 = Workbook()
+        ws4 = wb4.active
+        ws4.title = "Bảo quản và phục vụ"
+        
+        # Header chính
+        ws4['A1'] = "TÊN CƠ SỞ: MNĐL Cây Nhỏ"
+        ws4['A1'].font = Font(bold=True, size=12)
+        ws4['A1'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
+        ws4.merge_cells('A1:O1')
+        
+        ws4['D2'] = "BIỂU MẪU KIỂM TRA BẢO QUẢN VÀ PHỤC VỤ THỨC ĂN"
+        ws4['D2'].font = Font(bold=True, size=14, color="006600")
+        ws4['D2'].alignment = Alignment(horizontal='center', vertical='center')
+        ws4.merge_cells('D2:K2')
+        
+        ws4['M2'] = "Số: 1248/QĐ - Bộ Y Tế"
+        ws4['M2'].font = Font(bold=True, size=10)
+        ws4['M2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+        
+        # Thông tin kiểm tra
+        info_data4 = [
+            (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân - Bếp trưởng", 'M', "Mẫu số 3.0"),
+            (4, 'A', f"Tuần kiểm tra: Tuần {week_number} ({week_start.strftime('%d/%m/%Y')} - {week_end.strftime('%d/%m/%Y')})", 'M', f"Số học sinh: {student_count}"),
+            (5, 'A', "Khu vực: Bếp ăn + Khu phục vụ - MNĐL Cây Nhỏ", 'M', "Chuẩn: ATTP 2021")
+        ]
+        
+        for row, col_a, text_a, col_m, text_m in info_data4:
+            ws4[f'{col_a}{row}'] = text_a
+            ws4[f'{col_a}{row}'].font = Font(bold=True, size=10)
+            ws4[f'{col_m}{row}'] = text_m
+            ws4[f'{col_m}{row}'].font = Font(bold=True, size=10)
+            ws4[f'{col_m}{row}'].fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+        
+        # Tiêu đề phần chính
+        ws4['A7'] = "PHẦN IV: KIỂM TRA BẢO QUẢN VÀ PHỤC VỤ THỨC ĂN"
+        ws4['A7'].font = Font(bold=True, size=12, color="006600")
+        ws4['A7'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
+        ws4.merge_cells('A7:L7')
+        ws4['O7'] = "BƯỚC 3"
+        ws4['O7'].font = Font(bold=True, size=12, color="006600")
+        ws4['O7'].fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+        
+        # Header bảng chính
+        headers4 = [
+            'STT', 'NGÀY/CA\nPHỤC VỤ', 'TÊN MÓN ĂN', 'THỜI GIAN\nHOÀN THÀNH', 'THỜI GIAN\nPHỤC VỤ',
+            'NHIỆT ĐỘ\nKHI PHỤC VỤ', 'THIẾT BỊ\nGIỮ NHIỆT', 'VỆ SINH DỤNG CỤ', '', 
+            'ĐÁNH GIÁ\nPHỤC VỤ', '', 'BIỆN PHÁP\nXỬ LÝ', 'SỐ SUẤT\nTHỰC TẾ', 'GHI CHÚ\nĐẶC BIỆT'
+        ]
+        
+        for i, header in enumerate(headers4, 1):
+            cell = ws4.cell(row=8, column=i, value=header)
+            cell.font = Font(bold=True, size=9, color="FFFFFF")
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.fill = PatternFill(start_color="006600", end_color="006600", fill_type="solid")
+            cell.border = thick_border
+        
+        # Sub-headers chi tiết
+        sub_headers4 = [
+            '', '', '', '', '', '', '', 'Chén/bát', 'Thìa/đũa',
+            'Đạt', 'Không đạt', '', '', ''
+        ]
+        
+        for i, header in enumerate(sub_headers4, 1):
+            cell = ws4.cell(row=9, column=i, value=header)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="4D9900", end_color="4D9900", fill_type="solid")
+            cell.border = thin_border
+        
+        # Merge cells cho headers
+        merge_ranges4 = ['H8:I8', 'J8:K8']  # Vệ sinh dụng cụ, Đánh giá phục vụ
+        for merge_range in merge_ranges4:
+            ws4.merge_cells(merge_range)
+        
+        # Số thứ tự cột
+        for i in range(1, 15):
+            cell = ws4.cell(row=10, column=i, value=i)
+            cell.font = Font(bold=True, size=8)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+            cell.border = thin_border
+        
+        # Điền dữ liệu phục vụ thức ăn
+        row_num = 11
+        stt = 1
+        
+        for day_idx, day_key in enumerate(days):
+            if day_key in menu_data:
+                current_date = week_start + timedelta(days=day_idx)
+                
+                for meal_key, (ca_name, start_time, end_time) in meal_times.items():
+                    if menu_data[day_key].get(meal_key):
+                        dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
+                        for dish in dishes:
+                            # Thời gian phục vụ
+                            serve_times = {
+                                'morning': '6:30',
+                                'snack': '9:00', 
+                                'lunch': '11:00',
+                                'afternoon': '14:30',
+                                'lateafternoon': '16:00',
+                                'dessert': '12:15'
+                            }
+                            serve_time = serve_times.get(meal_key, '12:00')
+                            
+                            # Thiết bị giữ nhiệt
+                            equipment = get_heating_equipment(dish)
+                            serving_temp = get_serving_temperature(dish)
+                            actual_portions = get_actual_portions(dish, student_count)
+                            
+                            data_row4 = [
+                                stt,  # STT
+                                f"{days_vn[day_idx]}\n{current_date.strftime('%d/%m')}\n{ca_name}",  # Ngày/ca
+                                dish.title(),  # Tên món ăn
+                                end_time,  # Thời gian hoàn thành
+                                serve_time,  # Thời gian phục vụ
+                                serving_temp,  # Nhiệt độ khi phục vụ
+                                equipment,  # Thiết bị giữ nhiệt
+                                "Sạch sẽ\nKhử trùng",  # Chén/bát
+                                "Sạch sẽ\nKhử trùng",  # Thìa/đũa
+                                '✓',  # Đạt
+                                '',  # Không đạt
+                                "Phục vụ\nđúng giờ",  # Biện pháp xử lý
+                                f"{actual_portions} phần",  # Số suất thực tế
+                                get_serving_note(dish)  # Ghi chú đặc biệt
+                            ]
+                            
+                            for j, value in enumerate(data_row4, 1):
+                                cell = ws4.cell(row=row_num, column=j, value=value)
+                                cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+                                cell.border = thin_border
+                                
+                                # Styling đặc biệt
+                                if j == 1:  # STT
+                                    cell.font = Font(bold=True, color="006600")
+                                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                                elif j == 3:  # Tên món ăn
+                                    cell.font = Font(bold=True, size=10)
+                                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                                elif j == 10 and value == '✓':  # Đạt
+                                    cell.font = Font(bold=True, size=12, color="228B22")
+                                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                                elif j == 6:  # Nhiệt độ
+                                    cell.font = Font(bold=True, color="FF4500")
+                                elif j == 13:  # Số suất thực tế
+                                    cell.font = Font(bold=True, color="0066CC")
+                            
+                            row_num += 1
+                            stt += 1
+                            
+                            if row_num > 40:  # Giới hạn
+                                break
+                    if row_num > 40:
+                        break
+                if row_num > 40:
+                    break
+        
+        # Thống kê phục vụ
+        stats_row4 = row_num + 2
+        ws4[f'A{stats_row4}'] = "THỐNG KÊ PHỤC VỤ THỨC ĂN:"
+        ws4[f'A{stats_row4}'].font = Font(bold=True, size=11, color="006600")
+        ws4[f'A{stats_row4}'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
+        
+        total_servings = stt - 1
+        total_portions = sum(get_actual_portions('', student_count) for _ in range(total_servings))
+        
+        stats_info4 = [
+            f"• Tổng số lần phục vụ: {total_servings} lần",
+            f"• Tổng số suất ăn phục vụ: {total_portions} suất",
+            f"• Trung bình suất/lần: {total_portions/total_servings:.1f} suất/lần",
+            f"• Thời gian trung bình từ chế biến xong đến phục vụ: <30 phút"
+        ]
+        
+        for i, stat in enumerate(stats_info4, 1):
+            ws4[f'A{stats_row4 + i}'] = stat
+            ws4[f'A{stats_row4 + i}'].font = Font(size=10)
+        
+        # Nguyên tắc bảo quản và phục vụ
+        principles_row = stats_row4 + 6
+        ws4[f'A{principles_row}'] = "NGUYÊN TẮC BẢO QUẢN VÀ PHỤC VỤ AN TOÀN:"
+        ws4[f'A{principles_row}'].font = Font(bold=True, size=11, color="004000")
+        
+        principles_notes = [
+            "• Thời gian: Từ chế biến xong đến phục vụ không quá 2 giờ",
+            "• Nhiệt độ: Món nóng >60°C, món lạnh <10°C khi phục vụ",
+            "• Thiết bị: Sử dụng tủ giữ nhiệt, nồi cơm điện, bình giữ nhiệt",
+            "• Vệ sinh: Khử trùng dụng cụ trước mỗi bữa ăn",
+            "• Kiểm tra: Nhiệt độ thức ăn trước khi phục vụ cho trẻ"
+        ]
+        
+        for i, note in enumerate(principles_notes, 1):
+            ws4[f'A{principles_row + i}'] = note
+            ws4[f'A{principles_row + i}'].font = Font(size=9, color="004000")
+        
+        # Chữ ký
+        signature_row4 = principles_row + 8
+        signature_data4 = [
+            (signature_row4, 'D', "NHÂN VIÊN PHỤC VỤ", 'K', "HIỆU TRƯỞNG"),
+            (signature_row4 + 1, 'D', "(Ký, ghi rõ họ tên)", 'K', "(Ký, ghi rõ họ tên)"),
+            (signature_row4 + 5, 'D', "Nguyễn Thị Vân", 'K', "Nguyễn Thị Vân"),
+            (signature_row4 + 6, 'D', f"Ngày {today.day}/{today.month}/{today.year}", 'K', f"Ngày {today.day}/{today.month}/{today.year}")
+        ]
+        
+        for row, col_d, text_d, col_k, text_k in signature_data4:
+            ws4[f'{col_d}{row}'] = text_d
+            ws4[f'{col_k}{row}'] = text_k
+            
+            for col, text in [(col_d, text_d), (col_k, text_k)]:
+                cell = ws4[f'{col}{row}']
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                if row == signature_row4:
+                    cell.font = Font(bold=True, size=12, color="006600")
+                    cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                elif row == signature_row4 + 1:
+                    cell.font = Font(italic=True, size=9)
+                elif row == signature_row4 + 5:
+                    cell.font = Font(bold=True, size=11)
+                else:
+                    cell.font = Font(size=9)
+        
+        file4_buffer = BytesIO()
+        wb4.save(file4_buffer)
+        file4_buffer.seek(0)
+        zipf.writestr(f"Bước 3 - Bảo quản và phục vụ thức ăn - Tuần {week_number}.xlsx", file4_buffer.read())
     
     # Đóng zipfile và trả về
     zip_buffer.seek(0)
