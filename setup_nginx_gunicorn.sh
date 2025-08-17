@@ -19,7 +19,7 @@ SERVER_IP="180.93.136.198"
 PROJECT_PATH="/home/smalltree/smalltree"  # Git clone location
 VENV_PATH="$PROJECT_PATH/venv"
 SERVICE_NAME="smalltree-gunicorn"
-APP_MODULE="app.run:app"  # Python app module
+APP_MODULE="run:app"  # Python app module (run.py is at root level)
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  🚀 SmallTree Academy Deployment Setup ${NC}"
@@ -71,8 +71,8 @@ if [ ! -d "$PROJECT_PATH" ]; then
     exit 1
 fi
 
-if [ ! -f "$PROJECT_PATH/app/run.py" ]; then
-    print_error "app/run.py not found in $PROJECT_PATH"
+if [ ! -f "$PROJECT_PATH/run.py" ]; then
+    print_error "run.py not found in $PROJECT_PATH"
     print_info "Please ensure the repository is cloned correctly"
     exit 1
 fi
@@ -132,7 +132,7 @@ print_info "Initializing database..."
 sudo -u smalltree bash -c "
     cd $PROJECT_PATH
     source venv/bin/activate
-    export FLASK_APP=app/run.py
+    export FLASK_APP=run.py
     
     # Create database directory if not exists
     mkdir -p app

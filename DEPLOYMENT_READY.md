@@ -11,10 +11,11 @@
 - ❌ dns_setup_guide.sh (DNS đã được provider setup)
 
 ### 🐧 Files Linux production:
-- ✅ setup_nginx_gunicorn.sh (Fixed - no Pillow build errors)
+- ✅ setup_nginx_gunicorn.sh (Fixed for run.py at root level)
 - ✅ maintain_server.sh (Server management)  
 - ✅ requirements_minimal.txt (Core packages only)
-- ✅ ssl_setup.sh (SSL automation)my - PRODUCTION READY
+- ✅ ssl_setup.sh (SSL automation)
+- ✅ test_structure.sh (Verify project structure)my - PRODUCTION READY
 
 **Domain:** mamnoncaynho.com  
 **Server IP:** 180.93.136.198  
