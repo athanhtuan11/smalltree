@@ -1,0 +1,420 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-success mb-0">
+                <i class="fas fa-user-graduate"></i> {{ student.name }}
+            </h2>
+            <small class="text-muted">
+                Mã số: {{ student.student_code or 'N/A' }} | 
+                Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
+                Sinh: {{ student.birth_date or 'N/A' }}
+            </small>
+        </div>
+        <div>
+            <a href="{{ url_for('main.student_albums') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+            {% if session.role in ['admin', 'teacher'] %}
+            <a href="{{ url_for('main.create_student_album', student_id=student.id) }}" 
+               class="btn btn-success">
+                <i class="fas fa-plus"></i> Tạo album mới
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-photo-video fa-lg mb-1"></i>
+                    <h6>{{ albums|length }}</h6>
+                    <small>Album</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-images fa-lg mb-1"></i>
+                    <h6>{{ total_photos }}</h6>
+                    <small>Tổng ảnh</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-chart-line fa-lg mb-1"></i>
+                    <h6>{{ progress_records|length }}</h6>
+                    <small>Đánh giá</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center py-3">
+                    <i class="fas fa-calendar fa-lg mb-1"></i>
+                    <h6>{{ albums_this_month|length }}</h6>
+                    <small>Tháng này</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="studentTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="albums-tab" data-bs-toggle="tab" data-bs-target="#albums" 
+                    type="button" role="tab">
+                <i class="fas fa-photo-video"></i> Album ({{ albums|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="progress-tab" data-bs-toggle="tab" data-bs-target="#progress" 
+                    type="button" role="tab">
+                <i class="fas fa-chart-line"></i> Tiến bộ ({{ progress_records|length }})
+            </button>
+        </li>
+        {% if session.role in ['admin', 'teacher'] %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="add-progress-tab" data-bs-toggle="tab" data-bs-target="#add-progress" 
+                    type="button" role="tab">
+                <i class="fas fa-plus"></i> Thêm đánh giá
+            </button>
+        </li>
+        {% endif %}
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="studentTabsContent">
+        <!-- Albums Tab -->
+        <div class="tab-pane fade show active" id="albums" role="tabpanel">
+            {% if albums %}
+            <div class="row">
+                {% for album in albums %}
+                <div class="col-lg-4 col-md-6 col-12 mb-4">
+                    <div class="card h-100 shadow-sm album-card">
+                        <!-- Cover Photo -->
+                        {% set cover_photo = album.photos|selectattr('is_cover_photo', 'equalto', true)|first 
+                                            or album.photos|first %}
+                        {% if cover_photo %}
+                        <div class="position-relative">
+                            <img src="{{ url_for('static', filename=cover_photo.filepath) }}" 
+                                 class="card-img-top album-cover" alt="Album cover">
+                            <div class="position-absolute top-0 end-0 m-2">
+                                <span class="badge bg-dark bg-opacity-75">
+                                    {{ album.photos|length }} <i class="fas fa-images"></i>
+                                </span>
+                            </div>
+                            {% if album.milestone_type %}
+                            <div class="position-absolute top-0 start-0 m-2">
+                                <span class="badge bg-primary">
+                                    {% if album.milestone_type == 'academic' %}
+                                    <i class="fas fa-graduation-cap"></i> Học tập
+                                    {% elif album.milestone_type == 'social' %}
+                                    <i class="fas fa-users"></i> Xã hội
+                                    {% elif album.milestone_type == 'physical' %}
+                                    <i class="fas fa-running"></i> Vận động
+                                    {% elif album.milestone_type == 'creative' %}
+                                    <i class="fas fa-palette"></i> Sáng tạo
+                                    {% else %}
+                                    <i class="fas fa-star"></i> Khác
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center album-cover">
+                            <i class="fas fa-image fa-3x text-muted"></i>
+                        </div>
+                        {% endif %}
+
+                        <div class="card-body">
+                            <h6 class="card-title fw-bold">{{ album.title }}</h6>
+                            
+                            <div class="mb-2">
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar"></i> {{ album.date_created.strftime('%d/%m/%Y') }}
+                                    {% if album.age_at_time %}
+                                    | <i class="fas fa-child"></i> {{ album.age_at_time }}
+                                    {% endif %}
+                                </small>
+                            </div>
+
+                            {% if album.description %}
+                            <p class="card-text small text-muted">
+                                {{ album.description[:100] }}{% if album.description|length > 100 %}...{% endif %}
+                            </p>
+                            {% endif %}
+
+                            {% if album.school_year or album.semester %}
+                            <div class="mb-2">
+                                {% if album.school_year %}
+                                <span class="badge bg-info">{{ album.school_year }}</span>
+                                {% endif %}
+                                {% if album.semester %}
+                                <span class="badge bg-secondary">{{ album.semester }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="card-footer bg-white">
+                            <div class="d-flex gap-1">
+                                <a href="{{ url_for('main.view_album', album_id=album.id) }}" 
+                                   class="btn btn-primary btn-sm flex-grow-1">
+                                    <i class="fas fa-eye"></i> Xem chi tiết
+                                </a>
+                                {% if session.role in ['admin', 'teacher'] %}
+                                <form method="POST" action="{{ url_for('main.delete_album', album_id=album.id) }}" 
+                                      style="display:inline-block;" 
+                                      onsubmit="return confirm('Bạn có chắc muốn xóa album này?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center text-muted mt-5">
+                <i class="fas fa-photo-video fa-3x mb-3"></i>
+                <h4>Chưa có album nào</h4>
+                <p>{{ student.name }} chưa có album nào. Hãy tạo album đầu tiên!</p>
+                {% if session.role in ['admin', 'teacher'] %}
+                <a href="{{ url_for('main.create_student_album', student_id=student.id) }}" 
+                   class="btn btn-success">
+                    <i class="fas fa-plus"></i> Tạo album đầu tiên
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Progress Tab -->
+        <div class="tab-pane fade" id="progress" role="tabpanel">
+            {% if progress_records %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Ngày đánh giá</th>
+                            <th>Kỹ năng</th>
+                            <th>Tên kỹ năng</th>
+                            <th>Mức độ</th>
+                            <th>Giáo viên</th>
+                            <th>Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in progress_records %}
+                        <tr>
+                            <td>{{ record.evaluation_date.strftime('%d/%m/%Y') }}</td>
+                            <td>
+                                {% if record.skill_category == 'language' %}
+                                <span class="badge bg-primary">Ngôn ngữ</span>
+                                {% elif record.skill_category == 'motor' %}
+                                <span class="badge bg-success">Vận động</span>
+                                {% elif record.skill_category == 'social' %}
+                                <span class="badge bg-info">Xã hội</span>
+                                {% elif record.skill_category == 'cognitive' %}
+                                <span class="badge bg-warning">Nhận thức</span>
+                                {% elif record.skill_category == 'self_care' %}
+                                <span class="badge bg-secondary">Tự phục vụ</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.skill_name }}</td>
+                            <td>
+                                {% if record.level_achieved == 'excellent' %}
+                                <span class="badge bg-success">Xuất sắc</span>
+                                {% elif record.level_achieved == 'good' %}
+                                <span class="badge bg-primary">Tốt</span>
+                                {% elif record.level_achieved == 'developing' %}
+                                <span class="badge bg-warning">Đang phát triển</span>
+                                {% elif record.level_achieved == 'needs_support' %}
+                                <span class="badge bg-danger">Cần hỗ trợ</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.teacher_name }}</td>
+                            <td>
+                                {% if record.notes %}
+                                <small>{{ record.notes[:50] }}{% if record.notes|length > 50 %}...{% endif %}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted mt-5">
+                <i class="fas fa-chart-line fa-3x mb-3"></i>
+                <h4>Chưa có đánh giá nào</h4>
+                <p>{{ student.name }} chưa có đánh giá tiến bộ nào.</p>
+                {% if session.role in ['admin', 'teacher'] %}
+                <button class="btn btn-success" data-bs-toggle="tab" data-bs-target="#add-progress">
+                    <i class="fas fa-plus"></i> Thêm đánh giá đầu tiên
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Add Progress Tab -->
+        {% if session.role in ['admin', 'teacher'] %}
+        <div class="tab-pane fade" id="add-progress" role="tabpanel">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-plus"></i> Thêm đánh giá tiến bộ cho {{ student.name }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('main.add_student_progress', student_id=student.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ngày đánh giá</label>
+                                        <input type="date" name="evaluation_date" class="form-control" 
+                                               value="{{ current_date }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Loại kỹ năng</label>
+                                        <select name="skill_category" class="form-select" required>
+                                            <option value="language">Ngôn ngữ</option>
+                                            <option value="motor">Vận động</option>
+                                            <option value="social">Xã hội</option>
+                                            <option value="cognitive">Nhận thức</option>
+                                            <option value="self_care">Tự phục vụ</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">Tên kỹ năng cụ thể</label>
+                                        <input type="text" name="skill_name" class="form-control" 
+                                               placeholder="Ví dụ: Kể chuyện, Vẽ tranh, Chơi cùng bạn..." required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Mức độ đạt được</label>
+                                        <select name="level_achieved" class="form-select" required>
+                                            <option value="excellent">Xuất sắc</option>
+                                            <option value="good">Tốt</option>
+                                            <option value="developing">Đang phát triển</option>
+                                            <option value="needs_support">Cần hỗ trợ</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Ghi chú chi tiết</label>
+                                    <textarea name="notes" class="form-control" rows="3" 
+                                              placeholder="Mô tả chi tiết về sự tiến bộ của bé..."></textarea>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Lưu đánh giá
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" data-bs-toggle="tab" data-bs-target="#progress">
+                                        Hủy
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.album-cover {
+    height: 200px;
+    object-fit: cover;
+}
+
+.album-card {
+    transition: transform 0.2s;
+}
+
+.album-card:hover {
+    transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+    .album-cover {
+        height: 150px;
+    }
+    
+    .card-body {
+        padding: 0.75rem;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+</style>
+
+<script>
+// Auto-populate skill names based on category
+document.addEventListener('DOMContentLoaded', function() {
+    const skillCategories = {
+        'language': ['Kể chuyện', 'Đọc sách', 'Hát', 'Trò chuyện', 'Từ vựng mới'],
+        'motor': ['Chạy nhảy', 'Vẽ tranh', 'Cắt giấy', 'Xây dựng', 'Bóng đá'],
+        'social': ['Chơi cùng bạn', 'Chia sẻ', 'Giúp đỡ', 'Lắng nghe', 'Hợp tác'],
+        'cognitive': ['Đếm số', 'Nhận biết màu', 'Ghép hình', 'Giải đố', 'Quan sát'],
+        'self_care': ['Ăn uống', 'Vệ sinh', 'Mặc quần áo', 'Sắp xếp', 'Ngủ nghỉ']
+    };
+    
+    const categorySelect = document.querySelector('select[name="skill_category"]');
+    const skillInput = document.querySelector('input[name="skill_name"]');
+    
+    if (categorySelect && skillInput) {
+        categorySelect.addEventListener('change', function() {
+            const category = this.value;
+            const skills = skillCategories[category] || [];
+            
+            // Create datalist for autocomplete
+            let datalist = document.getElementById('skill-suggestions');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'skill-suggestions';
+                document.body.appendChild(datalist);
+                skillInput.setAttribute('list', 'skill-suggestions');
+            }
+            
+            datalist.innerHTML = '';
+            skills.forEach(skill => {
+                const option = document.createElement('option');
+                option.value = skill;
+                datalist.appendChild(option);
+            });
+        });
+        
+        // Trigger initial load
+        categorySelect.dispatchEvent(new Event('change'));
+    }
+});
+</script>
+{% endblock %}

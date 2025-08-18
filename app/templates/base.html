@@ -51,6 +51,14 @@
                             <span>Điểm danh</span>
                         </a>
                     </li>
+                    {% if session.get('role') in ['admin', 'teacher', 'parent'] %}
+                    <li class="nav-item">
+                        <a class="nav-link d-flex align-items-center py-2" href="{{ url_for('main.student_albums') }}" style="min-height: 44px;">
+                            <i class="bi bi-images me-2" style="color:#43a047; font-size:1.1em;"></i> 
+                            <span>Album học sinh</span>
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link d-flex align-items-center py-2" href="/contact" style="min-height: 44px;">
                             <i class="bi bi-envelope-heart me-2" style="color:#43a047; font-size:1.1em;"></i> 

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -3951,3 +3951,208 @@ def ai_dashboard():
         return redirect_no_permission()
     
     return render_template('ai_dashboard.html')
+
+# ===== STUDENT ALBUM MANAGEMENT ROUTES =====
+
+@main.route('/student-albums')
+def student_albums():
+    """Danh sách album của tất cả học sinh"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    students = Child.query.all()
+    albums = StudentAlbum.query.join(Child).order_by(StudentAlbum.date_created.desc()).all()
+    
+    # Tính thống kê
+    today = date.today()
+    albums_today = [album for album in albums if album.date_created == today]
+    academic_albums = [album for album in albums if album.milestone_type == 'academic']
+    
+    # Mobile detection
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
+    
+    return render_template('student_albums.html', 
+                         students=students, 
+                         albums=albums, 
+                         albums_today=albums_today,
+                         academic_albums=academic_albums,
+                         mobile=mobile)
+
+@main.route('/student/<int:student_id>/albums')
+def student_albums_detail(student_id):
+    """Album chi tiết của một học sinh"""
+    if session.get('role') not in ['admin', 'teacher', 'parent']:
+        return redirect_no_permission()
+    
+    student = Child.query.get_or_404(student_id)
+    
+    # Nếu là parent, chỉ xem được album của con mình
+    if session.get('role') == 'parent' and session.get('user_id') != student_id:
+        flash('Bạn chỉ có thể xem album của con mình!', 'error')
+        return redirect(url_for('main.index'))
+    
+    albums = StudentAlbum.query.filter_by(student_id=student_id).order_by(StudentAlbum.date_created.desc()).all()
+    progress_records = StudentProgress.query.filter_by(student_id=student_id).order_by(StudentProgress.evaluation_date.desc()).all()
+    
+    # Tính thống kê cho student này
+    total_photos = sum(len(album.photos) for album in albums)
+    today = date.today()
+    first_day_of_month = today.replace(day=1)
+    albums_this_month = [album for album in albums if album.date_created >= first_day_of_month]
+    
+    # Mobile detection
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
+    
+    return render_template('student_album_detail.html', 
+                         student=student, 
+                         albums=albums, 
+                         progress_records=progress_records,
+                         total_photos=total_photos,
+                         albums_this_month=albums_this_month,
+                         mobile=mobile,
+                         current_date=date.today().strftime('%Y-%m-%d'))
+
+@main.route('/student/<int:student_id>/album/new', methods=['GET', 'POST'])
+def create_student_album(student_id):
+    """Tạo album mới cho học sinh"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    student = Child.query.get_or_404(student_id)
+    
+    if request.method == 'POST':
+        # Lấy thông tin album
+        title = request.form.get('title')
+        description = request.form.get('description', '')
+        milestone_type = request.form.get('milestone_type', 'other')
+        school_year = request.form.get('school_year', '')
+        semester = request.form.get('semester', '')
+        age_at_time = request.form.get('age_at_time', '')
+        
+        # Tạo album mới
+        album = StudentAlbum(
+            student_id=student_id,
+            title=title,
+            description=description,
+            date_created=date.today(),
+            milestone_type=milestone_type,
+            school_year=school_year,
+            semester=semester,
+            age_at_time=age_at_time,
+            created_by=session.get('username', 'teacher'),
+            is_shared_with_parents=True
+        )
+        
+        db.session.add(album)
+        db.session.flush()  # Để lấy album.id
+        
+        # Xử lý upload ảnh
+        uploaded_files = request.files.getlist('photos')
+        if uploaded_files:
+            upload_dir = os.path.join(current_app.static_folder, 'student_albums', str(student_id), str(album.id))
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            for i, file in enumerate(uploaded_files):
+                if file and file.filename:
+                    filename = secrets.token_hex(16) + '.' + file.filename.rsplit('.', 1)[1].lower()
+                    filepath = os.path.join(upload_dir, filename)
+                    file.save(filepath)
+                    
+                    # Tạo record ảnh
+                    photo = StudentPhoto(
+                        album_id=album.id,
+                        filename=filename,
+                        filepath=f"student_albums/{student_id}/{album.id}/{filename}",
+                        original_filename=file.filename,
+                        caption=request.form.get(f'caption_{i}', ''),
+                        upload_date=datetime.now(),
+                        file_size=os.path.getsize(filepath),
+                        image_order=i,
+                        is_cover_photo=(i == 0)  # Ảnh đầu tiên làm ảnh đại diện
+                    )
+                    db.session.add(photo)
+        
+        db.session.commit()
+        flash(f'✅ Đã tạo album "{title}" cho {student.name}!', 'success')
+        return redirect(url_for('main.student_albums_detail', student_id=student_id))
+    
+    # Mobile detection
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
+    
+    return render_template('create_student_album.html', student=student, mobile=mobile)
+
+@main.route('/album/<int:album_id>')
+def view_album(album_id):
+    """Xem chi tiết một album"""
+    if session.get('role') not in ['admin', 'teacher', 'parent']:
+        return redirect_no_permission()
+    
+    album = StudentAlbum.query.get_or_404(album_id)
+    
+    # Nếu là parent, chỉ xem được album của con mình
+    if session.get('role') == 'parent' and session.get('user_id') != album.student_id:
+        flash('Bạn chỉ có thể xem album của con mình!', 'error')
+        return redirect(url_for('main.index'))
+    
+    photos = StudentPhoto.query.filter_by(album_id=album_id).order_by(StudentPhoto.image_order).all()
+    
+    # Mobile detection
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
+    
+    return render_template('view_album.html', album=album, photos=photos, mobile=mobile)
+
+@main.route('/student/<int:student_id>/progress/new', methods=['GET', 'POST'])
+def add_student_progress(student_id):
+    """Thêm đánh giá tiến bộ cho học sinh"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    student = Child.query.get_or_404(student_id)
+    
+    if request.method == 'POST':
+        progress = StudentProgress(
+            student_id=student_id,
+            evaluation_date=datetime.strptime(request.form.get('evaluation_date'), '%Y-%m-%d').date(),
+            skill_category=request.form.get('skill_category'),
+            skill_name=request.form.get('skill_name'),
+            level_achieved=request.form.get('level_achieved'),
+            notes=request.form.get('notes', ''),
+            teacher_name=session.get('username', 'teacher')
+        )
+        
+        db.session.add(progress)
+        db.session.commit()
+        
+        flash(f'✅ Đã thêm đánh giá tiến bộ cho {student.name}!', 'success')
+        return redirect(url_for('main.student_albums_detail', student_id=student_id))
+    
+    # Mobile detection
+    user_agent = request.headers.get('User-Agent', '').lower()
+    mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
+    
+    return render_template('add_student_progress.html', student=student, mobile=mobile)
+
+@main.route('/album/<int:album_id>/delete', methods=['POST'])
+def delete_album(album_id):
+    """Xóa album"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    album = StudentAlbum.query.get_or_404(album_id)
+    student_id = album.student_id
+    
+    # Xóa thư mục chứa ảnh
+    album_dir = os.path.join(current_app.static_folder, 'student_albums', str(student_id), str(album_id))
+    if os.path.exists(album_dir):
+        import shutil
+        shutil.rmtree(album_dir)
+    
+    db.session.delete(album)
+    db.session.commit()
+    
+    flash('✅ Đã xóa album!', 'success')
+    return redirect(url_for('main.student_albums_detail', student_id=student_id))

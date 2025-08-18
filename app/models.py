@@ -86,3 +86,48 @@ class Product(db.Model):
     
     # Relationship
     supplier = db.relationship('Supplier', backref=db.backref('products', lazy=True))
+
+class StudentAlbum(db.Model):
+    """Album cá nhân của học sinh để theo dõi quá trình phát triển"""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)  # Tiêu đề album/mốc phát triển
+    description = db.Column(db.Text)  # Mô tả
+    date_created = db.Column(db.Date, nullable=False)  # Ngày tạo
+    milestone_type = db.Column(db.String(50))  # Loại mốc: 'academic', 'social', 'physical', 'creative', 'other'
+    school_year = db.Column(db.String(20))  # Năm học: 2024-2025
+    semester = db.Column(db.String(10))  # Học kỳ: HK1, HK2
+    age_at_time = db.Column(db.String(10))  # Độ tuổi khi chụp: "3 tuổi 2 tháng"
+    created_by = db.Column(db.String(100))  # Người tạo: teacher, admin
+    is_shared_with_parents = db.Column(db.Boolean, default=True)  # Chia sẻ với phụ huynh
+    
+    # Relationship
+    student = db.relationship('Child', backref=db.backref('albums', lazy=True))
+    photos = db.relationship('StudentPhoto', backref='album', lazy=True, cascade='all, delete-orphan')
+
+class StudentPhoto(db.Model):
+    """Ảnh trong album của học sinh"""
+    id = db.Column(db.Integer, primary_key=True)
+    album_id = db.Column(db.Integer, db.ForeignKey('student_album.id'), nullable=False)
+    filename = db.Column(db.String(200), nullable=False)
+    filepath = db.Column(db.String(300), nullable=False)
+    original_filename = db.Column(db.String(200))  # Tên file gốc
+    caption = db.Column(db.Text)  # Chú thích ảnh
+    upload_date = db.Column(db.DateTime, nullable=False)
+    file_size = db.Column(db.Integer)  # Kích thước file (bytes)
+    image_order = db.Column(db.Integer, default=0)  # Thứ tự hiển thị trong album
+    is_cover_photo = db.Column(db.Boolean, default=False)  # Ảnh đại diện album
+
+class StudentProgress(db.Model):
+    """Theo dõi tiến bộ học tập và phát triển của học sinh"""
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
+    evaluation_date = db.Column(db.Date, nullable=False)
+    skill_category = db.Column(db.String(50), nullable=False)  # 'language', 'motor', 'social', 'cognitive', 'self_care'
+    skill_name = db.Column(db.String(200), nullable=False)  # Tên kỹ năng cụ thể
+    level_achieved = db.Column(db.String(20))  # 'excellent', 'good', 'developing', 'needs_support'
+    notes = db.Column(db.Text)  # Ghi chú chi tiết
+    teacher_name = db.Column(db.String(100))  # Giáo viên đánh giá
+    
+    # Relationship
+    student = db.relationship('Child', backref=db.backref('progress_records', lazy=True))

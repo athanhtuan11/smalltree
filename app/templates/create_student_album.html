@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-success">
+            <i class="fas fa-plus"></i> Tạo Album Mới cho {{ student.name }}
+        </h2>
+        <a href="{{ url_for('main.student_albums_detail', student_id=student.id) }}" 
+           class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Quay lại
+        </a>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-graduate"></i> {{ student.name }} 
+                        <small>({{ student.student_code or 'N/A' }} - {{ student.class_name or 'Chưa phân lớp' }})</small>
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="albumForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <!-- Basic Info -->
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label">
+                                    <i class="fas fa-heading"></i> Tiêu đề album <span class="text-danger">*</span>
+                                </label>
+                                <input type="text" name="title" class="form-control" required
+                                       placeholder="VD: Ngày đầu tiên đi học, Sinh nhật lần thứ 3...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    <i class="fas fa-star"></i> Loại mốc phát triển
+                                </label>
+                                <select name="milestone_type" class="form-select">
+                                    <option value="academic">🎓 Học tập</option>
+                                    <option value="social">👥 Xã hội</option>
+                                    <option value="physical">🏃 Vận động</option>
+                                    <option value="creative">🎨 Sáng tạo</option>
+                                    <option value="other" selected>⭐ Khác</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-align-left"></i> Mô tả
+                            </label>
+                            <textarea name="description" class="form-control" rows="3"
+                                      placeholder="Mô tả về sự kiện, hoạt động hoặc mốc phát triển này..."></textarea>
+                        </div>
+
+                        <!-- Timeline Info -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar-alt"></i> Năm học
+                                </label>
+                                <input type="text" name="school_year" class="form-control" 
+                                       placeholder="VD: 2024-2025" value="2024-2025">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar"></i> Học kỳ
+                                </label>
+                                <select name="semester" class="form-select">
+                                    <option value="">Chọn học kỳ</option>
+                                    <option value="HK1">Học kỳ 1</option>
+                                    <option value="HK2">Học kỳ 2</option>
+                                    <option value="Hè">Hè</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">
+                                    <i class="fas fa-child"></i> Độ tuổi khi chụp
+                                </label>
+                                <input type="text" name="age_at_time" class="form-control" 
+                                       placeholder="VD: 3 tuổi 2 tháng">
+                            </div>
+                        </div>
+
+                        <!-- Photo Upload -->
+                        <div class="mb-4">
+                            <label class="form-label">
+                                <i class="fas fa-images"></i> Ảnh cho album
+                            </label>
+                            <div class="border rounded p-3 bg-light">
+                                <input type="file" name="photos" class="form-control mb-3" 
+                                       multiple accept="image/*" id="photoInput">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Có thể chọn nhiều ảnh cùng lúc. Định dạng: JPG, PNG, GIF. Tối đa 10MB mỗi ảnh.
+                                </small>
+                                
+                                <!-- Preview Container -->
+                                <div id="photoPreview" class="mt-3"></div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Buttons -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-save"></i> Tạo Album
+                            </button>
+                            <a href="{{ url_for('main.student_albums_detail', student_id=student.id) }}" 
+                               class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> Hủy
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.photo-preview-item {
+    position: relative;
+    display: inline-block;
+    margin: 5px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.photo-preview-img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+}
+
+.photo-remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(220, 53, 69, 0.8);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 25px;
+    height: 25px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.photo-caption-input {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 5px;
+    font-size: 11px;
+}
+
+.photo-caption-input::placeholder {
+    color: #ccc;
+}
+
+@media (max-width: 768px) {
+    .photo-preview-img {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const photoInput = document.getElementById('photoInput');
+    const photoPreview = document.getElementById('photoPreview');
+    let selectedFiles = [];
+
+    photoInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        
+        files.forEach((file, index) => {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert(`File "${file.name}" không phải là ảnh!`);
+                return;
+            }
+            
+            // Validate file size (10MB max)
+            if (file.size > 10 * 1024 * 1024) {
+                alert(`File "${file.name}" quá lớn! Tối đa 10MB.`);
+                return;
+            }
+            
+            selectedFiles.push(file);
+            
+            // Create preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'photo-preview-item';
+                previewItem.innerHTML = `
+                    <img src="${e.target.result}" class="photo-preview-img" alt="Preview">
+                    <button type="button" class="photo-remove-btn" onclick="removePhoto(${selectedFiles.length - 1})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <input type="text" class="photo-caption-input" placeholder="Chú thích ảnh..." 
+                           name="caption_${selectedFiles.length - 1}">
+                `;
+                
+                photoPreview.appendChild(previewItem);
+                
+                // Add first image indicator
+                if (selectedFiles.length === 1) {
+                    const firstLabel = document.createElement('small');
+                    firstLabel.className = 'text-success d-block mt-2';
+                    firstLabel.innerHTML = '<i class="fas fa-star"></i> Ảnh đầu tiên sẽ làm ảnh đại diện album';
+                    photoPreview.appendChild(firstLabel);
+                }
+            };
+            
+            reader.readAsDataURL(file);
+        });
+        
+        // Update file input
+        updateFileInput();
+    });
+
+    window.removePhoto = function(index) {
+        selectedFiles.splice(index, 1);
+        photoPreview.innerHTML = '';
+        
+        // Rebuild preview
+        selectedFiles.forEach((file, newIndex) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'photo-preview-item';
+                previewItem.innerHTML = `
+                    <img src="${e.target.result}" class="photo-preview-img" alt="Preview">
+                    <button type="button" class="photo-remove-btn" onclick="removePhoto(${newIndex})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <input type="text" class="photo-caption-input" placeholder="Chú thích ảnh..." 
+                           name="caption_${newIndex}">
+                `;
+                
+                photoPreview.appendChild(previewItem);
+            };
+            reader.readAsDataURL(file);
+        });
+        
+        updateFileInput();
+    };
+
+    function updateFileInput() {
+        // Create new FileList
+        const dt = new DataTransfer();
+        selectedFiles.forEach(file => dt.items.add(file));
+        photoInput.files = dt.files;
+    }
+    
+    // Form validation
+    document.getElementById('albumForm').addEventListener('submit', function(e) {
+        const title = document.querySelector('input[name="title"]').value.trim();
+        
+        if (!title) {
+            e.preventDefault();
+            alert('Vui lòng nhập tiêu đề album!');
+            return;
+        }
+        
+        if (selectedFiles.length === 0) {
+            if (!confirm('Bạn chưa chọn ảnh nào. Có muốn tạo album trống không?')) {
+                e.preventDefault();
+                return;
+            }
+        }
+        
+        // Show loading
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang tạo album...';
+        submitBtn.disabled = true;
+    });
+});
+</script>
+{% endblock %}

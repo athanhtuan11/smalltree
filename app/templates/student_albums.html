@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-success">
+            <i class="fas fa-photo-video"></i> Album Học Sinh
+        </h2>
+        <div>
+            <a href="/students" class="btn btn-outline-secondary">
+                <i class="fas fa-users"></i> Danh sách học sinh
+            </a>
+        </div>
+    </div>
+
+    {% if mobile %}
+    <div class="alert alert-info">
+        <i class="fas fa-mobile-alt"></i> Vuốt để xem thêm thông tin
+    </div>
+    {% endif %}
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <h5>{{ students|length }}</h5>
+                    <small>Tổng học sinh</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <i class="fas fa-photo-video fa-2x mb-2"></i>
+                    <h5>{{ albums|length }}</h5>
+                    <small>Tổng album</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <i class="fas fa-calendar-day fa-2x mb-2"></i>
+                    <h5>{{ albums_today|length }}</h5>
+                    <small>Album hôm nay</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <i class="fas fa-star fa-2x mb-2"></i>
+                    <h5>{{ academic_albums|length }}</h5>
+                    <small>Mốc học tập</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Students Grid -->
+    <div class="row">
+        {% for student in students %}
+        <div class="col-lg-4 col-md-6 col-12 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0 fw-bold text-success">
+                            <i class="fas fa-user-graduate"></i> {{ student.name }}
+                        </h6>
+                        <span class="badge bg-primary">{{ student.student_code or 'N/A' }}</span>
+                    </div>
+                    <small class="text-muted">
+                        Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
+                        Sinh: {{ student.birth_date or 'N/A' }}
+                    </small>
+                </div>
+                <div class="card-body">
+                    {% set student_albums = albums|selectattr('student_id', 'equalto', student.id)|list %}
+                    
+                    <div class="mb-3">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="text-primary">
+                                    <i class="fas fa-photo-video fa-lg"></i>
+                                    <div class="fw-bold">{{ student_albums|length }}</div>
+                                    <small>Album</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-success">
+                                    <i class="fas fa-images fa-lg"></i>
+                                    <div class="fw-bold">
+                                        {{ student_albums|sum(attribute='photos')|length if student_albums else 0 }}
+                                    </div>
+                                    <small>Ảnh</small>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-warning">
+                                    <i class="fas fa-chart-line fa-lg"></i>
+                                    <div class="fw-bold">
+                                        {{ student.progress_records|length if student.progress_records else 0 }}
+                                    </div>
+                                    <small>Đánh giá</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Albums Preview -->
+                    {% if student_albums %}
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-2">
+                            <i class="fas fa-clock"></i> Album gần đây:
+                        </h6>
+                        {% for album in student_albums[:2] %}
+                        <div class="mb-2 p-2 bg-light rounded">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold small">{{ album.title }}</div>
+                                    <div class="text-muted small">
+                                        <i class="fas fa-calendar"></i> {{ album.date_created.strftime('%d/%m/%Y') }}
+                                        {% if album.milestone_type %}
+                                        <span class="badge badge-sm bg-secondary ms-1">{{ album.milestone_type }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <a href="{{ url_for('main.view_album', album_id=album.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if student_albums|length > 2 %}
+                        <small class="text-muted">và {{ student_albums|length - 2 }} album khác...</small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted mb-3">
+                        <i class="fas fa-folder-open fa-2x"></i>
+                        <div>Chưa có album nào</div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-footer bg-white">
+                    <div class="d-flex gap-1">
+                        <a href="{{ url_for('main.student_albums_detail', student_id=student.id) }}" 
+                           class="btn btn-primary btn-sm flex-grow-1">
+                            <i class="fas fa-folder-open"></i> Xem album
+                        </a>
+                        {% if session.role in ['admin', 'teacher'] %}
+                        <a href="{{ url_for('main.create_student_album', student_id=student.id) }}" 
+                           class="btn btn-success btn-sm">
+                            <i class="fas fa-plus"></i> Thêm
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not students %}
+    <div class="text-center text-muted mt-5">
+        <i class="fas fa-users fa-3x mb-3"></i>
+        <h4>Chưa có học sinh nào</h4>
+        <p>Hãy thêm học sinh để bắt đầu tạo album cho các em.</p>
+        <a href="/attendance/new" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Thêm học sinh mới
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.card {
+    transition: transform 0.2s;
+}
+.card:hover {
+    transform: translateY(-2px);
+}
+
+{% if mobile %}
+.card-body {
+    padding: 0.75rem;
+}
+.card-footer {
+    padding: 0.5rem;
+}
+{% endif %}
+</style>
+{% endblock %}

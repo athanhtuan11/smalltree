@@ -1,0 +1,423 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-success mb-1">
+                <i class="fas fa-photo-video"></i> {{ album.title }}
+            </h2>
+            <div class="text-muted">
+                <i class="fas fa-user-graduate"></i> {{ album.student.name }} 
+                <span class="mx-2">|</span>
+                <i class="fas fa-calendar"></i> {{ album.date_created.strftime('%d/%m/%Y') }}
+                {% if album.age_at_time %}
+                <span class="mx-2">|</span>
+                <i class="fas fa-child"></i> {{ album.age_at_time }}
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <a href="{{ url_for('main.student_albums_detail', student_id=album.student_id) }}" 
+               class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+            {% if session.role in ['admin', 'teacher'] %}
+            <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <i class="fas fa-trash"></i> Xóa album
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Album Info -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    {% if album.description %}
+                    <p class="mb-2">{{ album.description }}</p>
+                    {% endif %}
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        {% if album.milestone_type %}
+                        <span class="badge bg-primary">
+                            {% if album.milestone_type == 'academic' %}
+                            <i class="fas fa-graduation-cap"></i> Học tập
+                            {% elif album.milestone_type == 'social' %}
+                            <i class="fas fa-users"></i> Xã hội
+                            {% elif album.milestone_type == 'physical' %}
+                            <i class="fas fa-running"></i> Vận động
+                            {% elif album.milestone_type == 'creative' %}
+                            <i class="fas fa-palette"></i> Sáng tạo
+                            {% else %}
+                            <i class="fas fa-star"></i> Khác
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                        
+                        {% if album.school_year %}
+                        <span class="badge bg-info">{{ album.school_year }}</span>
+                        {% endif %}
+                        
+                        {% if album.semester %}
+                        <span class="badge bg-secondary">{{ album.semester }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <small class="text-muted">
+                        Tạo bởi: {{ album.created_by }} | 
+                        Tổng {{ photos|length }} ảnh
+                        {% if album.is_shared_with_parents %}
+                        | <i class="fas fa-share-alt text-success"></i> Đã chia sẻ với phụ huynh
+                        {% endif %}
+                    </small>
+                </div>
+                <div class="col-md-4 text-end">
+                    {% if session.role in ['admin', 'teacher'] %}
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-primary" onclick="downloadAlbum()">
+                            <i class="fas fa-download"></i> Tải về
+                        </button>
+                        <button class="btn btn-outline-success" onclick="shareAlbum()">
+                            <i class="fas fa-share"></i> Chia sẻ
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if photos %}
+    <!-- Photo Gallery -->
+    <div class="row g-3 mb-4" id="photoGallery">
+        {% for photo in photos %}
+        <div class="col-lg-3 col-md-4 col-6">
+            <div class="card photo-card h-100">
+                <div class="position-relative">
+                    <img src="{{ url_for('static', filename=photo.filepath) }}" 
+                         class="card-img-top photo-thumbnail" 
+                         alt="{{ photo.original_filename }}"
+                         data-bs-toggle="modal" 
+                         data-bs-target="#photoModal"
+                         data-photo-id="{{ photo.id }}"
+                         data-photo-src="{{ url_for('static', filename=photo.filepath) }}"
+                         data-photo-caption="{{ photo.caption or '' }}"
+                         data-photo-filename="{{ photo.original_filename }}"
+                         data-photo-upload="{{ photo.upload_date.strftime('%d/%m/%Y %H:%M') }}">
+                    
+                    {% if photo.is_cover_photo %}
+                    <div class="position-absolute top-0 start-0 m-2">
+                        <span class="badge bg-warning">
+                            <i class="fas fa-star"></i> Ảnh đại diện
+                        </span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="position-absolute bottom-0 start-0 end-0 photo-overlay">
+                        <div class="p-2 text-white">
+                            <small>{{ loop.index }}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if photo.caption %}
+                <div class="card-body p-2">
+                    <small class="text-muted">{{ photo.caption }}</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Photo View Options -->
+    <div class="text-center mb-4">
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-secondary" onclick="viewMode('grid')" id="gridBtn">
+                <i class="fas fa-th"></i> Lưới
+            </button>
+            <button class="btn btn-outline-secondary" onclick="viewMode('list')" id="listBtn">
+                <i class="fas fa-list"></i> Danh sách
+            </button>
+            <button class="btn btn-outline-secondary" onclick="startSlideshow()" id="slideshowBtn">
+                <i class="fas fa-play"></i> Slideshow
+            </button>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Empty Album -->
+    <div class="text-center text-muted mt-5">
+        <i class="fas fa-images fa-3x mb-3"></i>
+        <h4>Album chưa có ảnh</h4>
+        <p>Album "{{ album.title }}" chưa có ảnh nào.</p>
+        {% if session.role in ['admin', 'teacher'] %}
+        <button class="btn btn-success" onclick="addPhotos()">
+            <i class="fas fa-plus"></i> Thêm ảnh
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Photo Modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="photoModalTitle">Ảnh trong album</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img id="modalPhoto" class="img-fluid" alt="Photo">
+                <div class="p-3">
+                    <div id="photoInfo" class="text-muted small"></div>
+                    <div id="photoCaption" class="mt-2"></div>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <button class="btn btn-outline-secondary" onclick="previousPhoto()">
+                    <i class="fas fa-chevron-left"></i> Trước
+                </button>
+                <span id="photoCounter" class="text-muted"></span>
+                <button class="btn btn-outline-secondary" onclick="nextPhoto()">
+                    Sau <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+{% if session.role in ['admin', 'teacher'] %}
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Xác nhận xóa album</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Bạn có chắc muốn xóa album <strong>"{{ album.title }}"</strong>?
+                </div>
+                <p>Hành động này sẽ:</p>
+                <ul>
+                    <li>Xóa vĩnh viễn album và tất cả {{ photos|length }} ảnh</li>
+                    <li>Không thể hoàn tác</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <form method="POST" action="{{ url_for('main.delete_album', album_id=album.id) }}" style="display:inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Xóa album
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.photo-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.photo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.photo-thumbnail {
+    height: 200px;
+    object-fit: cover;
+}
+
+.photo-overlay {
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+}
+
+#modalPhoto {
+    max-height: 70vh;
+    object-fit: contain;
+}
+
+.list-view .col-lg-3,
+.list-view .col-md-4,
+.list-view .col-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+}
+
+.list-view .photo-thumbnail {
+    height: 100px;
+    width: 100px;
+    object-fit: cover;
+}
+
+.list-view .card {
+    flex-direction: row;
+}
+
+.list-view .card-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .photo-thumbnail {
+        height: 150px;
+    }
+    
+    .col-6:nth-child(odd) {
+        padding-right: 0.5rem;
+    }
+    
+    .col-6:nth-child(even) {
+        padding-left: 0.5rem;
+    }
+}
+</style>
+
+<script>
+let currentPhotoIndex = 0;
+const photos = [
+    {% for photo in photos %}
+    {
+        id: {{ photo.id }},
+        src: "{{ url_for('static', filename=photo.filepath) }}",
+        caption: "{{ photo.caption or '' }}",
+        filename: "{{ photo.original_filename }}",
+        upload: "{{ photo.upload_date.strftime('%d/%m/%Y %H:%M') }}"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Photo modal functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const photoModal = document.getElementById('photoModal');
+    
+    photoModal.addEventListener('show.bs.modal', function(event) {
+        const trigger = event.relatedTarget;
+        const photoId = parseInt(trigger.getAttribute('data-photo-id'));
+        
+        currentPhotoIndex = photos.findIndex(p => p.id === photoId);
+        showPhoto(currentPhotoIndex);
+    });
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        if (photoModal.classList.contains('show')) {
+            if (e.key === 'ArrowLeft') previousPhoto();
+            if (e.key === 'ArrowRight') nextPhoto();
+            if (e.key === 'Escape') bootstrap.Modal.getInstance(photoModal).hide();
+        }
+    });
+});
+
+function showPhoto(index) {
+    if (index < 0 || index >= photos.length) return;
+    
+    const photo = photos[index];
+    document.getElementById('modalPhoto').src = photo.src;
+    document.getElementById('photoInfo').innerHTML = `
+        <strong>${photo.filename}</strong><br>
+        Tải lên: ${photo.upload}
+    `;
+    document.getElementById('photoCaption').textContent = photo.caption;
+    document.getElementById('photoCounter').textContent = `${index + 1} / ${photos.length}`;
+}
+
+function previousPhoto() {
+    currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+    showPhoto(currentPhotoIndex);
+}
+
+function nextPhoto() {
+    currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+    showPhoto(currentPhotoIndex);
+}
+
+function viewMode(mode) {
+    const gallery = document.getElementById('photoGallery');
+    const buttons = document.querySelectorAll('#gridBtn, #listBtn');
+    
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    if (mode === 'list') {
+        gallery.classList.add('list-view');
+        document.getElementById('listBtn').classList.add('active');
+    } else {
+        gallery.classList.remove('list-view');
+        document.getElementById('gridBtn').classList.add('active');
+    }
+}
+
+function startSlideshow() {
+    if (photos.length === 0) return;
+    
+    currentPhotoIndex = 0;
+    const modal = new bootstrap.Modal(document.getElementById('photoModal'));
+    modal.show();
+    
+    const slideInterval = setInterval(() => {
+        nextPhoto();
+        if (currentPhotoIndex === 0) {
+            clearInterval(slideInterval);
+        }
+    }, 3000);
+    
+    // Stop slideshow when modal is closed
+    document.getElementById('photoModal').addEventListener('hidden.bs.modal', function() {
+        clearInterval(slideInterval);
+    }, { once: true });
+}
+
+function downloadAlbum() {
+    if (confirm('Tải về tất cả ảnh trong album?')) {
+        // Create download links for all photos
+        photos.forEach((photo, index) => {
+            setTimeout(() => {
+                const link = document.createElement('a');
+                link.href = photo.src;
+                link.download = `${photo.filename}`;
+                link.click();
+            }, index * 100); // Stagger downloads
+        });
+    }
+}
+
+function shareAlbum() {
+    const albumUrl = window.location.href;
+    if (navigator.share) {
+        navigator.share({
+            title: '{{ album.title }}',
+            text: 'Album của {{ album.student.name }}',
+            url: albumUrl
+        });
+    } else {
+        navigator.clipboard.writeText(albumUrl).then(() => {
+            alert('Đã sao chép link album vào clipboard!');
+        });
+    }
+}
+
+function addPhotos() {
+    // TODO: Implement add photos functionality
+    alert('Tính năng đang phát triển');
+}
+
+// Set default view mode
+document.addEventListener('DOMContentLoaded', function() {
+    viewMode('grid');
+});
+</script>
+{% endblock %}
