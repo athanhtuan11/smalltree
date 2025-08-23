@@ -59,7 +59,16 @@
                             <div class="col-md-6">
                                 <div class="mb-3">
                                     {{ form.unit.label(class="form-label") }}
-                                    {{ form.unit(class="form-control", placeholder="VD: kg, lít, gói") }}
+                                    <div class="input-group">
+                                        <select name="unit_select" id="unit_select" class="form-select">
+                                            <option value="">-- Đơn vị --</option>
+                                            {% for u in product_units %}
+                                            <option value="{{ u }}">{{ u }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text" name="unit" id="unit" class="form-control" placeholder="Nhập hoặc chọn đơn vị" value="{{ form.unit.data }}" required autocomplete="off">
+                                    </div>
+                                    <small class="text-muted">Bạn có thể chọn hoặc tự nhập đơn vị mới.</small>
                                     {% if form.unit.errors %}
                                         <div class="text-danger">
                                             {% for error in form.unit.errors %}
@@ -67,58 +76,34 @@
                                             {% endfor %}
                                         </div>
                                     {% endif %}
+                                    <script>
+                                    // Khi chọn dropdown, tự động điền vào input
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        var select = document.getElementById('unit_select');
+                                        var input = document.getElementById('unit');
+                                        if (select && input) {
+                                            select.addEventListener('change', function() {
+                                                if (select.value) input.value = select.value;
+                                            });
+                                        }
+                                    });
+                                    </script>
                                 </div>
                             </div>
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    {{ form.usual_quantity.label(class="form-label") }}
-                                    {{ form.usual_quantity(class="form-control", placeholder="VD: 2.5") }}
-                                    {% if form.usual_quantity.errors %}
-                                        <div class="text-danger">
-                                            {% for error in form.usual_quantity.errors %}
-                                                <small>{{ error }}</small>
-                                            {% endfor %}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                {# Đã bỏ trường số lượng thường dùng #}
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            {{ form.storage_condition.label(class="form-label") }}
-                            {{ form.storage_condition(class="form-control", placeholder="VD: Tủ lạnh, Kho khô ráo") }}
-                            {% if form.storage_condition.errors %}
-                                <div class="text-danger">
-                                    {% for error in form.storage_condition.errors %}
-                                        <small>{{ error }}</small>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+                            {# Đã bỏ trường điều kiện bảo quản #}
                         </div>
 
                         <div class="mb-3">
-                            {{ form.shelf_life_days.label(class="form-label") }}
-                            {{ form.shelf_life_days(class="form-control", placeholder="VD: 30") }}
-                            {% if form.shelf_life_days.errors %}
-                                <div class="text-danger">
-                                    {% for error in form.shelf_life_days.errors %}
-                                        <small>{{ error }}</small>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
+                            {# Đã bỏ trường thời hạn sử dụng #}
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.notes.label(class="form-label") }}
-                            {{ form.notes(class="form-control", rows="2", placeholder="Ghi chú thêm...") }}
-                            {% if form.notes.errors %}
-                                <div class="text-danger">
-                                    {% for error in form.notes.errors %}
-                                        <small>{{ error }}</small>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
+                        {# Đã bỏ trường ghi chú #}
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="{{ url_for('main.products') }}" class="btn btn-secondary me-md-2">

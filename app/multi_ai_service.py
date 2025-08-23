@@ -134,6 +134,9 @@ class MultiAIService:
                 logger.error(f"❌ Anthropic init failed: {e}")
     
     def generate_text(self, prompt: str, max_retries: int = None) -> Dict[str, Any]:
+        print("\n========== PROMPT GỬI ĐẾN MULTI-AI ==========")
+        print(prompt)
+        print("========== HẾT PROMPT =========\n")
         """
         Generate text sử dụng available providers theo thứ tự priority
         """

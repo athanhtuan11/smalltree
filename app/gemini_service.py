@@ -104,7 +104,7 @@ class GeminiService:
             return 5  # Lots of ingredients = maximum variety
 
     def generate_menu_suggestions(self, age_group=None, available_ingredients=None, special_requirements=None, 
-                                age_months=None, dietary_preferences=None):
+                                age_months=None, dietary_preferences=None, menu_prompt=None):
         """
         Generate menu suggestions using Gemini AI with dynamic meal counting
         Supports both new (age_group) and legacy (age_months) signatures
@@ -149,38 +149,41 @@ class GeminiService:
             print(f"⚡ [CACHE HIT] Returning cached result")
             return _menu_cache[cache_key]
 
-        # 🚀 GEMINI 2.5 PRO OPTIMIZED PROMPT - Chi tiết và cụ thể hơn
-        prompt = f"""Tạo thực đơn tuần cân bằng dinh dưỡng cho trẻ {age_group}.
+        # Nếu có menu_prompt thì dùng luôn prompt này, không tự tạo prompt mặc định
+        if menu_prompt:
+            prompt = menu_prompt
+        else:
+            # 🚀 GEMINI 2.5 PRO OPTIMIZED PROMPT - Chi tiết và cụ thể hơn
+            prompt = f"""Tạo thực đơn tuần cân bằng dinh dưỡng cho trẻ {age_group}.
 Nguyên liệu có sẵn: {ingredients_text}
 Yêu cầu đặc biệt: {requirements_text}
 
 Lưu ý: Tên món ăn phải CỤ THỂ và CHI TIẾT. Ví dụ:
-- Thay vì "Cơm thịt rau" → "Cơm thịt heo xào cải thảo"
-- Thay vì "Cháo gà" → "Cháo gà xé phay với cà rốt"
-- Thay vì "Canh rau" → "Canh bí đỏ thịt bằm"
+- Thay vì \"Cơm thịt rau\" → \"Cơm thịt heo xào cải thảo\"
+- Thay vì \"Cháo gà\" → \"Cháo gà xé phay với cà rốt\"
+- Thay vì \"Canh rau\" → \"Canh bí đỏ thịt bằm\"
 
 Trả về JSON format:
 {{
-  "weekly_menu": {{
-    "mon": {{"morning": "Cháo gà xé phay với cà rốt", "snack": "Sữa chua có đường", "dessert": "Chuối nghiền mật ong", "lunch": "Cơm thịt bò xào đậu cove", "afternoon": "Bánh quy sữa dinh dưỡng", "lateafternoon": "Sữa tươi không đường"}},
-    "tue": {{"morning": "Phở bò thái nhỏ có rau thơm", "snack": "Bánh crackers nguyên cám", "dessert": "Cam vắt tươi", "lunch": "Cơm gà luộc với bí đỏ", "afternoon": "Chè đậu xanh nước cốt dừa", "lateafternoon": "Nước ép táo"}},
-    "wed": {{"morning": "Cháo thịt heo bằm rau cải", "snack": "Kẹo dẻo vitamin C", "dessert": "Táo nghiền có quế", "lunch": "Cơm cá hồi áp chảo rau muống", "afternoon": "Bánh bao nhân thịt nhỏ", "lateafternoon": "Sữa đậu nành"}},
-    "thu": {{"morning": "Bún riêu cua đồng có rau", "snack": "Bánh su kem nhỏ", "dessert": "Nho tách hạt tươi", "lunch": "Cơm sườn non hầm khoai tây", "afternoon": "Chè cung đình hạt sen", "lateafternoon": "Nước lọc"}},
-    "fri": {{"morning": "Cháo tôm nghiền với bí ngô", "snack": "Yogurt tự nhiên", "dessert": "Lê nghiền có mật ong", "lunch": "Cơm gà nướng rau cải xanh", "afternoon": "Bánh flan caramen", "lateafternoon": "Sữa đậu nành vani"}},
-    "sat": {{"morning": "Mì gà tom yum thái nhỏ", "snack": "Bánh quy yến mạch", "dessert": "Dưa hấu cắt nhỏ", "lunch": "Cơm thịt heo rim mắm rau lang", "afternoon": "Chè thái hạt lựu", "lateafternoon": "Sữa tươi có canxi"}}
-  }},
-  "total_meals": 36,
-  "nutrition_notes": "Thực đơn cân bằng protein, vitamin, khoáng chất phù hợp độ tuổi với tên món cụ thể"
+    \"weekly_menu\": {{
+        \"mon\": {{\"morning\": \"Cháo gà xé phay với cà rốt\", \"snack\": \"Sữa chua có đường\", \"dessert\": \"Chuối nghiền mật ong\", \"lunch\": \"Cơm thịt bò xào đậu cove\", \"afternoon\": \"Bánh quy sữa dinh dưỡng\", \"lateafternoon\": \"Sữa tươi không đường\"}},
+        \"tue\": {{\"morning\": \"Phở bò thái nhỏ có rau thơm\", \"snack\": \"Bánh crackers nguyên cám\", \"dessert\": \"Cam vắt tươi\", \"lunch\": \"Cơm gà luộc với bí đỏ\", \"afternoon\": \"Chè đậu xanh nước cốt dừa\", \"lateafternoon\": \"Nước ép táo\"}},
+        \"wed\": {{\"morning\": \"Cháo thịt heo bằm rau cải\", \"snack\": \"Kẹo dẻo vitamin C\", \"dessert\": \"Táo nghiền có quế\", \"lunch\": \"Cơm cá hồi áp chảo rau muống\", \"afternoon\": \"Bánh bao nhân thịt nhỏ\", \"lateafternoon\": \"Sữa đậu nành\"}},
+        \"thu\": {{\"morning\": \"Bún riêu cua đồng có rau\", \"snack\": \"Bánh su kem nhỏ\", \"dessert\": \"Nho tách hạt tươi\", \"lunch\": \"Cơm sườn non hầm khoai tây\", \"afternoon\": \"Chè cung đình hạt sen\", \"lateafternoon\": \"Nước lọc\"}},
+        \"fri\": {{\"morning\": \"Cháo tôm nghiền với bí ngô\", \"snack\": \"Yogurt tự nhiên\", \"dessert\": \"Lê nghiền có mật ong\", \"lunch\": \"Cơm gà nướng rau cải xanh\", \"afternoon\": \"Bánh flan caramen\", \"lateafternoon\": \"Sữa đậu nành vani\"}},
+        \"sat\": {{\"morning\": \"Mì gà tom yum thái nhỏ\", \"snack\": \"Bánh quy yến mạch\", \"dessert\": \"Dưa hấu cắt nhỏ\", \"lunch\": \"Cơm thịt heo rim mắm rau lang\", \"afternoon\": \"Chè thái hạt lựu\", \"lateafternoon\": \"Sữa tươi có canxi\"}}
+    }},
+    \"total_meals\": 36,
+    \"nutrition_notes\": \"Thực đơn cân bằng protein, vitamin, khoáng chất phù hợp độ tuổi với tên món cụ thể\"
 }}"""
 
         print(f"🚀 [SPEED] Calling Gemini with {len(prompt)} chars prompt...")
         
         start_time = time.time()  # Use pre-imported time
-        
+
         try:
             # Add timeout and better error handling
             print(f"⏰ [DEBUG] Starting Gemini API call...")
-            
             response = self.model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
@@ -191,7 +194,6 @@ Trả về JSON format:
                 ),
                 request_options={'timeout': 30}  # 30 second timeout
             )
-            
             print(f"✅ [DEBUG] Gemini API call completed")
             
             api_time = time.time() - start_time

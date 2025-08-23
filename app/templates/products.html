@@ -43,7 +43,6 @@
                                     <th>Loại</th>
                                     <th>Nhà cung cấp</th>
                                     <th>Đơn vị</th>
-                                    <th>SL thường dùng</th>
                                     <th>Thao tác</th>
                                 </tr>
                             </thead>
@@ -53,9 +52,7 @@
                                     <td>{{ loop.index }}</td>
                                     <td>
                                         <strong>{{ product.name }}</strong>
-                                        {% if product.notes %}
-                                            <br><small class="text-muted">{{ product.notes[:30] }}...</small>
-                                        {% endif %}
+                                            {# Đã bỏ hiển thị notes vì Product không còn thuộc tính này #}
                                     </td>
                                     <td>
                                         {% if product.category == 'fresh' %}
@@ -69,17 +66,17 @@
                                         <br><small class="text-muted">{{ product.supplier.contact_person or '-' }}</small>
                                     </td>
                                     <td>{{ product.unit }}</td>
-                                    <td>{{ product.usual_quantity or '-' }}</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <a href="{{ url_for('main.edit_product', product_id=product.id) }}" 
                                                class="btn btn-outline-primary btn-sm">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            {% if session.role == 'admin' %}
+                                            {% if session.role in ['admin', 'teacher'] %}
                                             <form method="POST" action="{{ url_for('main.delete_product', product_id=product.id) }}" 
                                                   style="display: inline;"
                                                   onsubmit="return confirm('Bạn có chắc muốn xóa sản phẩm này?')">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="btn btn-outline-danger btn-sm">
                                                     <i class="fas fa-trash"></i>
                                                 </button>

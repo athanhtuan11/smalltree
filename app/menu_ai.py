@@ -1,69 +1,63 @@
-from flask import current_app
-from .gemini_service import gemini_service
 
-def get_ai_menu_suggestions(age_group="2-3 tuổi", dietary_requirements="", count=5, available_ingredients=""):
-    """
-    Lấy gợi ý thực đơn từ Gemini AI - VERSION NHANH (không kiểm tra dinh dưỡng)
-    """
-    print(f"🚀 [SPEED MODE] Gemini AI for {age_group}, ingredients: {available_ingredients[:30]}...")
-    
-    # Convert age_group to age_months
-    age_months = 24  # Default
-    if "1-3" in age_group:
-        age_months = 24
-    elif "3-5" in age_group:
-        age_months = 48
-    elif "1-5" in age_group:
-        age_months = 36
+# Multi-AI Service as the only backend for menu AI
+from .multi_ai_service import MultiAIService
+from config import Config
 
+# Global instance (reuse for all calls)
+_multi_ai_service = None
+def _get_multi_ai_service():
+    global _multi_ai_service
+    if _multi_ai_service is None:
+        config = {
+            "cohere": {"api_key": Config.COHERE_API_KEY, "model": "command-r"},
+            "groq": {"api_key": Config.GROQ_API_KEY, "model": Config.GROQ_MODEL},
+            "openai": {"api_key": Config.OPENAI_API_KEY, "model": Config.OPENAI_MODEL},
+            "anthropic": {"api_key": Config.ANTHROPIC_API_KEY, "model": Config.ANTHROPIC_MODEL},
+            "gemini": {"api_key": Config.GEMINI_API_KEY, "model": "gemini-1.5-pro"},
+            "priority": ["cohere", "groq", "openai", "anthropic", "gemini"]
+        }
+        _multi_ai_service = MultiAIService(config)
+    return _multi_ai_service
+
+def get_ai_menu_suggestions(age_group="2-3 tuổi", dietary_requirements="", count=5, available_ingredients="", menu_prompt=None):
+    """
+    Lấy gợi ý thực đơn từ Multi-AI Service (Cohere, Groq, OpenAI, Anthropic, Gemini)
+    """
+    prompt = menu_prompt if menu_prompt else None
+    import json
     try:
-        # Gọi Gemini trực tiếp không qua enhancement
-        result = gemini_service.generate_menu_suggestions(
-            age_months=age_months,
-            available_ingredients=available_ingredients,
-            dietary_preferences=dietary_requirements
-        )
-        
-        # Xử lý kết quả siêu nhanh - minimal processing
-        if isinstance(result, dict) and 'weekly_menu' in result:
-            suggestions = []
-            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-            day_names = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7']
-            slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
-            slot_names = ['Sáng', 'Phụ sáng', 'Tráng miệng', 'Trưa', 'Xế', 'Xế chiều']
-            
-            # Single loop optimization
-            for i, day in enumerate(days):
-                suggestions.append(f"📅 **{day_names[i]}:**")
-                day_menu = result['weekly_menu'][day]
-                for j, slot in enumerate(slots):
-                    meal = day_menu.get(slot, 'Món ăn dinh dưỡng')
-                    suggestions.append(f"  • {slot_names[j]}: {meal}")
-                suggestions.append("")  # Empty line
-            
-            # Minimal summary
-            suggestions.extend([
-                "📊 **Tổng kết:**",
-                f"• Tổng số bữa ăn: {result.get('total_meals', 36)}",
-                "• Trạng thái: Thực đơn đã tạo ✅"
-            ])
-            
-            print(f"⚡ [SPEED MODE] Generated {len(days) * len(slots)} meals successfully!")
-            return suggestions
-            
-        elif isinstance(result, dict) and 'meals' in result:
-            # Legacy format fallback
-            suggestions = [meal.get('name', f"Bữa ăn {i+1}") for i, meal in enumerate(result['meals'])]
-            print(f"⚡ [SPEED MODE] Generated {len(suggestions)} suggestions")
-            return suggestions
+        service = _get_multi_ai_service()
+        result = service.generate_text(prompt)
+        if result["success"]:
+            content = result["content"]
+            # Nếu là string, cố gắng parse JSON
+            if isinstance(content, str):
+                try:
+                    # Loại bỏ markdown code block nếu có
+                    clean = content.strip()
+                    if clean.startswith('```json'):
+                        clean = clean[7:]
+                    if clean.startswith('```'):
+                        clean = clean[3:]
+                    if clean.endswith('```'):
+                        clean = clean[:-3]
+                    menu_json = json.loads(clean)
+                    return menu_json
+                except Exception:
+                    # Nếu không parse được thì trả về text như cũ
+                    return [content]
+            else:
+                return content
         else:
-            print(f"⚡ [SPEED MODE] Unexpected format, returning as-is")
-            return [str(result)]
-            
+            return [
+                "❌ Không thể tạo menu từ AI",
+                "🔄 Vui lòng kiểm tra kết nối mạng và thử lại",
+                f"📝 Error: {result.get('error', 'Unknown error')} | Prompt: {prompt if prompt else '(no prompt)'}"
+            ]
     except Exception as e:
-        print(f"❌ [SPEED MODE] Gemini error: {e}")
+        print(f"❌ [MULTI-AI] Error: {e}")
         return [
-            "❌ Gemini AI không thể tạo thực đơn",
-            f"🔧 Lỗi: {str(e)}",
-            "💡 Kiểm tra Gemini API key trong config.py"
+            "❌ Không thể tạo menu từ AI",
+            "🔄 Vui lòng kiểm tra kết nối mạng và thử lại",
+            f"📝 Error: {str(e)[:100]} | Prompt: {prompt if prompt else '(no prompt)'}"
         ]

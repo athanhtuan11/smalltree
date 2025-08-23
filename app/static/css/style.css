@@ -128,7 +128,6 @@ p {
     background: #fff0f5;
 }
 
-/* Mobile-first responsive design */
 @media (max-width: 768px) {
     .mobile-btn-group {
         display: flex;
@@ -142,6 +141,16 @@ p {
         min-height: 44px;
         font-size: 1rem;
         font-weight: 600;
+    }
+    .menu-btn-uniform {
+        min-width: 90px;
+        max-width: 100%;
+        font-size: 0.97em !important;
+        padding: 8px 0 !important;
+        margin-bottom: 4px;
+    }
+    .menu-btn-uniform-group {
+        gap: 6px !important;
     }
     
     .mobile-grid-2 {
@@ -194,6 +203,14 @@ p {
     .mobile-btn-group .btn {
         font-size: 0.95rem;
         padding: 10px 12px;
+    }
+    .menu-btn-uniform {
+        font-size: 0.95em !important;
+        padding: 8px 0 !important;
+        min-width: 80px;
+    }
+    .menu-btn-uniform-group {
+        gap: 4px !important;
     }
     
     .mobile-form-control {

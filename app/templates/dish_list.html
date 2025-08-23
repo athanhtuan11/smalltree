@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="text-success mb-0">Danh sách món ăn</h2>
+        <a href="{{ url_for('main.create_dish') }}" class="btn btn-primary">+ Tạo món ăn</a>
+    </div>
+    <table class="table table-bordered table-striped">
+        <thead class="table-success">
+            <tr>
+                <th>Tên món ăn</th>
+                <th>Thành phần nguyên liệu</th>
+                <th>Dùng cho bữa nào</th>
+                <th>Trạng thái</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dish in dishes %}
+            <tr>
+                <td>{{ dish.name }}</td>
+                                <td>
+                                    {% for ing in dish.ingredients %}
+                                        {{ ing.product.name if ing.product else '' }}{% if not loop.last %}, {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% set meal_labels = {'morning':'Sáng','snack':'Phụ sáng','dessert':'Tráng miệng','lunch':'Trưa','afternoon':'Xế','lateafternoon':'Xế chiều'} %}
+                                    {% for meal in ['morning','snack','dessert','lunch','afternoon','lateafternoon'] %}
+                                        <span style="margin-right:6px;">
+                                            <input type="checkbox" disabled {% if dish.meal_times and meal in dish.meal_times %}checked{% endif %}>
+                                            <label style="margin-left:2px;">{{ meal_labels[meal] }}</label>
+                                        </span>
+                                    {% endfor %}
+                                </td>
+                <td>
+                    {% if dish.is_active %}
+                        <span class="badge bg-success">Đang dùng</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Ẩn</span>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('main.toggle_dish_active', dish_id=dish.id) }}" style="display:inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-{{ 'secondary' if dish.is_active else 'success' }} ms-2">
+                            {{ 'Ẩn' if dish.is_active else 'Bật' }}
+                        </button>
+                    </form>
+                </td>
+                <td>
+                    <a href="{{ url_for('main.edit_dish', dish_id=dish.id) }}" class="btn btn-sm btn-warning">Sửa</a>
+                    <form method="post" action="{{ url_for('main.delete_dish', dish_id=dish.id) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa món này?');">
+                        <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{{ url_for('main.menu') }}" class="btn btn-secondary mt-3">Quay lại Menu</a>
+</div>
+{% endblock %}

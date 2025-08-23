@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary">Sửa sản phẩm</h2>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label for="name" class="form-label">Tên sản phẩm</label>
+            <input type="text" class="form-control" id="name" name="name" value="{{ form.name.data or product.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="category" class="form-label">Loại</label>
+            <select class="form-select" id="category" name="category" required>
+                <option value="fresh" {% if (form.category.data or product.category) == 'fresh' %}selected{% endif %}>Tươi sống</option>
+                <option value="dry" {% if (form.category.data or product.category) == 'dry' %}selected{% endif %}>Khô</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="supplier_id" class="form-label">Nhà cung cấp</label>
+            <select class="form-select" id="supplier_id" name="supplier_id" required>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}" {% if (form.supplier_id.data or product.supplier_id) == s.id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="unit" class="form-label">Đơn vị</label>
+            <select name="unit" id="unit" class="form-select" required>
+                <option value="">-- Đơn vị --</option>
+                {% for u in product_units %}
+                <option value="{{ u }}" {% if (form.unit.data or product.unit) == u %}selected{% endif %}>{{ u }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+        <a href="{{ url_for('main.products') }}" class="btn btn-secondary">Hủy</a>
+    </form>
+</div>
+{% endblock %}

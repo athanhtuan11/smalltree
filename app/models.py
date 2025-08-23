@@ -72,20 +72,38 @@ class Supplier(db.Model):
     is_active = db.Column(db.Boolean, default=True)
 
 class Product(db.Model):
+    # Relationship: product.supplier -> Supplier
+    supplier = db.relationship('Supplier')
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)  # Tên sản phẩm
     category = db.Column(db.String(50), nullable=False)  # 'fresh' hoặc 'dry'
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=False)
     unit = db.Column(db.String(20), nullable=False)  # kg, lít, gói...
-    usual_quantity = db.Column(db.Float)  # Số lượng thường dùng
-    storage_condition = db.Column(db.String(100))  # Điều kiện bảo quản
-    shelf_life_days = db.Column(db.Integer)  # Thời hạn sử dụng (ngày)
+    # usual_quantity = db.Column(db.Float)  # Đã bỏ trường số lượng thường dùng
+    is_active = db.Column(db.Boolean, default=True)
+
+# ================== MÓN ĂN VÀ NGUYÊN LIỆU ==================
+class Dish(db.Model):
+    meal_times = db.Column(db.JSON, default=list)  # Lưu các bữa dùng: ["morning", "snack", ...]
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+    description = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)  # Thêm trường này để lọc món ăn đang hoạt động
+    # Relationship: dish.ingredients -> list of DishIngredient
+    ingredients = db.relationship('DishIngredient', backref='dish', lazy=True, cascade="all, delete-orphan")
+
+class DishIngredient(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    dish_id = db.Column(db.Integer, db.ForeignKey('dish.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    unit = db.Column(db.String(20), nullable=False)
+    # Relationship: dish_ingredient.product -> Product
+    product = db.relationship('Product')
     notes = db.Column(db.Text)  # Ghi chú
     created_date = db.Column(db.DateTime, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     
-    # Relationship
-    supplier = db.relationship('Supplier', backref=db.backref('products', lazy=True))
 
 class StudentAlbum(db.Model):
     """Album cá nhân của học sinh để theo dõi quá trình phát triển"""

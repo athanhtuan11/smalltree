@@ -1,9 +1,12 @@
+
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re, secrets
+
 
 # Import optional dependencies with error handling
 try:
@@ -16,56 +19,14 @@ except ImportError:
     Document = None
     Pt = None
 
-# Import AI services with error handling
+
+# Import AI menu suggestion (single entry point)
 try:
     from app.menu_ai import get_ai_menu_suggestions
 except ImportError:
     print("Warning: menu_ai not available")
     def get_ai_menu_suggestions(*args, **kwargs):
         return "AI service not available"
-
-try:
-    from werkzeug.security import generate_password_hash, check_password_hash
-    WERKZEUG_AVAILABLE = True
-except ImportError:
-    print("Warning: werkzeug.security not available, using fallback")
-    import hashlib
-    WERKZEUG_AVAILABLE = False
-    def generate_password_hash(password):
-        return hashlib.sha256(password.encode()).hexdigest()
-    def check_password_hash(hash_password, password):
-        return hash_password == hashlib.sha256(password.encode()).hexdigest()
-
-# Enhanced AI imports - Multi-AI support
-try:
-    from app.enhanced_menu_ai import get_ai_menu_suggestions_enhanced
-    ENHANCED_MENU_AI_AVAILABLE = True
-    print("✅ Enhanced Menu AI imported successfully")
-except ImportError as e:
-    ENHANCED_MENU_AI_AVAILABLE = False
-    print(f"⚠️ Enhanced Menu AI not available: {e}")
-
-try:
-    from app.enhanced_curriculum_ai import get_ai_curriculum_suggestions_enhanced  
-    ENHANCED_CURRICULUM_AI_AVAILABLE = True
-    print("✅ Enhanced Curriculum AI imported successfully")
-except ImportError as e:
-    ENHANCED_CURRICULUM_AI_AVAILABLE = False
-    print(f"⚠️ Enhanced Curriculum AI not available: {e}")
-
-# Multi-AI Factory - Fallback cho Gemini hết quota
-try:
-    from app.ai_factory import get_ai_menu_suggestions as ai_menu_fallback
-    from app.ai_factory import get_ai_curriculum_suggestions as ai_curriculum_fallback
-    AI_FACTORY_AVAILABLE = True
-    print("✅ AI Factory (Cohere + Groq) imported successfully")
-except ImportError as e:
-    AI_FACTORY_AVAILABLE = False
-    print(f"⚠️ AI Factory not available: {e}")
-    def ai_menu_fallback(*args, **kwargs):
-        return "AI service không khả dụng"
-    def ai_curriculum_fallback(*args, **kwargs):
-        return "AI service không khả dụng"
 
 # Enhanced Security imports
 from .security_utils import (
@@ -115,6 +76,8 @@ except ImportError:
 
 main = Blueprint('main', __name__)
 
+
+
 # DEBUG: Test Curriculum AI import ngay khi khởi động
 try:
     print("🔍 [STARTUP DEBUG] Testing curriculum AI import...")
@@ -149,6 +112,154 @@ LOGIN_COOLDOWN_SECONDS = 30
 login_attempts = {}
 lockout_until = {}
 last_login_time = {}
+
+# --- GLOBAL ERROR HANDLER FOR API JSON RESPONSE ---
+from werkzeug.exceptions import HTTPException
+
+@main.errorhandler(Exception)
+def handle_api_exception(e):
+    from flask import request
+    import traceback
+    # Chỉ trả về JSON nếu là API (application/json hoặc /ai/ route)
+    if request.path.startswith('/ai/') or request.is_json or request.headers.get('Accept', '').startswith('application/json'):
+        code = 500
+        if isinstance(e, HTTPException):
+            code = e.code
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'trace': traceback.format_exc()[:1000]  # Giới hạn độ dài trace cho debug
+        }), code
+    # Nếu không phải API thì trả về mặc định
+    raise e
+# Password hash/check imports (with fallback)
+try:
+    from werkzeug.security import generate_password_hash, check_password_hash
+    WERKZEUG_AVAILABLE = True
+except ImportError:
+    print("Warning: werkzeug.security not available, using fallback")
+    import hashlib
+    WERKZEUG_AVAILABLE = False
+    def generate_password_hash(password):
+        return hashlib.sha256(password.encode()).hexdigest()
+    def check_password_hash(hash_password, password):
+        return hash_password == hashlib.sha256(password.encode()).hexdigest()
+
+
+# ================== DANH SÁCH MÓN ĂN ==================
+
+@main.route('/dish-list')
+def dish_list():
+    from app.models import Dish
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    dishes = Dish.query.all()
+    dish_infos = []
+    return render_template('dish_list.html', dishes=dishes)
+
+# Route để bật/tắt trạng thái món ăn
+@main.route('/dish/<int:dish_id>/toggle-active', methods=['POST'])
+def toggle_dish_active(dish_id):
+    from app.models import Dish, db
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    dish = Dish.query.get_or_404(dish_id)
+    dish.is_active = not dish.is_active
+    db.session.commit()
+    flash(f"Đã {'bật' if dish.is_active else 'ẩn'} món ăn!", 'success')
+    return redirect(url_for('main.dish_list'))
+
+# ================== SỬA/XÓA MÓN ĂN ==================
+@main.route('/dish/<int:dish_id>/edit', methods=['GET', 'POST'])
+def edit_dish(dish_id):
+    from app.models import Dish, DishIngredient, Product, db
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    dish = Dish.query.get_or_404(dish_id)
+    products = Product.query.all()
+    product_units = sorted(list(set([p.unit for p in products if p.unit])))
+    if request.method == 'POST':
+        dish.name = request.form.get('name')
+        dish.description = request.form.get('description')
+        meal_times = request.form.getlist('meal_times')
+        dish.meal_times = meal_times
+        # Xóa nguyên liệu cũ
+        DishIngredient.query.filter_by(dish_id=dish.id).delete()
+        ingredient_ids = request.form.getlist('ingredient_id')
+        units = request.form.getlist('unit')
+        quantities = request.form.getlist('quantity')
+        for idx, pid in enumerate(ingredient_ids):
+            if not pid or not units[idx] or not quantities[idx]:
+                continue
+            di = DishIngredient(
+                dish_id=dish.id,
+                product_id=int(pid),
+                quantity=float(quantities[idx]),
+                unit=units[idx],
+                created_date=datetime.now(),
+                is_active=True
+            )
+            db.session.add(di)
+        db.session.commit()
+        flash('Đã cập nhật món ăn!', 'success')
+        return redirect(url_for('main.dish_list'))
+    # Chuẩn bị dữ liệu nguyên liệu cho form
+    ingredients = dish.ingredients
+    return render_template('edit_dish.html', dish=dish, products=products, ingredients=ingredients, product_units=product_units)
+
+@main.route('/dish/<int:dish_id>/delete', methods=['POST'])
+def delete_dish(dish_id):
+    from app.models import Dish, db
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    dish = Dish.query.get_or_404(dish_id)
+    db.session.delete(dish)
+    db.session.commit()
+    flash('Đã xóa món ăn!', 'success')
+    return redirect(url_for('main.dish_list'))
+# ================== TẠO MÓN ĂN ==================
+@main.route('/dish/new', methods=['GET', 'POST'])
+def create_dish():
+    from app.models import Dish, DishIngredient, Product, db
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    products = Product.query.filter_by(is_active=True).join(Supplier).order_by(Product.category, Product.name).all()
+    product_units = sorted(list(set([p.unit for p in products if p.unit])))
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        ingredient_ids = request.form.getlist('ingredient_id')
+        units = request.form.getlist('unit')
+        quantities = request.form.getlist('quantity')
+        from sqlalchemy.exc import IntegrityError
+        meal_times = request.form.getlist('meal_times')
+        dish = Dish(name=name, description=description, meal_times=meal_times)
+        db.session.add(dish)
+        try:
+            db.session.flush()  # Để lấy dish.id
+        except IntegrityError:
+            db.session.rollback()
+            flash('Tên món ăn đã tồn tại, vui lòng chọn tên khác!', 'danger')
+            return render_template('create_dish.html', products=products, product_units=product_units)
+        # Thêm nguyên liệu
+        for idx, pid in enumerate(ingredient_ids):
+            if not pid or not units[idx] or not quantities[idx]:
+                continue
+            di = DishIngredient(
+                dish_id=dish.id,
+                product_id=int(pid),
+                quantity=float(quantities[idx]),
+                unit=units[idx],
+                created_date=datetime.now(),
+                is_active=True
+            )
+            db.session.add(di)
+        db.session.commit()
+        flash('Đã tạo món ăn thành công!', 'success')
+        return redirect(url_for('main.dish_list'))
+    return render_template('create_dish.html', products=products, product_units=product_units)
+
+
 
 @main.route('/')
 def index():
@@ -279,7 +390,7 @@ def new_curriculum():
     if request.method == 'POST':
         week_number = request.form.get('week_number')
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6', 'morning_7']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
@@ -825,7 +936,7 @@ def edit_curriculum(week_number):
     import json
     if request.method == 'POST':
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6', 'morning_7']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
@@ -3166,13 +3277,13 @@ def products():
 def new_product():
     """Thêm sản phẩm mới"""
     current_role = session.get('role')
-    print(f"🔐 [DEBUG] User role: {current_role}, Session: {dict(session)}")
     
     if session.get('role') not in ['admin', 'teacher']:
-        print(f"🔐 [DEBUG] Access denied for role: {current_role}")
         return redirect_no_permission()
     
     form = ProductForm()
+    # Lấy danh sách đơn vị duy nhất từ Product
+    product_units = sorted(list(set([p.unit for p in Product.query.all() if p.unit])))
     # Lấy danh sách nhà cung cấp cho dropdown
     suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
     
@@ -3200,26 +3311,13 @@ def new_product():
             name=form.name.data,
             category=form.category.data,
             supplier_id=form.supplier_id.data,
-            unit=form.unit.data,
-            usual_quantity=form.usual_quantity.data,
-            storage_condition=form.storage_condition.data,
-            shelf_life_days=form.shelf_life_days.data,
-            notes=form.notes.data,
-            created_date=datetime.utcnow()
+            unit=form.unit.data
         )
         db.session.add(product)
         db.session.commit()
         flash('Thêm sản phẩm thành công!', 'success')
         return redirect(url_for('main.products'))
-    else:
-        # Debug form validation errors
-        if request.method == 'POST':
-            print(f"🔍 [DEBUG] Form validation failed!")
-            for field, errors in form.errors.items():
-                print(f"🔍 [DEBUG] Field '{field}': {errors}")
-            print(f"🔍 [DEBUG] Suppliers count: {len(suppliers)}")
-    
-    return render_template('new_product.html', form=form)
+    return render_template('new_product.html', form=form, product_units=product_units)
 
 @main.route('/products/<int:product_id>/edit', methods=['GET', 'POST'])
 def edit_product(product_id):
@@ -3229,6 +3327,7 @@ def edit_product(product_id):
     
     product = Product.query.get_or_404(product_id)
     form = ProductForm(obj=product)
+    product_units = sorted(list(set([p.unit for p in Product.query.all() if p.unit])))
     
     # Lấy danh sách nhà cung cấp cho dropdown
     suppliers = Supplier.query.filter_by(is_active=True).order_by(Supplier.name).all()
@@ -3240,12 +3339,12 @@ def edit_product(product_id):
         flash('Cập nhật sản phẩm thành công!', 'success')
         return redirect(url_for('main.products'))
     
-    return render_template('edit_product.html', form=form, product=product)
+    return render_template('edit_product.html', form=form, product=product, suppliers=suppliers, product_units=product_units)
 
 @main.route('/products/<int:product_id>/delete', methods=['POST'])
 def delete_product(product_id):
     """Xóa sản phẩm"""
-    if session.get('role') != 'admin':
+    if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     
     product = Product.query.get_or_404(product_id)
@@ -3316,110 +3415,137 @@ def ai_menu_suggestions():
             age_group = '2-3 tuổi'  # Default fallback
         
         count = 5  # Fixed count for consistency
-        
-        # 🚀 TRY ENHANCED MULTI-AI FIRST!
+
+        # Lấy danh sách món ăn hiện tại (chỉ active)
+        from app.models import Dish
+        dishes = Dish.query.filter_by(is_active=True).all()
+        dish_names = [d.name for d in dishes]
+        # Prompt AI CHUẨN: chỉ dùng đúng danh sách món, không tự tạo thêm ngoài
+        prompt = (
+            "# YÊU CẦU TẠO THỰC ĐƠN TUẦN\n"
+            f"DANH SÁCH MÓN ĂN: {', '.join(dish_names)}\n"
+            "- Chỉ sử dụng đúng các món trong danh sách trên để tạo thực đơn 1 tuần (36 bữa, 6 ngày, mỗi ngày 6 bữa).\n"
+            "- TUYỆT ĐỐI KHÔNG được tự ý thêm, sáng tạo, hoặc đề xuất bất kỳ món ăn nào ngoài danh sách này.\n"
+            "- Nếu không đủ món để xoay vòng, hãy lặp lại các món trong danh sách, nhưng không được thêm món mới.\n"
+            "- Nếu có yêu cầu đặc biệt, tôi sẽ ghi rõ ở phần bên dưới.\n"
+            "- Bữa Phụ sáng (snack) chiều thường sử dụng các món ăn nhẹ như sữa, sữa hạt ....\n"
+            "- Bữa Tráng miệng (dessert) thường sử dụng các món ăn nhẹ như sữa, sữa hạt ....\n"
+            "- Bữa Xế chiều (lateafternoon) thường sử dụng các món ăn nhẹ như sữa, sữa hạt ....\n"
+            "- TUYỆT ĐỐI KHÔNG sử dụng món mặn, món chính cho bữa phụ sáng, tráng miệng, xế chiều \n"
+            "\nYêu cầu đặc biệt: [Điền các món bạn muốn thêm hoặc lưu ý khác tại đây]\n"
+            "\nTRẢ VỀ DUY NHẤT DỮ LIỆU JSON THEO ĐÚNG ĐỊNH DẠNG SAU (KHÔNG GIẢI THÍCH, KHÔNG THÊM TEXT NGOÀI JSON):\n"
+            '{\n'
+            '  "mon": {"morning": "...", "snack": "...", "dessert": "...", "lunch": "...", "afternoon": "...", "lateafternoon": "..."},\n'
+            '  "tue": {...},\n'
+            '  "wed": {...},\n'
+            '  "thu": {...},\n'
+            '  "fri": {...},\n'
+            '  "sat": {...}\n'
+            '}\n'
+            "\nChỉ trả về JSON đúng format trên, không thêm bất kỳ text nào khác."
+        )
+
+        # 🚀 ALWAYS use single entry point for AI menu suggestion
         try:
-            if ENHANCED_MENU_AI_AVAILABLE:
-                print(f"🚀 [MULTI-AI] Using Enhanced Menu AI with Groq fallback for {user_role}")
-                suggestions = get_ai_menu_suggestions_enhanced(
-                    age_group=age_group,
-                    dietary_requirements=dietary_requirements,
-                    available_ingredients=available_ingredients,
-                    use_multi_ai=True  # Enable Multi-AI fallback
-                )
-                print(f"✅ [MULTI-AI SUCCESS] Enhanced Menu AI completed for {user_role}")
-            else:
-                print(f"🔄 [FALLBACK] Using original Menu AI for {user_role}")
-                suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
-        except Exception as multi_ai_error:
-            print(f"⚠️ [MULTI-AI FALLBACK] Enhanced AI failed: {multi_ai_error}")
-            print(f"🔄 [FALLBACK] Trying AI Factory (Cohere + Groq) for {user_role}")
-            if AI_FACTORY_AVAILABLE:
-                suggestions = ai_menu_fallback(age_group, count, dietary_requirements)
-                print(f"✅ [AI FACTORY SUCCESS] Used Cohere/Groq for {user_role}")
-            else:
-                suggestions = get_ai_menu_suggestions(age_group, dietary_requirements, count, available_ingredients)
-                print(f"🔄 [ORIGINAL FALLBACK] Used original AI for {user_role}")
-        
+            print(f"🚀 [MENU AI] Always using prompt CHUẨN truyền vào cho mọi provider!")
+            print(f"[DEBUG] Prompt truyền vào Menu-AI:\n{prompt}")
+            suggestions = get_ai_menu_suggestions(
+                age_group=age_group,
+                dietary_requirements=dietary_requirements,
+                count=count,
+                available_ingredients=available_ingredients,
+                menu_prompt=prompt
+            )
+            print(f"[DEBUG] Raw AI suggestions: {repr(suggestions)}")
+            # Nếu suggestions là string và có JSON object bên trong, cố gắng extract JSON
+            if isinstance(suggestions, str):
+                import re
+                import json
+                # Tìm JSON object đầu tiên trong string
+                match = re.search(r'\{[\s\S]*\}', suggestions)
+                if match:
+                    json_str = match.group(0)
+                    try:
+                        suggestions_obj = json.loads(json_str)
+                        print("[DEBUG] Extracted JSON object from AI string response.")
+                        suggestions = suggestions_obj
+                    except Exception as json_err:
+                        print(f"[ERROR] Failed to parse extracted JSON: {json_err}")
+            # Nếu suggestions là list, kiểm tra từng phần tử xem có JSON object không
+            if isinstance(suggestions, list):
+                import re
+                import json
+                for idx, s in enumerate(suggestions):
+                    if isinstance(s, str):
+                        match = re.search(r'\{[\s\S]*\}', s)
+                        if match:
+                            json_str = match.group(0)
+                            try:
+                                suggestions_obj = json.loads(json_str)
+                                print(f"[DEBUG] Extracted JSON object from AI list response at index {idx}.")
+                                suggestions = suggestions_obj
+                                break
+                            except Exception as json_err:
+                                print(f"[ERROR] Failed to parse extracted JSON in list: {json_err}")
+            # Nếu suggestions là list và có dòng provider, log provider
+            if isinstance(suggestions, list):
+                for s in suggestions:
+                    if "Generated by:" in s:
+                        print(f"[DEBUG] Provider trả về: {s}")
+            print(f"✅ [MENU AI SUCCESS] Menu AI completed for {user_role}")
+        except Exception as menu_ai_error:
+            print(f"⚠️ [MENU AI ERROR] Menu AI failed: {menu_ai_error}")
+            suggestions = [
+                "❌ Không thể tạo menu từ AI",
+                "🔄 Vui lòng kiểm tra kết nối mạng và thử lại",
+                f"📝 Error: {str(menu_ai_error)[:100]}"
+            ]
         # Log successful operation
         print(f"✅ [SUCCESS] Menu generated for {user_role} - Age: {age_group}, Ingredients: {len(available_ingredients)} chars")
-        
+
+        # Nếu AI trả về dict đúng format menu thì trả về luôn
+        if isinstance(suggestions, dict) and all(day in suggestions for day in ['mon','tue','wed','thu','fri','sat']):
+            return jsonify({
+                'success': True,
+                'menu': suggestions,
+                'age_group': age_group,
+                'security_info': f"Generated securely for {user_role}",
+                'prompt': prompt,
+                'dish_names': dish_names
+            })
+        # Nếu không phải dict, cố gắng convert về menu chuẩn
+        # Nếu là list (suggestions text), dùng extract_weekly_menu_from_suggestions
+        if isinstance(suggestions, list):
+            menu_data = extract_weekly_menu_from_suggestions(suggestions)
+            return jsonify({
+                'success': True,
+                'menu': menu_data,
+                'age_group': age_group,
+                'security_info': f"Generated securely for {user_role} (fallback from suggestions)",
+                'prompt': prompt,
+                'dish_names': dish_names
+            })
+        # Nếu là string, cũng convert sang list trước khi extract
+        if isinstance(suggestions, str):
+            menu_data = extract_weekly_menu_from_suggestions([suggestions])
+            return jsonify({
+                'success': True,
+                'menu': menu_data,
+                'age_group': age_group,
+                'security_info': f"Generated securely for {user_role} (fallback from string)",
+                'prompt': prompt,
+                'dish_names': dish_names
+            })
+        # Nếu không convert được, trả về menu rỗng
+        menu_data = extract_weekly_menu_from_suggestions([])
         return jsonify({
             'success': True,
-            'suggestions': suggestions,
+            'menu': menu_data,
             'age_group': age_group,
-            'security_info': f"Generated securely for {user_role}"
+            'security_info': f"Generated securely for {user_role} (empty fallback)",
+            'prompt': prompt,
+            'dish_names': dish_names
         })
-    except Exception as e:
-        # Enhanced error logging với security context
-        error_msg = str(e)
-        print(f"❌ [ERROR] Menu generation failed for {user_role} from {user_ip}: {error_msg}")
-        
-        # Don't expose internal errors to client
-        return jsonify({
-            'success': False,
-            'error': 'Đã xảy ra lỗi khi tạo thực đơn. Vui lòng thử lại sau.'
-        }), 500
-
-@main.route('/ai/create-menu-from-suggestions', methods=['POST'])
-def create_menu_from_ai_suggestions():
-    """Tạo thực đơn mới từ gợi ý AI"""
-    if session.get('role') not in ['admin', 'teacher']:
-        return jsonify({'error': 'Không có quyền truy cập'}), 403
-    
-    try:
-        # Lấy data từ AI
-        ai_data = request.json
-        if not ai_data or not ai_data.get('success'):
-            return jsonify({'error': 'Dữ liệu AI không hợp lệ'}), 400
-            
-        # Tính tuần hiện tại
-        from datetime import datetime
-        now = datetime.now()
-        week_number = now.isocalendar()[1]  # Tuần trong năm
-        
-        # Kiểm tra tham số overwrite
-        overwrite = ai_data.get('overwrite', False)
-        
-        # Kiểm tra xem tuần này đã có thực đơn chưa
-        existing_menu = Curriculum.query.filter_by(week_number=week_number).first()
-        if existing_menu and not overwrite:
-            return jsonify({
-                'error': f'Tuần {week_number} đã có thực đơn. Bạn có muốn ghi đè không?',
-                'week_number': week_number,
-                'existing': True
-            }), 409
-        
-        # Trích xuất dữ liệu thực đơn từ AI suggestions
-        suggestions = ai_data.get('suggestions', [])
-        weekly_menu = extract_weekly_menu_from_suggestions(suggestions)
-        
-        if existing_menu and overwrite:
-            # Cập nhật thực đơn hiện có
-            existing_menu.content = json.dumps(weekly_menu, ensure_ascii=False)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': f'Đã cập nhật thực đơn tuần {week_number} thành công',
-                'week_number': week_number,
-                'overwritten': True
-            })
-        else:
-            # Tạo thực đơn mới
-            new_menu = Curriculum(
-                week_number=week_number,
-                content=json.dumps(weekly_menu, ensure_ascii=False)
-            )
-            
-            db.session.add(new_menu)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': f'Đã tạo thực đơn tuần {week_number} thành công',
-                'week_number': week_number
-            })
         
     except Exception as e:
         db.session.rollback()
@@ -3610,248 +3736,10 @@ def convert_structured_to_frontend_format(ai_result, age_group, week_number, the
             'error': str(e)
         }
 
-@main.route('/ai/curriculum-suggestions', methods=['POST'])
-def ai_curriculum_suggestions():
-    """API endpoint để lấy gợi ý chương trình học từ Gemini AI"""
-    
-    # Role check
-    user_role = session.get('role')
-    if user_role not in ['admin', 'teacher']:
-        return jsonify({
-            'success': False,
-            'error': 'Không có quyền truy cập. Vui lòng đăng nhập với tài khoản admin hoặc giáo viên.'
-        }), 403
-    
-    # Rate Limiting
-    user_ip = validate_ip_address(request.remote_addr)
-    rate_allowed, wait_seconds = check_rate_limit(f"ai_curriculum_{user_ip}", AI_RATE_LIMIT_SECONDS)
-    
-    if not rate_allowed:
-        log_security_event('RATE_LIMIT_EXCEEDED', f'Curriculum User: {user_role}, Wait: {wait_seconds}s', user_ip)
-        return jsonify({
-            'success': False,
-            'error': f'Quá nhiều yêu cầu. Vui lòng chờ {wait_seconds} giây trước khi thử lại.'
-        }), 429
-    
-    try:
-        # Get and validate input
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Không có dữ liệu đầu vào'}), 400
-        
-        # Sanitize inputs
-        age_group = sanitize_input(data.get('age_group', '2-3 tuổi'))
-        week_number = int(data.get('week_number', 1))
-        themes = sanitize_input(data.get('themes', ''))
-        special_focus = sanitize_input(data.get('special_focus', ''))
-        
-        # Length limits để tránh abuse
-        if len(themes) > 500:
-            return jsonify({
-                'success': False,
-                'error': 'Chủ đề quá dài (tối đa 500 ký tự)'
-            }), 400
-            
-        if len(special_focus) > 500:
-            return jsonify({
-                'success': False,
-                'error': 'Trọng tâm đặc biệt quá dài (tối đa 500 ký tự)'
-            }), 400
-        
-        # Validate age group - sử dụng cùng logic như Menu AI
-        valid_age_groups = ['1-2 tuổi', '2-3 tuổi', '3-4 tuổi', '4-5 tuổi']
-        if age_group not in valid_age_groups:
-            age_group = '2-3 tuổi'  # Default fallback
-        
-        # Validate week number
-        if not (1 <= week_number <= 53):
-            return jsonify({'success': False, 'error': 'Số tuần phải từ 1-53'}), 400
-        
-        # Log security event
-        log_security_event('CURRICULUM_AI_REQUEST', f'User: {user_role}, Age: {age_group}, Week: {week_number}', user_ip)
-        
-        # 🚀 TRY ENHANCED MULTI-AI FIRST!
-        try:
-            if ENHANCED_CURRICULUM_AI_AVAILABLE:
-                print(f"🚀 [MULTI-AI] Using Enhanced Curriculum AI with Groq fallback for {user_role}")
-                ai_result = get_ai_curriculum_suggestions_enhanced(
-                    age_group=age_group,
-                    week_number=week_number,
-                    use_multi_ai=True  # Enable Multi-AI fallback
-                )
-                print(f"✅ [MULTI-AI SUCCESS] Enhanced Curriculum AI completed for {user_role}")
-                print(f"🔍 [DEBUG] AI Result type: {type(ai_result)}")
-                print(f"🔍 [DEBUG] AI Result success: {ai_result.get('success') if isinstance(ai_result, dict) else 'Not dict'}")
-                
-                # Handle the new structured format
-                if isinstance(ai_result, dict) and ai_result.get('success'):
-                    # Convert structured data to frontend format
-                    print(f"🔍 [DEBUG] Converting structured data to frontend format")
-                    curriculum_data = convert_structured_to_frontend_format(
-                        ai_result, age_group, week_number, themes, special_focus
-                    )
-                    print(f"✅ [DEBUG] Frontend format conversion completed")
-                else:
-                    print(f"⚠️ [DEBUG] AI result not successful, using fallback format")
-                    # Fallback for old format
-                    curriculum_data = {
-                        'week_number': week_number,
-                        'age_group': age_group,
-                        'themes': themes,
-                        'special_focus': special_focus,
-                        'daily_activities': ai_result if isinstance(ai_result, list) else [],
-                        'materials': [],
-                        'provider': 'enhanced_fallback'
-                    }
-            else:
-                print(f"🔄 [FALLBACK] Using original Curriculum AI for {user_role}")
-                # Import original curriculum AI service
-                from app.curriculum_ai import curriculum_ai_service
-                curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
-                    age_group=age_group,
-                    week_number=week_number,
-                    themes=themes if themes else None,
-                    special_focus=special_focus if special_focus else None
-                )
-        except Exception as multi_ai_error:
-            print(f"⚠️ [MULTI-AI FALLBACK] Enhanced Curriculum AI failed: {multi_ai_error}")
-            print(f"🔄 [FALLBACK] Trying AI Factory (Cohere + Groq) for {user_role}")
-            if AI_FACTORY_AVAILABLE:
-                try:
-                    ai_content = ai_curriculum_fallback(age_group, themes, 30)
-                    curriculum_data = {
-                        'week_number': week_number,
-                        'age_group': age_group,
-                        'themes': themes,
-                        'special_focus': special_focus,
-                        'daily_activities': [ai_content],
-                        'materials': [],
-                        'provider': 'ai_factory_cohere_groq'
-                    }
-                    print(f"✅ [AI FACTORY SUCCESS] Used Cohere/Groq for {user_role}")
-                except Exception as factory_error:
-                    print(f"⚠️ [AI FACTORY FAILED] {factory_error}")
-                    print(f"🔄 [ORIGINAL FALLBACK] Using original Curriculum AI for {user_role}")
-                    # Import original curriculum AI service
-                    from app.curriculum_ai import curriculum_ai_service
-                    curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
-                        age_group=age_group,
-                        week_number=week_number,
-                        themes=themes if themes else None,
-                        special_focus=special_focus if special_focus else None
-                    )
-            else:
-                print(f"🔄 [ORIGINAL FALLBACK] Using original Curriculum AI for {user_role}")
-                # Import original curriculum AI service
-                from app.curriculum_ai import curriculum_ai_service
-                curriculum_data = curriculum_ai_service.generate_weekly_curriculum(
-                    age_group=age_group,
-                    week_number=week_number,
-                    themes=themes if themes else None,
-                    special_focus=special_focus if special_focus else None
-                )
-        
-        # Log success
-        print(f"✅ [SUCCESS] Curriculum generated for {user_role} - Age: {age_group}, Week: {week_number}")
-        
-        return jsonify({
-            'success': True,
-            'curriculum_data': curriculum_data,
-            'age_group': age_group,
-            'week_number': week_number
-        })
-        
-    except Exception as e:
-        error_msg = str(e)
-        print(f"❌ [ERROR] Curriculum generation failed for {user_role} from {user_ip}: {error_msg}")
-        print(f"❌ [DEBUG] Exception type: {type(e)}")
-        print(f"❌ [DEBUG] Full traceback:")
-        import traceback
-        traceback.print_exc()
-        
-        log_security_event('CURRICULUM_AI_ERROR', f'Error: {error_msg}', user_ip)
-        
-        # Enhanced error handling like Menu AI
-        if "quota" in error_msg.lower() or "429" in error_msg:
-            return jsonify({
-                'success': False,
-                'error': 'API đã hết quota. Vui lòng thử lại sau hoặc kiểm tra cấu hình API key.'
-            }), 429
-        else:
-            # Don't expose internal errors to client
-            return jsonify({
-                'success': False,
-                'error': f'Đã xảy ra lỗi khi tạo chương trình học: {error_msg}'
-            }), 500
 
 
-@main.route('/ai/create-curriculum-from-suggestions', methods=['POST'])
-def ai_create_curriculum_from_suggestions():
-    """API endpoint để tạo chương trình học từ suggestions AI"""
-    
-    # Role check
-    user_role = session.get('role')
-    if user_role not in ['admin', 'teacher']:
-        return jsonify({
-            'success': False,
-            'error': 'Không có quyền truy cập'
-        }), 403
-    
-    try:
-        data = request.get_json()
-        if not data or 'curriculum_data' not in data:
-            return jsonify({'success': False, 'error': 'Không có dữ liệu chương trình học'}), 400
-        
-        curriculum_data = data['curriculum_data']
-        
-        # Handle both old and new format
-        if 'week_info' in curriculum_data:
-            # Old format
-            week_number = curriculum_data.get('week_info', {}).get('week_number', 1)
-            curriculum_content = curriculum_data.get('curriculum', {})
-        else:
-            # New format - get week_number directly and use structured_data
-            week_number = curriculum_data.get('week_number', 1)
-            if 'structured_data' in curriculum_data:
-                curriculum_content = curriculum_data['structured_data']
-            elif 'curriculum' in curriculum_data:
-                curriculum_content = curriculum_data['curriculum']
-            else:
-                return jsonify({'success': False, 'error': 'Không tìm thấy dữ liệu chương trình học hợp lệ'}), 400
-        
-        # Check if week already exists
-        existing = Curriculum.query.filter_by(week_number=week_number).first()
-        
-        if existing:
-            return jsonify({
-                'success': False,
-                'error': f'Tuần {week_number} đã tồn tại. Vui lòng chọn tuần khác hoặc xóa tuần cũ trước.'
-            }), 409
-        else:
-            # Create new curriculum with structured content
-            new_curriculum = Curriculum(
-                week_number=week_number,
-                content=json.dumps(curriculum_content, ensure_ascii=False)
-            )
-            
-            db.session.add(new_curriculum)
-            db.session.commit()
-            
-            print(f"✅ [SUCCESS] Created curriculum week {week_number} with structured format")
-            
-            return jsonify({
-                'success': True,
-                'message': f'Đã tạo chương trình học tuần {week_number} thành công',
-                'week_number': week_number
-            })
-        
-    except Exception as e:
-        db.session.rollback()
-        print(f"❌ [ERROR] Create Curriculum Error: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+
+
 
 
 @main.route('/debug-curriculum')
@@ -3944,12 +3832,16 @@ def create_test_teacher():
     
     return f"✅ Đã tạo tài khoản giáo viên test:<br>Email: gv1@gmail.com<br>Password: 123456<br>ID: {teacher.id}<br><a href='/login'>Đăng nhập ngay</a>"
 
-@main.route('/ai-dashboard')
+
+import random
+
+@main.route('/ai-dashboard', methods=['GET', 'POST'])
 def ai_dashboard():
     """Trang dashboard AI với các tính năng LLM Farm"""
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    
+
+    # Không tự tạo prompt ở đây nữa, chỉ render dashboard, prompt sẽ lấy từ API /ai/menu-suggestions
     return render_template('ai_dashboard.html')
 
 # ===== STUDENT ALBUM MANAGEMENT ROUTES =====

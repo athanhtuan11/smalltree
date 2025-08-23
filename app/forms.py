@@ -57,8 +57,4 @@ class ProductForm(FlaskForm):
                           validators=[DataRequired()])
     supplier_id = SelectField('Nhà cung cấp', coerce=int, validators=[DataRequired()])
     unit = StringField('Đơn vị tính', validators=[DataRequired(), Length(min=1, max=20)])
-    usual_quantity = FloatField('Số lượng thường dùng', validators=[NumberRange(min=0)])
-    storage_condition = StringField('Điều kiện bảo quản', validators=[Length(max=100)])
-    shelf_life_days = IntegerField('Thời hạn sử dụng (ngày)', validators=[NumberRange(min=0)])
-    notes = TextAreaField('Ghi chú')
     submit = SubmitField('Lưu sản phẩm')
