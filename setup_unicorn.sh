@@ -18,10 +18,9 @@ cd "$APP_DIR"
 NGINX_CONF_SRC="$APP_DIR/nginx_nursery.conf"
 NGINX_CONF_DST="/etc/nginx/sites-available/nursery-website"
 NGINX_SYMLINK="/etc/nginx/sites-enabled/nursery-website"
+
 if [ -f "$NGINX_CONF_SRC" ]; then
     echo "Copying nginx config..."
-    echo "Unicorn processes killed. Starting gunicorn..."
-    fi
     # Kill existing gunicorn master/workers cleanly
     if pgrep -f "gunicorn.*smalltree-website" > /dev/null; then
         echo "Killing existing gunicorn processes..."
@@ -29,13 +28,17 @@ if [ -f "$NGINX_CONF_SRC" ]; then
         sleep 2
     fi
 
-    # Start gunicorn (Python WSGI server)
-    if ! command -v gunicorn &> /dev/null; then
-        echo "gunicorn not found. Installing..."
-        pip install gunicorn || { echo "Failed to install gunicorn. Please install manually."; exit 1; }
+    # Ưu tiên chạy gunicorn từ venv nếu có
+    if [ -x "$APP_DIR/venv/bin/gunicorn" ]; then
+        GUNICORN="$APP_DIR/venv/bin/gunicorn"
+    elif command -v gunicorn &> /dev/null; then
+        GUNICORN="gunicorn"
+    else
+        echo "Không tìm thấy gunicorn trong venv hoặc hệ thống. Vui lòng cài bằng: source venv/bin/activate && pip install gunicorn"
+        exit 1
     fi
 
-    GUNICORN_CMD="gunicorn -c unicorn_config.py run:app --chdir $APP_DIR --daemon --pid $APP_DIR/unicorn.pid --log-file $APP_DIR/unicorn.log"
+    GUNICORN_CMD="$GUNICORN -c unicorn_config.py run:app --chdir $APP_DIR --daemon --pid $APP_DIR/unicorn.pid --log-file $APP_DIR/unicorn.log"
     echo "Starting gunicorn..."
     eval $GUNICORN_CMD
     echo "Testing nginx config..."
