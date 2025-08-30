@@ -20,11 +20,26 @@ NGINX_CONF_DST="/etc/nginx/sites-available/nursery-website"
 NGINX_SYMLINK="/etc/nginx/sites-enabled/nursery-website"
 if [ -f "$NGINX_CONF_SRC" ]; then
     echo "Copying nginx config..."
-    sudo cp "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
-    if [ ! -L "$NGINX_SYMLINK" ]; then
-        sudo ln -s "$NGINX_CONF_DST" "$NGINX_SYMLINK"
+    echo "Unicorn processes killed. Starting gunicorn..."
     fi
+    # Kill existing gunicorn master/workers cleanly
+    if pgrep -f "gunicorn.*smalltree-website" > /dev/null; then
+        echo "Killing existing gunicorn processes..."
+        pkill -f "gunicorn.*smalltree-website"
+        sleep 2
+    fi
+
+    # Start gunicorn (Python WSGI server)
+    if ! command -v gunicorn &> /dev/null; then
+        echo "gunicorn not found. Installing..."
+        pip install gunicorn || { echo "Failed to install gunicorn. Please install manually."; exit 1; }
+    fi
+
+    GUNICORN_CMD="gunicorn -c unicorn_config.py run:app --chdir $APP_DIR --daemon --pid $APP_DIR/unicorn.pid --log-file $APP_DIR/unicorn.log"
+    echo "Starting gunicorn..."
+    eval $GUNICORN_CMD
     echo "Testing nginx config..."
+    echo "Gunicorn started."
     sudo nginx -t && sudo systemctl reload nginx
     echo "Nginx config applied and reloaded."
 else
