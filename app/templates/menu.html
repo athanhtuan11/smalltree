@@ -108,18 +108,17 @@
 
 <div class="container-fluid mt-4 mb-4">
     <!-- Header Section -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-2">
-        <h2 class="fw-bold text-center text-md-start mb-2 mb-md-0 {% if mobile %}menu-header-mobile{% else %}menu-header-desktop{% endif %}" style="color:#43a047;">
-            <span class="d-none d-md-inline">Thực đơn các tuần</span>
-            <span class="d-md-none">Thực đơn</span>
-        </h2>
-        {% if session.get('role') in ['admin', 'teacher'] %}
-        <a href="{{ url_for('main.new_menu') }}" class="btn btn-success btn-sm menu-btn-uniform">
-            <i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Thêm </span>Thực đơn
-        </a>
-        {% endif %}
-    </div>
-    
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 gap-2">
+                <h2 class="fw-bold text-center text-md-start mb-2 mb-md-0 {% if mobile %}menu-header-mobile{% else %}menu-header-desktop{% endif %}" style="color:#43a047;">
+                        <span class="d-none d-md-inline">Thực đơn các tuần</span>
+                        <span class="d-md-none">Thực đơn</span>
+                </h2>
+                {% if session.get('role') in ['admin', 'teacher'] %}
+                <a href="{{ url_for('main.new_menu') }}" class="btn btn-success btn-sm menu-btn-uniform">
+                        <i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Thêm </span>Thực đơn
+                </a>
+                {% endif %}
+        </div>
     <!-- Action Buttons Section -->
     {% if session.get('role') in ['admin', 'teacher'] %}
         <div class="d-none d-md-block mb-3 menu-btn-uniform-group">

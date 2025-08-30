@@ -21,15 +21,15 @@ class GeminiService:
         try:
             # Debug API key loading
             if api_key:
-                print(f"🔧 [DEBUG] Using provided API key")
+                # print(f"🔧 [DEBUG] Using provided API key")
                 self.api_key = api_key
             else:
                 api_key_from_config = getattr(Config, 'GEMINI_API_KEY', None)
-                print(f"🔑 [DEBUG] Gemini API key from config: {api_key_from_config[:10] if api_key_from_config else None}...")
+                # print(f"🔑 [DEBUG] Gemini API key from config: {api_key_from_config[:10] if api_key_from_config else None}...")
                 
                 if not api_key_from_config:
                     # Hardcoded API key for testing - temporary measure
-                    print(f"🔧 [DEBUG] Using hardcoded API key for testing")
+                    # print(f"🔧 [DEBUG] Using hardcoded API key for testing")
                     api_key_from_config = "AIzaSyC5F9JQiQJUQcQQWm9Qcy_ZGOzqZz_Bfeg"
                     
                 self.api_key = api_key_from_config
