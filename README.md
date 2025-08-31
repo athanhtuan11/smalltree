@@ -132,7 +132,7 @@ DOMAIN=mamnoncaynho.com
 
 ### Nginx Configuration
 - **Static files**: Served directly by Nginx
-- **Application**: Proxied to Gunicorn on port 5000
+- **Application**: Proxied to Gsmalltree-website on port 5000
 - **Domain**: mamnoncaynho.com, www.mamnoncaynho.com
 
 ## 📜 License

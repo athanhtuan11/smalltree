@@ -167,11 +167,14 @@
         <a href="/menu/export" class="btn btn-success btn-sm menu-btn-uniform">
             <i class="fas fa-download"></i> Export Excel
         </a>
+        <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm menu-btn-uniform">
+            <i class="fas fa-list"></i> Danh sách món ăn
+        </a>
         <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm menu-btn-uniform">
-            <i class="fas fa-truck"></i> Nhà cung cấp
+            <i class="bi bi-truck"></i> Quản lý nhà cung cấp
         </a>
         <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm menu-btn-uniform">
-            <i class="fas fa-robot"></i> AI Dashboard
+            <i class="fas fa-robot"></i> Tạo Nhanh Thực Đơn
         </a>
     </div>
     {% endif %}

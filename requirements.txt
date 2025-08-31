@@ -8,7 +8,7 @@ Jinja2==3.0.3
 Werkzeug==2.0.3
 
 # Production Server
-gunicorn==20.1.0
+gsmalltree-website==20.1.0
 
 # Forms & Validation
 WTForms==3.0.1
