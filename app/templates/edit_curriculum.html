@@ -16,6 +16,15 @@
                 <label for="week_number" class="form-label fw-bold">Tuần</label>
                 <input type="text" class="form-control" id="week_number" name="week_number" value="{{ week.week_number }}" readonly>
             </div>
+            <div class="col-md-4">
+                <label for="class_id" class="form-label fw-bold">Chọn lớp</label>
+                <select class="form-select" id="class_id" name="class_id" required>
+                    <option value="">-- Chọn lớp --</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if week.class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         <div class="table-responsive" style="margin-left:-12px; margin-right:-12px;">
             <table class="table table-bordered align-middle bg-light">

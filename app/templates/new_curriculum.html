@@ -16,6 +16,15 @@
             <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>
         </div>
         <div class="mb-3">
+            <label for="class_id" class="form-label">Chọn lớp</label>
+            <select class="form-select" id="class_id" name="class_id" required>
+                <option value="">-- Chọn lớp --</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
             <label class="form-label">Nội dung từng khung giờ</label>
             <div class="table-responsive" style="margin-left:-12px; margin-right:-12px;">
             <table class="table table-bordered align-middle bg-light">

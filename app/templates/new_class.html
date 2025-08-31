@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-end mb-3">
+        <a href="/attendance" class="btn btn-secondary fw-bold">Quay lại điểm danh</a>
+    </div>
+    <h2>Tạo Lớp mới</h2>
+    <form method="post" class="mb-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label for="class_name" class="form-label">Tên lớp</label>
+            <input type="text" class="form-control" id="class_name" name="class_name" required placeholder="Ví dụ: Kay 01, Kay 02">
+        </div>
+        <div class="mb-3">
+            <label for="description" class="form-label">Mô tả</label>
+            <input type="text" class="form-control" id="description" name="description" placeholder="Ghi chú thêm (nếu có)">
+        </div>
+        <button type="submit" class="btn btn-success">Tạo Lớp</button>
+    </form>
+    <h3 class="mt-4">Danh sách lớp hiện có</h3>
+    <table class="table table-bordered mt-2">
+        <thead>
+            <tr>
+                <th>Tên lớp</th>
+                <th>Mô tả</th>
+                <th>Hành động</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in classes %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.description or '' }}</td>
+                <td>
+                    <a href="/classes/{{ c.id }}/edit" class="btn btn-warning btn-sm">Sửa</a>
+                    <form method="post" action="/classes/{{ c.id }}/delete" style="display:inline;" onsubmit="return confirm('Xác nhận xoá lớp này?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-sm">Xoá</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center">Chưa có lớp nào.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

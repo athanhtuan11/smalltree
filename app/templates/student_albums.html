@@ -91,7 +91,7 @@
                                 <div class="text-success">
                                     <i class="fas fa-images fa-lg"></i>
                                     <div class="fw-bold">
-                                        {{ student_albums|sum(attribute='photos')|length if student_albums else 0 }}
+                                        {{ student_albums | map(attribute='photos') | map('length') | sum if student_albums else 0 }}
                                     </div>
                                     <small>Ảnh</small>
                                 </div>
@@ -184,14 +184,15 @@
 .card:hover {
     transform: translateY(-2px);
 }
-
+</style>
 {% if mobile %}
+<style>
 .card-body {
     padding: 0.75rem;
 }
 .card-footer {
     padding: 0.5rem;
 }
-{% endif %}
 </style>
+{% endif %}
 {% endblock %}

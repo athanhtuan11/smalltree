@@ -120,6 +120,23 @@
         {% endif %}
     </div>
     
+    <!-- Filter Section -->
+    <form method="get" class="mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <label for="class_id" class="form-label mb-0">Lọc theo lớp:</label>
+            </div>
+            <div class="col-auto">
+                <select id="class_id" name="class_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">Tất cả lớp</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
+    
     <!-- Action Buttons Section -->
     {% if session.get('role') in ['admin', 'teacher'] %}
     <div class="d-none d-md-flex flex-row gap-2 mb-3">
@@ -142,6 +159,9 @@
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-upload"></i> Import Excel
                 </button>
+                <a href="/curriculum/export" class="btn btn-success mt-2">
+                    <i class="fas fa-download"></i> Export Excel
+                </a>
             </div>
         </form>
     </div>
@@ -163,7 +183,12 @@
     {% for week in curriculum %}
     <div class="card mb-4 shadow rounded-4 border-0">
         <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
-            <h4 class="fw-bold mb-2 mb-md-0">Tuần {{ week.week_number }}</h4>
+            <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+                <h4 class="fw-bold mb-0">Tuần {{ week.week_number }}</h4>
+                {% if week.class_name %}
+                <span class="badge bg-light text-success ms-md-2" style="font-size:1em;">Lớp: {{ week.class_name }}</span>
+                {% endif %}
+            </div>
             {% if session.get('role') in ['admin', 'teacher'] %}
                 <div class="d-flex flex-column flex-md-row gap-2 curriculum-btn-group-mobile">
                     <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Chỉnh sửa</a>

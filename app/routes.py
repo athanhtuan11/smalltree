@@ -72,7 +72,65 @@ except ImportError:
     PIL_AVAILABLE = False
     Image = None
 
+
 main = Blueprint('main', __name__)
+
+
+# Route tạo lớp mới (không circular import)
+
+# CRUD Class
+from app.models import Class
+
+@main.route('/classes/new', methods=['GET', 'POST'])
+def new_class():
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        flash('Bạn không có quyền tạo lớp mới!', 'danger')
+        return redirect(url_for('main.attendance'))
+    # Thêm lớp mới
+    if request.method == 'POST':
+        class_name = request.form.get('class_name')
+        description = request.form.get('description')
+        if not class_name or len(class_name) < 3:
+            flash('Tên lớp phải có ít nhất 3 ký tự!', 'danger')
+            return redirect(url_for('main.new_class'))
+        existing = Class.query.filter_by(name=class_name).first()
+        if existing:
+            flash('Lớp này đã tồn tại!', 'warning')
+            return redirect(url_for('main.new_class'))
+        new_class = Class(name=class_name, description=description)
+        db.session.add(new_class)
+        db.session.commit()
+        flash(f'Đã tạo lớp mới: {class_name}', 'success')
+        return redirect(url_for('main.new_class'))
+    # Hiển thị danh sách lớp
+    classes = Class.query.order_by(Class.name).all()
+    mobile = is_mobile()
+    return render_template('new_class.html', title='Tạo Lớp mới', mobile=mobile, classes=classes)
+
+@main.route('/classes/<int:class_id>/edit', methods=['GET', 'POST'])
+def edit_class(class_id):
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        flash('Bạn không có quyền sửa lớp!', 'danger')
+        return redirect(url_for('main.new_class'))
+    class_obj = Class.query.get_or_404(class_id)
+    if request.method == 'POST':
+        class_obj.name = request.form.get('class_name')
+        class_obj.description = request.form.get('description')
+        db.session.commit()
+        flash('Đã cập nhật lớp!', 'success')
+        return redirect(url_for('main.new_class'))
+    return render_template('edit_class.html', class_obj=class_obj)
+
+@main.route('/classes/<int:class_id>/delete', methods=['POST'])
+def delete_class(class_id):
+    if session.get('role') != 'admin' and session.get('role') != 'teacher':
+        flash('Bạn không có quyền xóa lớp!', 'danger')
+        return redirect(url_for('main.new_class'))
+    class_obj = Class.query.get_or_404(class_id)
+    db.session.delete(class_obj)
+    db.session.commit()
+    flash('Đã xóa lớp!', 'success')
+    return redirect(url_for('main.new_class'))
 
 
 
@@ -313,7 +371,10 @@ def contact():
 def new_activity():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
+    classes = Class.query.order_by(Class.name).all()
+    class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
     form = ActivityCreateForm()
+    form.class_id.choices = class_choices
     if form.validate_on_submit():
         title = form.title.data
         content = form.description.data
@@ -326,7 +387,7 @@ def new_activity():
             safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
             if ext not in allowed_ext:
                 flash('Chỉ cho phép tải lên các file ảnh có đuôi: .jpg, .jpeg, .png, .gif, .jfif!', 'danger')
-                return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile())
+                return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile(), classes=classes)
             filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
             save_path = os.path.join('app', 'static', 'images', filename)
             # Resize background
@@ -334,7 +395,8 @@ def new_activity():
             img.thumbnail((1200, 800))
             img.save(save_path)
             image_url = url_for('static', filename=f'images/{filename}')
-        new_post = Activity(title=title, description=content, date=date_val, image=image_url)
+        class_id = form.class_id.data if form.class_id.data != 0 else None
+        new_post = Activity(title=title, description=content, date=date_val, image=image_url, class_id=class_id)
         db.session.add(new_post)
         db.session.commit()
         # Tạo thư mục lưu ảnh hoạt động
@@ -369,7 +431,7 @@ def new_activity():
     mobile = is_mobile()
     from datetime import date
     current_date_iso = date.today().isoformat()
-    return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile, current_date_iso=current_date_iso)
+    return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile, current_date_iso=current_date_iso, classes=classes)
 
 @main.route('/activities/<int:id>/delete', methods=['POST'])
 def delete_activity(id):
@@ -396,6 +458,17 @@ def activity_detail(id):
     if not post:
         flash('Không tìm thấy bài viết!', 'danger')
         return redirect(url_for('main.activities'))
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+    if user_role == 'parent':
+        child = Child.query.filter_by(id=user_id).first()
+        class_name = child.class_name if child else None
+        class_obj = Class.query.filter_by(name=class_name).first() if class_name else None
+        class_id = class_obj.id if class_obj else None
+        # Nếu bài viết không phải của lớp con mình và không phải khách vãng lai thì không cho xem
+        if post.class_id is not None and post.class_id != class_id:
+            flash('Bạn không có quyền xem bài viết này!', 'danger')
+            return redirect(url_for('main.activities'))
     activity = {
         'id': post.id,
         'title': post.title,
@@ -409,12 +482,15 @@ def activity_detail(id):
     form = DeleteActivityForm()
     return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile, form=form)
 
+from app.models import Class
 @main.route('/curriculum/new', methods=['GET', 'POST'])
 def new_curriculum():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
+    classes = Class.query.order_by(Class.name).all()
     if request.method == 'POST':
         week_number = request.form.get('week_number')
+        class_id = request.form.get('class_id')
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
         morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6', 'morning_7']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
@@ -426,20 +502,38 @@ def new_curriculum():
             for slot in afternoon_slots:
                 curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
         content = json.dumps(curriculum_data, ensure_ascii=False)
-        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        new_week = Curriculum(week_number=week_number, class_id=class_id, content=content, material=None)
         db.session.add(new_week)
         db.session.commit()
         flash('Đã thêm chương trình học mới!', 'success')
         return redirect(url_for('main.curriculum'))
     mobile = is_mobile()
-    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile)
+    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes)
+
 
 @main.route('/curriculum')
 def curriculum():
     import secrets
+    from app.models import Class
     if 'csrf_token' not in session or not session['csrf_token']:
         session['csrf_token'] = secrets.token_hex(16)
-    weeks = Curriculum.query.order_by(Curriculum.week_number).all()
+    class_id = None
+    classes = Class.query.order_by(Class.name).all()
+    # Nếu là phụ huynh, chỉ cho xem curriculum của lớp con mình, không cho override qua URL
+    if session.get('role') == 'parent':
+        user_id = session.get('user_id')
+        child = Child.query.filter_by(id=user_id).first()
+        if child and child.class_name:
+            class_obj = Class.query.filter_by(name=child.class_name).first()
+            if class_obj:
+                class_id = class_obj.id
+    else:
+        # Chỉ admin/teacher mới được chọn class_id qua URL
+        class_id = request.args.get('class_id', type=int)
+    if class_id:
+        weeks = Curriculum.query.filter_by(class_id=class_id).order_by(Curriculum.week_number).all()
+    else:
+        weeks = Curriculum.query.order_by(Curriculum.week_number).all()
     curriculum = []
     for week in weeks:
         try:
@@ -448,22 +542,25 @@ def curriculum():
             data = {}
         curriculum.append({
             'week_number': week.week_number,
-            'data': data
+            'data': data,
+            'class_id': week.class_id,
+            'class_name': week.class_obj.name if week.class_obj else ''
         })
     mobile = is_mobile()
-    return render_template('curriculum.html', curriculum=curriculum, title='Chương trình học', mobile=mobile)
+    return render_template('curriculum.html', curriculum=curriculum, title='Chương trình học', mobile=mobile, classes=classes, selected_class_id=class_id)
 
 @main.route('/attendance/new', methods=['GET', 'POST'])
 def new_student():
     if session.get('role') != 'admin' and session.get('role') != 'teacher':
         return redirect_no_permission()
+    classes = Class.query.order_by(Class.name).all()
     if request.method == 'POST':
         name = request.form.get('name')
         student_code = request.form.get('student_code')
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
-        if class_name not in ['Kay 01', 'Kay 02']:
+        if not any(c.name == class_name for c in classes):
             flash('Lớp không hợp lệ!', 'danger')
             return redirect(url_for('main.new_student'))
         new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code)
@@ -472,7 +569,7 @@ def new_student():
         flash('Đã thêm học sinh mới!', 'success')
         return redirect(url_for('main.attendance'))
     mobile = is_mobile()
-    return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile)
+    return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile, classes=classes)
 
 @main.route('/attendance', methods=['GET', 'POST'])
 def attendance():
@@ -484,8 +581,9 @@ def attendance():
     from datetime import date
     attendance_date = request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
     selected_class = request.args.get('class_name')
-    # Lấy danh sách lớp cố định
-    class_names = ['Kay 01', 'Kay 02']
+    # Lấy danh sách lớp từ bảng Class
+    from app.models import Class
+    class_names = [c.name for c in Class.query.order_by(Class.name).all()]
     # Lọc học sinh theo lớp
     if selected_class:
         students = Child.query.filter_by(class_name=selected_class).all()
@@ -987,6 +1085,7 @@ def edit_curriculum(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     week = Curriculum.query.filter_by(week_number=week_number).first()
+    classes = Class.query.order_by(Class.name).all()
     if not week:
         flash('Không tìm thấy chương trình học để chỉnh sửa!', 'danger')
         return redirect(url_for('main.curriculum'))
@@ -1002,45 +1101,57 @@ def edit_curriculum(week_number):
                 curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
             for slot in afternoon_slots:
                 curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
+        class_id = request.form.get('class_id')
+        week.class_id = class_id
         week.content = json.dumps(curriculum_data, ensure_ascii=False)
         db.session.commit()
         flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
         return redirect(url_for('main.curriculum'))
     data = json.loads(week.content)
     mobile = is_mobile()
-    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week_number}', mobile=mobile)
+    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week_number}', mobile=mobile, classes=classes)
 
 @main.route('/profile')
 def profile():
     user = None
     role = session.get('role')
     user_id = session.get('user_id')
+    info = {}
     if role == 'parent':
         user = Child.query.get(user_id)
-        role_display = 'Phụ huynh'
-        full_name = user.parent_contact if user else ''
+        if user:
+            info = {
+                'full_name': user.parent_contact,
+                'email': user.email,
+                'phone': user.phone,
+                'role_display': 'Phụ huynh',
+                'student_code': user.student_code,
+                'class_name': user.class_name,
+                'birth_date': user.birth_date,
+                'parent_contact': user.parent_contact,
+            }
+    elif role == 'teacher':
+        user = Staff.query.get(user_id)
+        if user:
+            info = {
+                'full_name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role_display': 'Giáo viên',
+                'student_code': '',
+                'class_name': user.position,
+                'birth_date': '',
+                'parent_contact': '',
+            }
+    elif role == 'admin':
+        # Nếu là admin, hiển thị thông tin cơ bản
         info = {
-            'full_name': full_name,
-            'email': user.email if user else '',
-            'phone': user.phone if user else '',
-            'role_display': role_display,
-            'student_code': user.student_code if user else '',
-            'class_name': user.class_name if user else '',
-            'birth_date': user.birth_date if user else '',
-            'parent_contact': user.parent_contact if user else '',
-        }
-    elif role == 'teacher' or role == 'admin':
-        # Giáo viên và admin xem được tất cả thông tin của bản thân
-        user = Staff.query.get(user_id) if role == 'teacher' else None
-        role_display = 'Giáo viên' if role == 'teacher' else 'Admin'
-        full_name = user.name if user else 'Admin'
-        info = {
-            'full_name': full_name,
-            'email': user.email if user else '',
-            'phone': user.phone if user else '',
-            'role_display': role_display,
+            'full_name': 'Admin',
+            'email': 'admin@smalltree.vn',
+            'phone': '',
+            'role_display': 'Admin',
             'student_code': '',
-            'class_name': getattr(user, 'position', '') if user else '',
+            'class_name': '',
             'birth_date': '',
             'parent_contact': '',
         }
@@ -1175,7 +1286,21 @@ def change_admin_password():
 
 @main.route('/activities')
 def activities():
-    posts = Activity.query.order_by(Activity.date.desc()).all()
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+    posts = None
+    if user_role == 'parent':
+        child = Child.query.filter_by(id=user_id).first()
+        class_name = child.class_name if child else None
+        class_obj = Class.query.filter_by(name=class_name).first() if class_name else None
+        class_id = class_obj.id if class_obj else None
+        # Chỉ lấy bài viết của lớp con mình hoặc bài cho khách vãng lai
+        posts = Activity.query.filter(
+            (Activity.class_id == class_id) | (Activity.class_id == None)
+        ).order_by(Activity.date.desc()).all()
+    else:
+        # Giáo viên, admin xem tất cả
+        posts = Activity.query.order_by(Activity.date.desc()).all()
     activities = [
         {
             'id': post.id,
@@ -1241,6 +1366,8 @@ def edit_account(user_id):
     if session.get('role') != 'admin':
         return redirect_no_permission()
     user_type = request.args.get('type', 'parent')
+    from app.models import Class
+    classes = Class.query.order_by(Class.name).all() if user_type == 'parent' else []
     if user_type == 'teacher':
         user = Staff.query.get_or_404(user_id)
     else:
@@ -1274,7 +1401,7 @@ def edit_account(user_id):
         'parent_contact': getattr(user, 'parent_contact', None) if show_sensitive else 'Ẩn',
         'position': getattr(user, 'position', None) if show_sensitive else 'Ẩn',
     }
-    return render_template('edit_account.html', user=masked_user, type=user_type, title='Chỉnh sửa tài khoản')
+    return render_template('edit_account.html', user=masked_user, type=user_type, title='Chỉnh sửa tài khoản', classes=classes)
 
 @main.route('/accounts/parent/<int:user_id>/delete', methods=['POST'])
 def delete_parent_account(user_id):
@@ -1305,19 +1432,16 @@ def edit_activity(id):
         if not post:
             flash('Không tìm thấy bài viết để chỉnh sửa!', 'danger')
             return redirect(url_for('main.activities'))
+        from app.models import Class
         from app.forms import ActivityEditForm
+        classes = Class.query.order_by(Class.name).all()
+        class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
         form = ActivityEditForm()
-        if request.method == 'POST':
-            print('---[DEBUG] POST DATA---')
-            print('form.title:', form.title.data)
-            print('form.description:', form.description.data)
-            print('form.background:', form.background.data)
-            print('request.files:', request.files)
-            print('request.files.getlist("images"):', request.files.getlist('images'))
-            print('form.validate_on_submit:', form.validate_on_submit())
+        form.class_id.choices = class_choices
         if request.method == 'POST' and form.validate_on_submit():
             post.title = form.title.data
             post.description = form.description.data
+            post.class_id = form.class_id.data if form.class_id.data != 0 else None
             background_file = form.background.data
             image_url = post.image
             if background_file and getattr(background_file, 'filename', None):
@@ -1326,7 +1450,7 @@ def edit_activity(id):
                 safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
                 if ext not in allowed_ext:
                     flash('Chỉ cho phép tải lên các file ảnh có đuôi: .jpg, .jpeg, .png, .gif, .jfif!', 'danger')
-                    return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=is_mobile())
+                    return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=is_mobile(), classes=classes)
                 filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
                 save_path = os.path.join('app', 'static', 'images', filename)
                 img = Image.open(background_file)
@@ -1367,7 +1491,8 @@ def edit_activity(id):
         if request.method == 'GET':
             form.title.data = post.title
             form.description.data = post.description
-        return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=mobile)
+            form.class_id.data = post.class_id if post.class_id is not None else 0
+        return render_template('edit_activity.html', post=post, form=form, title='Chỉnh sửa hoạt động', mobile=mobile, classes=classes)
     except Exception as e:
         print(f"[ERROR] Lỗi khi render edit_activity: {e}")
         import traceback
@@ -2137,13 +2262,9 @@ def export_food_safety_process(week_number):
                 (signature_row, 'D', "BẾP TRƯỞNG", 'K', "HIỆU TRƯỞNG"),
                 (signature_row + 1, 'D', "(Ký, ghi rõ họ tên)", 'K', "(Ký, ghi rõ họ tên)"),
                 (signature_row + 5, 'D', "Nguyễn Thị Vân", 'K', "Nguyễn Thị Vân"),
-                (signature_row + 6, 'D', f"Ngày {(current_date.day if 'current_date' in locals() else week_start.day)}/"
-                                          f"{(current_date.month if 'current_date' in locals() else week_start.month)}/"
-                                          f"{(current_date.year if 'current_date' in locals() else week_start.year)}",
+                (signature_row + 6, 'D', f"Ngày {day_date.day}/{day_date.month}/{day_date.year}",
                  'K',
-                 f"Ngày {(current_date.day if 'current_date' in locals() else week_start.day)}/"
-                 f"{(current_date.month if 'current_date' in locals() else week_start.month)}/"
-                 f"{(current_date.year if 'current_date' in locals() else week_start.year)}")
+                 f"Ngày {day_date.day}/{day_date.month}/{day_date.year}")
             ]
             for row, col_d, text_d, col_k, text_k in signature_data:
                 ws1[f'{col_d}{row}'] = text_d
@@ -3538,21 +3659,30 @@ def ai_dashboard():
 @main.route('/student-albums')
 def student_albums():
     """Danh sách album của tất cả học sinh"""
-    if session.get('role') not in ['admin', 'teacher']:
-        return redirect_no_permission()
-    
-    students = Child.query.all()
-    albums = StudentAlbum.query.join(Child).order_by(StudentAlbum.date_created.desc()).all()
-    
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+    students = []
+    albums = []
+    if user_role == 'parent':
+        # Chỉ xem album của con mình
+        child = Child.query.filter_by(id=user_id).first()
+        if child:
+            students = [child]
+            albums = StudentAlbum.query.filter_by(student_id=child.id).order_by(StudentAlbum.date_created.desc()).all()
+        else:
+            students = []
+            albums = []
+    else:
+        # Giáo viên, admin xem tất cả
+        students = Child.query.all()
+        albums = StudentAlbum.query.join(Child).order_by(StudentAlbum.date_created.desc()).all()
     # Tính thống kê
     today = date.today()
     albums_today = [album for album in albums if album.date_created == today]
     academic_albums = [album for album in albums if album.milestone_type == 'academic']
-    
     # Mobile detection
     user_agent = request.headers.get('User-Agent', '').lower()
     mobile = any(device in user_agent for device in ['mobile', 'android', 'iphone'])
-    
     return render_template('student_albums.html', 
                          students=students, 
                          albums=albums, 

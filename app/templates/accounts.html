@@ -31,6 +31,7 @@
                     <th>Tên của phụ huynh</th>
                     <th>Email</th>
                     <th>Số điện thoại</th>
+                    <th>Lớp</th>
                     <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <th>Hành động</th>
@@ -44,6 +45,7 @@
                     <td>{{ child.parent_contact }}</td>
                     <td>{{ child.email }}</td>
                     <td>{{ child.phone }}</td>
+                    <td>{{ child.class }}</td>
                     <!-- Không hiển thị mật khẩu -->
                     {% if session['role'] == 'admin' %}
                     <td>

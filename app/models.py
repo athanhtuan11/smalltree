@@ -1,7 +1,14 @@
+
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+# ================== LỚP HỌC ==================
+class Class(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.String(255))
 
+    # Có thể mở rộng thêm các trường khác nếu cần
 class Child(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -30,6 +37,8 @@ class Activity(db.Model):
     description = db.Column(db.Text, nullable=False)
     date = db.Column(db.Date, nullable=False)
     image = db.Column(db.String(200))  # Đường dẫn hình nền
+    class_id = db.Column(db.Integer, db.ForeignKey('class.id'), nullable=True)  # Null = cho tất cả khách vãng lai
+    class_obj = db.relationship('Class', backref=db.backref('activities', lazy=True))
     images = db.relationship('ActivityImage', backref='activity', lazy=True)
 
 class ActivityImage(db.Model):
@@ -42,8 +51,11 @@ class ActivityImage(db.Model):
 class Curriculum(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     week_number = db.Column(db.Integer, nullable=False)
+    class_id = db.Column(db.Integer, db.ForeignKey('class.id'), nullable=True)
     content = db.Column(db.Text, nullable=False)
     material = db.Column(db.String(200), nullable=True)
+    # Relationship
+    class_obj = db.relationship('Class', backref=db.backref('curriculums', lazy=True))
 
 class AttendanceRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)

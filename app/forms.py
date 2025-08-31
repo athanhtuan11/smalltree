@@ -24,6 +24,7 @@ class ActivityCreateForm(FlaskForm):
     title = StringField('Tiêu đề', validators=[DataRequired()])
     description = TextAreaField('Nội dung', validators=[DataRequired()])
     date = StringField('Ngày', validators=[DataRequired()])
+    class_id = SelectField('Đăng cho lớp', coerce=int, validators=[Optional()])  # 0 = khách vãng lai
     background = FileField('Ảnh nền', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'])])
     images = MultipleFileField('Ảnh hoạt động', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'], 'Chỉ cho phép file ảnh!'), Optional()])
     submit = SubmitField('Đăng bài')
@@ -31,6 +32,7 @@ class ActivityCreateForm(FlaskForm):
 class ActivityEditForm(FlaskForm):
     title = StringField('Tiêu đề', validators=[DataRequired()])
     description = TextAreaField('Nội dung', validators=[DataRequired()])
+    class_id = SelectField('Đăng cho lớp', coerce=int, validators=[Optional()])
     background = FileField('Ảnh nền', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'])])
     images = MultipleFileField('Ảnh hoạt động', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'], 'Chỉ cho phép file ảnh!'), Optional()])
     submit = SubmitField('Lưu thay đổi')

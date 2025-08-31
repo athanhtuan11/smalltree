@@ -60,6 +60,16 @@
 			"label": "Flask db migrate for Dish and DishIngredient",
 			"type": "shell",
 			"command": "flask db migrate -m \"add Dish and DishIngredient models\""
+		},
+		{
+			"label": "Flask db migrate for Class model",
+			"type": "shell",
+			"command": "flask db migrate -m \"add Class model\""
+		},
+		{
+			"label": "Flask db init",
+			"type": "shell",
+			"command": "flask db init"
 		}
 	]
 }

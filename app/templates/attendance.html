@@ -44,6 +44,7 @@
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Điểm danh học sinh theo ngày</h2>
     <div class="d-flex flex-column flex-md-row gap-2 mb-3 attendance-btn-group-mobile">
+        <a href="/classes/new" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">Tạo Lớp mới</a>
         <a href="/attendance/new" class="btn btn-primary {% if mobile %}attendance-btn-mobile{% endif %}">Tạo học sinh mới</a>
         <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}" {% if session['role'] == 'parent' %}style="display:none;"{% endif %}>Xem lịch sử điểm danh / Xuất hóa đơn</a>
         <a href="/students" class="btn btn-secondary {% if mobile %}attendance-btn-mobile{% endif %}">Danh sách học sinh</a>
@@ -61,8 +62,9 @@
                 <label for="class_name" class="form-label">Lọc theo lớp:</label>
                 <select id="class_name" name="class_name" class="form-select" onchange="this.form.submit()">
                     <option value="">Tất cả lớp</option>
-                    <option value="Kay 01" {% if selected_class == 'Kay 01' %}selected{% endif %}>Kay 01</option>
-                    <option value="Kay 02" {% if selected_class == 'Kay 02' %}selected{% endif %}>Kay 02</option>
+                    {% for cname in class_names %}
+                    <option value="{{ cname }}" {% if selected_class == cname %}selected{% endif %}>{{ cname }}</option>
+                    {% endfor %}
                 </select>
             </div>
         </div>

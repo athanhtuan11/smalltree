@@ -29,8 +29,9 @@
         <div class="mb-3">
             <label for="class_name" class="form-label">Lớp</label>
             <select class="form-select" id="class_name" name="class_name" required>
-                <option value="Kay 01" {% if user.class_name == 'Kay 01' %}selected{% endif %}>Kay 01</option>
-                <option value="Kay 02" {% if user.class_name == 'Kay 02' %}selected{% endif %}>Kay 02</option>
+                {% for c in classes %}
+                <option value="{{ c.name }}" {% if user.class_name == c.name %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
             </select>
         </div>
         <div class="mb-3">

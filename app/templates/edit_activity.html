@@ -25,6 +25,15 @@
         </div>
         {% endif %}
         <div class="mb-3">
+            <label for="class_id" class="form-label">Đăng cho lớp</label>
+            <select class="form-select" id="class_id" name="class_id">
+                <option value="0">Tất cả khách vãng lai</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}" {% if form.class_id.data == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
             <label for="title" class="form-label">Tiêu đề</label>
             {{ form.title(class_="form-control", id="title", required=True) }}
         </div>
