@@ -15,12 +15,17 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$APP_DIR"
 
 # --- NGINX CONFIG AUTO SETUP ---
+
+# --- NGINX CONFIG AUTO SETUP ---
 NGINX_CONF_SRC="$APP_DIR/nginx_nursery.conf"
-NGINX_CONF_DST="/etc/nginx/sites-available/nursery-website"
-NGINX_SYMLINK="/etc/nginx/sites-enabled/nursery-website"
+NGINX_CONF_DST="/etc/nginx/sites-available/smalltree.conf"
+NGINX_SYMLINK="/etc/nginx/sites-enabled/default"
 
 if [ -f "$NGINX_CONF_SRC" ]; then
     echo "Copying nginx config..."
+    cp "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
+    ln -sf "$NGINX_CONF_DST" "$NGINX_SYMLINK"
+
     # Kill existing gunicorn master/workers cleanly
     if pgrep -f "gunicorn.*smalltree-website" > /dev/null; then
         echo "Killing existing gunicorn processes..."
@@ -38,13 +43,19 @@ if [ -f "$NGINX_CONF_SRC" ]; then
         exit 1
     fi
 
+    # Dùng run:app vì run.py có biến app toàn cục
     GUNICORN_CMD="$GUNICORN -c unicorn_config.py run:app --chdir $APP_DIR --daemon --pid $APP_DIR/unicorn.pid --log-file $APP_DIR/unicorn.log"
     echo "Starting gunicorn..."
     eval $GUNICORN_CMD
     echo "Testing nginx config..."
+    if nginx -t; then
+        systemctl reload nginx
+        echo "Nginx config applied and reloaded."
+    else
+        echo "Nginx config test failed! Please check your config."
+        exit 1
+    fi
     echo "Gunicorn started."
-    sudo nginx -t && sudo systemctl reload nginx
-    echo "Nginx config applied and reloaded."
 else
     echo "nginx_nursery.conf not found in $APP_DIR, please check!"
 fi
