@@ -496,8 +496,20 @@ def attendance():
         record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
         if record:
             student.status = record.status
+            student.breakfast = record.breakfast
+            student.lunch = record.lunch
+            student.snack = record.snack
+            student.toilet = record.toilet
+            student.toilet_times = record.toilet_times
+            student.note = record.note
         else:
             student.status = 'Vắng'
+            student.breakfast = ''
+            student.lunch = ''
+            student.snack = ''
+            student.toilet = ''
+            student.toilet_times = ''
+            student.note = ''
     if request.method == 'POST':
         for student in students:
             present_value = request.form.get(f'present_{student.id}')
@@ -509,13 +521,32 @@ def attendance():
                 status = 'Vắng mặt không phép'
             else:
                 status = 'Vắng'
+            breakfast = request.form.get(f'breakfast_{student.id}')
+            lunch = request.form.get(f'lunch_{student.id}')
+            snack = request.form.get(f'snack_{student.id}')
+            toilet = request.form.get(f'toilet_{student.id}')
+            toilet_times = request.form.get(f'toilet_times_{student.id}') or None
+            note = request.form.get(f'note_{student.id}')
             record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
             if record:
                 record.status = status
+                record.breakfast = breakfast
+                record.lunch = lunch
+                record.snack = snack
+                record.toilet = toilet
+                record.toilet_times = toilet_times
+                record.note = note
             else:
-                record = AttendanceRecord(child_id=student.id, date=attendance_date, status=status)
+                record = AttendanceRecord(child_id=student.id, date=attendance_date, status=status,
+                                         breakfast=breakfast, lunch=lunch, snack=snack, toilet=toilet, toilet_times=toilet_times, note=note)
                 db.session.add(record)
             student.status = status
+            student.breakfast = breakfast
+            student.lunch = lunch
+            student.snack = snack
+            student.toilet = toilet
+            student.toilet_times = toilet_times
+            student.note = note
         db.session.commit()
         flash('Đã lưu điểm danh!', 'success')
         return redirect(url_for('main.attendance', attendance_date=attendance_date, class_name=selected_class))

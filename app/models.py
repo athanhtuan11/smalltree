@@ -50,6 +50,12 @@ class AttendanceRecord(db.Model):
     child_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
     date = db.Column(db.String(20), nullable=False)
     status = db.Column(db.String(20), nullable=False)
+    breakfast = db.Column(db.String(20))
+    lunch = db.Column(db.String(20))
+    snack = db.Column(db.String(20))
+    toilet = db.Column(db.String(10))
+    toilet_times = db.Column(db.Integer)
+    note = db.Column(db.String(255))
 
 class BmiRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
