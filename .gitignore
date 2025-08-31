@@ -45,7 +45,7 @@ Thumbs.db
 *.log
 logs/
 app.log
-
+*.pid
 # Upload files và user content
 uploads/
 static/images/activities/
