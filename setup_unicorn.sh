@@ -49,16 +49,4 @@ else
     echo "nginx_nursery.conf not found in $APP_DIR, please check!"
 fi
 
-# Kill existing unicorn master/workers cleanly
-if pgrep -f "unicorn.*smalltree-website" > /dev/null; then
-    echo "Killing existing unicorn processes..."
-    pkill -f "unicorn.*smalltree-website"
-    sleep 2
-fi
-
-# Start unicorn (adjust as needed for your app)
-UNICORN_CMD="unicorn -c unicorn_config.py run:app --chdir $APP_DIR --daemon --pid $APP_DIR/unicorn.pid --log-file $APP_DIR/unicorn.log"
-echo "Starting unicorn..."
-eval $UNICORN_CMD
-
 echo "Unicorn started."
