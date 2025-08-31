@@ -17,8 +17,8 @@ env/
 ENV/
 .venv/
 
-# Flask instance folder
-instance/
+# Flask folder
+migrations/
 
 # Environment variables và config
 .env
