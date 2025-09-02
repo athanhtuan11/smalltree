@@ -37,7 +37,7 @@
                 <td>{{ student.name }}</td>
                 <td>{% if student.student_code == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.student_code }}{% endif %}</td>
                 <td>{% if student.class_name == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.class_name }}{% endif %}</td>
-                <td>{{ student.birth_date }}</td>
+                <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}</td>
                 <td>{% if student.parent_contact == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.parent_contact }}{% endif %}</td>
                 {% if session.get('role') in ['admin', 'teacher'] %}
                 <td>

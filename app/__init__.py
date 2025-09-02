@@ -6,6 +6,21 @@ import os
 from dotenv import load_dotenv
 
 def create_app():
+    # Định nghĩa filter định dạng ngày tháng năm cho Jinja2
+    @app.template_filter('datetimeformat')
+    def datetimeformat(value, format='%d/%m/%Y'):
+        if not value:
+            return ''
+        try:
+            # value có thể là string 'YYYY-MM-DD' hoặc datetime/date object
+            from datetime import datetime, date
+            if isinstance(value, (datetime, date)):
+                return value.strftime(format.replace('d', '%d').replace('m', '%m').replace('Y', '%Y'))
+            # Nếu là string dạng 'YYYY-MM-DD'
+            dt = datetime.strptime(value, '%Y-%m-%d')
+            return dt.strftime(format.replace('d', '%d').replace('m', '%m').replace('Y', '%Y'))
+        except Exception:
+            return value
     # Load environment variables from .env file
     load_dotenv()
     
