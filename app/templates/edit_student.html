@@ -22,10 +22,46 @@
         </div>
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>
-            <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ student.birth_date }}">
-            {% if student.birth_date %}
-                <div class="form-text text-primary">Hiển thị: {{ student.birth_date | datetimeformat('d/m/Y') }}</div>
-            {% endif %}
+            <input type="text" class="form-control" id="birth_date" name="birth_date" placeholder="dd/mm/yyyy" autocomplete="off">
+            <div class="form-text text-primary" id="birth_date_display">
+                {% if student.birth_date %}Hiển thị: {{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}
+            </div>
+            <!-- Flatpickr datepicker -->
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // Lấy ngày sinh từ server (có thể là yyyy-mm-dd hoặc chuỗi)
+                var serverBirth = "{{ student.birth_date|default('') }}";
+                var input = document.getElementById('birth_date');
+                // Chuyển yyyy-mm-dd sang dd/mm/yyyy nếu có
+                function toDMY(dateStr) {
+                    if (!dateStr) return '';
+                    if (dateStr.includes('/')) return dateStr;
+                    var parts = dateStr.split('-');
+                    if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+                    return dateStr;
+                }
+                input.value = toDMY(serverBirth);
+                flatpickr(input, {
+                    dateFormat: "d/m/Y",
+                    locale: "vn",
+                    allowInput: true,
+                    defaultDate: toDMY(serverBirth) || null
+                });
+                // Khi submit form, chuyển dd/mm/yyyy về yyyy-mm-dd
+                input.form && input.form.addEventListener('submit', function(e) {
+                    var val = input.value;
+                    if (val && val.includes('/')) {
+                        var parts = val.split('/');
+                        if (parts.length === 3) {
+                            input.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                        }
+                    }
+                });
+            });
+            </script>
         </div>
         <div class="mb-3">
             <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
