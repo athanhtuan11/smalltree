@@ -1109,6 +1109,7 @@ def student_list():
                 'student_code': s.student_code,
                 'class_name': s.class_name,
                 'parent_contact': s.parent_contact,
+                'birth_date': s.birth_date,
             }
         # Giáo viên và admin xem được tất cả thông tin
         return {
@@ -1119,6 +1120,7 @@ def student_list():
             'student_code': s.student_code,
             'class_name': s.class_name,
             'parent_contact': s.parent_contact,
+            'birth_date': s.birth_date,
         }
     masked_students = [m for m in (mask_student(s) for s in students) if m]
     return render_template('student_list.html', students=masked_students, title='Danh sách học sinh', mobile=mobile)

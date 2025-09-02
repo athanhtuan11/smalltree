@@ -90,7 +90,12 @@
                 <tbody>
                     {% for student in students %}
                     <tr style="background: #f1f8e9;">
-                        <td><span style="color:#1976d2; font-weight:bold; font-size:1.08em;">{{ student.name }}</span></td>
+                        <td>
+                            <span style="color:#1976d2; font-weight:bold; font-size:1.08em;">{{ student.name }}</span>
+                            {% if session.get('role') in ['admin', 'teacher'] %}
+                                <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm ms-2" title="Sửa thông tin học sinh"><i class="bi bi-pencil-square"></i> Sửa</a>
+                            {% endif %}
+                        </td>
                         <td>{{ student.student_code }}</td>
                         <td>{{ student.class_name if student.class_name else '' }}</td>
                         <td>{{ student.birth_date if student.birth_date else '' }}</td>
