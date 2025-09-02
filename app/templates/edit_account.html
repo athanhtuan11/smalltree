@@ -36,10 +36,42 @@
         </div>
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>
-            <input type="date" id="birth_date" name="birth_date" class="form-control" value="{{ user.birth_date }}">
-            {% if user.birth_date %}
-                <div class="form-text text-primary">Hiển thị: {{ user.birth_date | datetimeformat('d/m/Y') }}</div>
-            {% endif %}
+            <input type="text" id="birth_date" name="birth_date" class="form-control" placeholder="dd/mm/yyyy" autocomplete="off">
+            <div class="form-text text-primary" id="birth_date_display">
+                {% if user.birth_date %}Hiển thị: {{ user.birth_date | datetimeformat('d/m/Y') }}{% endif %}
+            </div>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var serverBirth = "{{ user.birth_date|default('') }}";
+                var input = document.getElementById('birth_date');
+                function toDMY(dateStr) {
+                    if (!dateStr) return '';
+                    if (dateStr.includes('/')) return dateStr;
+                    var parts = dateStr.split('-');
+                    if (parts.length === 3) return parts[2] + '/' + parts[1] + '/' + parts[0];
+                    return dateStr;
+                }
+                input.value = toDMY(serverBirth);
+                flatpickr(input, {
+                    dateFormat: "d/m/Y",
+                    locale: "vn",
+                    allowInput: true,
+                    defaultDate: toDMY(serverBirth) || null
+                });
+                input.form && input.form.addEventListener('submit', function(e) {
+                    var val = input.value;
+                    if (val && val.includes('/')) {
+                        var parts = val.split('/');
+                        if (parts.length === 3) {
+                            input.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                        }
+                    }
+                });
+            });
+            </script>
         </div>
         {% elif type == 'teacher' %}
         <div class="mb-3">

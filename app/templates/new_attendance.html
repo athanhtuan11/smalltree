@@ -21,7 +21,29 @@
         </div>
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>
-            <input type="date" class="form-control" id="birth_date" name="birth_date">
+            <input type="text" class="form-control" id="birth_date" name="birth_date" placeholder="dd/mm/yyyy" autocomplete="off">
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+            <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+            <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var input = document.getElementById('birth_date');
+                flatpickr(input, {
+                    dateFormat: "d/m/Y",
+                    locale: "vn",
+                    allowInput: true
+                });
+                input.form && input.form.addEventListener('submit', function(e) {
+                    var val = input.value;
+                    if (val && val.includes('/')) {
+                        var parts = val.split('/');
+                        if (parts.length === 3) {
+                            input.value = parts[2] + '-' + parts[1] + '-' + parts[0];
+                        }
+                    }
+                });
+            });
+            </script>
         </div>
         <div class="mb-3">
             <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
