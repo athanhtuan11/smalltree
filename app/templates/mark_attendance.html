@@ -20,6 +20,7 @@
                     <td>{{ student.name }}</td>
                     <td>{{ student.class_name if student.class_name else '' }}</td>
                     <td>{{ student.birth_date if student.birth_date else '' }}</td>
+                <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}</td>
                     <td>{{ student.parent_contact }}</td>
                     <td><input type="checkbox" name="present_{{ student.id }}" {% if student.status == 'Có mặt' %}checked{% endif %}></td>
                 </tr>

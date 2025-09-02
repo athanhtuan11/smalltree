@@ -29,7 +29,7 @@
                     <dt class="col-sm-4">Lớp/Chức vụ</dt>
                     <dd class="col-sm-8">{{ user.class_name if user.class_name else '-' }}</dd>
                     <dt class="col-sm-4">Ngày sinh</dt>
-                    <dd class="col-sm-8">{{ user.birth_date if user.birth_date else '-' }}</dd>
+                    <dd class="col-sm-8">{% if user.birth_date %}{{ user.birth_date | datetimeformat('d/m/Y') }}{% else %}-{% endif %}</dd>
                     <dt class="col-sm-4">Phụ huynh</dt>
                     <dd class="col-sm-8">{{ user.parent_contact if user.parent_contact else '-' }}</dd>
                 </dl>

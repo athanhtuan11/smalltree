@@ -79,7 +79,7 @@
                     </div>
                     <small class="text-muted d-block text-center mt-1">
                         Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
-                        Sinh: {{ student.birth_date or 'N/A' }}
+                        Sinh: {% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}N/A{% endif %}
                 </div>
                 <div class="card-body">
                     {% set student_albums = albums|selectattr('student_id', 'equalto', student.id)|list %}

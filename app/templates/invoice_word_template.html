@@ -68,6 +68,7 @@
   <div class="info">
     <strong>Họ và tên học sinh:</strong> {{ student_name }}<br>
     <strong>Ngày sinh:</strong> {{ birth_date }}<br>
+  <strong>Ngày sinh:</strong> {% if birth_date %}{{ birth_date | datetimeformat('d/m/Y') }}{% else %}-{% endif %}<br>
     <strong>Lớp:</strong> {{ class_name }}<br>
     <strong>Thời hạn đóng học phí:</strong> 02/{{ month }} - 10/{{ month }}/{{ year }}
   </div>

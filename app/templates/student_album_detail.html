@@ -10,7 +10,7 @@
             <small class="text-muted">
                 Mã số: {{ student.student_code or 'N/A' }} | 
                 Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
-                Sinh: {{ student.birth_date or 'N/A' }}
+                Sinh: {% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}N/A{% endif %}
             </small>
         </div>
         <div>
