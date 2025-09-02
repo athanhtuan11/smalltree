@@ -3546,13 +3546,6 @@ def student_albums():
     # Đảm bảo students và albums luôn là list
     students = students or []
     albums = albums or []
-    # DEBUG: In ra avatar và kiểm tra file tồn tại (sau khi đã gán students)
-    import os
-    for s in students:
-        print(f"[DEBUG] student: {s.name}, avatar: {s.avatar}")
-        if s.avatar:
-            abs_path = os.path.join('app', 'static', s.avatar)
-            print(f"[DEBUG] avatar file exists: {os.path.exists(abs_path)} - {abs_path}")
     # Tính thống kê
     today = date.today()
     albums_today = [album for album in albums if album.date_created == today]
