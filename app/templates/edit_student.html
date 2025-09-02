@@ -23,6 +23,9 @@
         <div class="mb-3">
             <label for="birth_date" class="form-label">Ngày sinh</label>
             <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ student.birth_date }}">
+            {% if student.birth_date %}
+                <div class="form-text text-primary">Hiển thị: {{ student.birth_date | datetimeformat('d/m/Y') }}</div>
+            {% endif %}
         </div>
         <div class="mb-3">
             <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
