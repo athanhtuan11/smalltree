@@ -12,9 +12,8 @@ def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
     
-    # Use environment DATABASE_URL if available, otherwise fallback to default
-    database_url = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    # Luôn lấy SQLALCHEMY_DATABASE_URI từ config.py (mặc định là SQLite)
+    app.config.from_object('config.Config')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
     migrate = Migrate(app, db)
@@ -23,10 +22,6 @@ def create_app():
     csrf = CSRFProtect(app)
     
     # Note: AI endpoints sẽ cần sử dụng CSRF token hoặc được handle riêng
-    
-    # Initialize Gemini service
-    from app.gemini_service import gemini_service
-    gemini_service.init_app(app)
     
     # Inject csrf_token cho templates
     @app.context_processor

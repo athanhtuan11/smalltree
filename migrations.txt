@@ -1,6 +1,7 @@
 Hướng dẫn migrate:
+flask db init
 1. Chạy lệnh sau trong terminal để tạo migration:
-   flask db migrate -m "add image to activity"
+   flask db migrate -m "init db"
 2. Chạy tiếp lệnh sau để cập nhật database:
    flask db upgrade
 

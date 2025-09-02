@@ -80,10 +80,6 @@
                     <small class="text-muted d-block text-center mt-1">
                         Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
                         Sinh: {{ student.birth_date or 'N/A' }}
-                    </small>
-                        Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
-                        Sinh: {{ student.birth_date or 'N/A' }}
-                    </small>
                 </div>
                 <div class="card-body">
                     {% set student_albums = albums|selectattr('student_id', 'equalto', student.id)|list %}

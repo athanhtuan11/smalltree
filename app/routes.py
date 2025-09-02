@@ -1,3 +1,9 @@
+# Helper for permission denial
+from flask import flash, redirect, url_for
+def redirect_no_permission():
+    flash('Bạn không có quyền truy cập chức năng này!', 'danger')
+    return redirect(url_for('main.login'))
+from werkzeug.security import generate_password_hash
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
@@ -18,65 +24,14 @@ except ImportError:
     Pt = None
 
 
-# Import AI menu suggestion (single entry point)
-try:
-    from app.menu_ai import get_ai_menu_suggestions
-except ImportError:
-    print("Warning: menu_ai not available")
-    def get_ai_menu_suggestions(*args, **kwargs):
-        return "AI service not available"
 
-# Enhanced Security imports
-from .security_utils import (
-    sanitize_input, validate_age_group, validate_menu_count, 
-    validate_ip_address, is_sql_injection_attempt, 
-    log_security_event, check_rate_limit, clean_rate_limit_storage
-)
 
-# Rate limiting cho AI endpoints - Security enhancement
-ai_request_timestamps = {}
-AI_RATE_LIMIT_SECONDS = 10  # Chỉ cho phép 1 request AI mỗi 10 giây/user
 
-# More optional imports with error handling
-try:
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-    from docx.shared import RGBColor
-except ImportError:
-    WD_ALIGN_PARAGRAPH = None
-    OxmlElement = None
-    qn = None
-    RGBColor = None
-
-try:
-    from openpyxl import load_workbook, Workbook
-    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-    OPENPYXL_AVAILABLE = True
-except ImportError:
-    print("Warning: openpyxl not available")
-    OPENPYXL_AVAILABLE = False
-    load_workbook = None
-    Workbook = None
-    PatternFill = None
-    Font = None
-    Alignment = None
-    Border = None
-    Side = None
-
-try:
-    from PIL import Image
-    PIL_AVAILABLE = True
-except ImportError:
-    print("Warning: PIL (Pillow) not available")
-    PIL_AVAILABLE = False
-    Image = None
 
 
 main = Blueprint('main', __name__)
 
 
-# Route tạo lớp mới (không circular import)
 
 # CRUD Class
 from app.models import Class
@@ -134,57 +89,7 @@ def delete_class(class_id):
 
 
 
-# ============== API: Lưu thực đơn AI vào database ==============
-@main.route('/ai/create-menu-from-suggestions', methods=['POST'])
-def create_menu_from_suggestions():
-    """Nhận dữ liệu thực đơn AI và lưu vào bảng Curriculum theo tuần"""
-    user_role = session.get('role')
-    if user_role not in ['admin', 'teacher']:
-        return jsonify({'success': False, 'error': 'Không có quyền truy cập.'}), 403
 
-    data = request.get_json(force=True)
-    menu = data.get('menu')
-    # age_group = data.get('age_group', '1-5 tuổi')  # Không dùng nữa vì model không có trường này
-    week_number = data.get('week_number')
-    overwrite = data.get('overwrite', False)
-    # Nếu không có week_number, tự động lấy tuần hiện tại
-    if not week_number:
-        week_number = datetime.now().isocalendar()[1]
-
-    # Kiểm tra đã có thực đơn tuần này chưa
-    week = Curriculum.query.filter_by(week_number=week_number).first()
-    classes = Class.query.order_by(Class.name).all()
-    if not week:
-        flash('Không tìm thấy chương trình học để chỉnh sửa!', 'danger')
-        return redirect(url_for('main.curriculum'))
-    if request.method == 'POST':
-        new_week_number = request.form.get('week_number', type=int)
-        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
-        afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
-        curriculum_data = {}
-        for day in days:
-            curriculum_data[day] = {}
-            for slot in morning_slots:
-                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
-            for slot in afternoon_slots:
-                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
-        class_id = request.form.get('class_id')
-        week.class_id = class_id
-        week.content = json.dumps(curriculum_data, ensure_ascii=False)
-        # Nếu đổi tuần, kiểm tra trùng lặp
-        if new_week_number != week.week_number:
-            existing = Curriculum.query.filter_by(week_number=new_week_number, class_id=class_id).first()
-            if existing:
-                flash(f'Đã tồn tại chương trình học tuần {new_week_number} cho lớp này, không thể đổi!', 'danger')
-                return redirect(url_for('main.edit_curriculum', week_number=week.week_number))
-            week.week_number = new_week_number
-        db.session.commit()
-        flash(f'Đã cập nhật chương trình học tuần {week.week_number}!', 'success')
-        return redirect(url_for('main.curriculum'))
-    data = json.loads(week.content)
-    mobile = is_mobile()
-    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week.week_number}', mobile=mobile, classes=classes)
 def is_mobile():
     ua = request.user_agent.string.lower()
     return 'mobile' in ua or 'android' in ua or 'iphone' in ua
@@ -366,8 +271,31 @@ def about():
 @main.route('/gallery')
 def gallery():
     mobile = is_mobile()
-    from app.models import ActivityImage
-    images = ActivityImage.query.order_by(ActivityImage.upload_date.desc()).all()
+    from app.models import ActivityImage, Activity, Child, Class
+    role = session.get('role')
+    user_id = session.get('user_id')
+    images = []
+    if role in ['admin', 'teacher']:
+        images = ActivityImage.query.order_by(ActivityImage.upload_date.desc()).all()
+    elif role == 'parent':
+        # Lấy class_id của con
+        child = Child.query.filter_by(id=user_id).first()
+        class_id = None
+        if child and child.class_name:
+            class_obj = Class.query.filter_by(name=child.class_name).first()
+            if class_obj:
+                class_id = class_obj.id
+        # Chỉ lấy ảnh của hoạt động thuộc lớp con hoặc cho khách vãng lai
+        if class_id:
+            images = ActivityImage.query.join(Activity).filter(
+                (Activity.class_id == class_id) | (Activity.class_id == None)
+            ).order_by(ActivityImage.upload_date.desc()).all()
+        else:
+            # Không xác định được lớp, chỉ lấy ảnh cho khách vãng lai
+            images = ActivityImage.query.join(Activity).filter(Activity.class_id == None).order_by(ActivityImage.upload_date.desc()).all()
+    else:
+        # Khách vãng lai chỉ xem ảnh hoạt động cho khách vãng lai
+        images = ActivityImage.query.join(Activity).filter(Activity.class_id == None).order_by(ActivityImage.upload_date.desc()).all()
     return render_template('gallery.html', title='Gallery', mobile=mobile, images=images)
 
 @main.route('/contact')
@@ -891,69 +819,6 @@ def invoice():
     student_ages = {student.id: calculate_age(student.birth_date) if student.birth_date else 0 for student in students}
     return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
 
-@main.route('/register', methods=['GET'])
-def register():
-    return render_template('register.html', title='Đăng ký tài khoản')
-
-@main.route('/register/parent', methods=['POST'])
-def register_parent():
-    name = request.form.get('parent_name')
-    email = request.form.get('parent_email')
-    phone = request.form.get('parent_phone')
-    child_name = request.form.get('child_name')
-    child_age = request.form.get('child_age')
-    password = request.form.get('parent_password')
-    password_confirm = request.form.get('parent_password_confirm')
-    if password != password_confirm:
-        flash('Mật khẩu nhập lại không khớp!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    # Kiểm tra trùng tên hoặc email với Child, Staff, admin
-    if (Child.query.filter_by(name=child_name).first() or
-        Staff.query.filter_by(name=child_name).first() or
-        child_name == 'admin'):
-        flash('Tên học sinh đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    if (Child.query.filter_by(email=email).first() or
-        Staff.query.filter_by(email=email).first() or
-        email == 'admin@smalltree.vn'):
-        flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    student_code = request.form.get('student_code')
-    hashed_pw = generate_password_hash(password)
-    new_child = Child(name=child_name, age=child_age, parent_contact=name, email=email, phone=phone, password=hashed_pw, student_code=student_code)
-    db.session.add(new_child)
-    db.session.commit()
-    flash('Đăng ký phụ huynh thành công!', 'success')
-    return redirect(url_for('main.about'))
-
-@main.route('/register/teacher', methods=['POST'])
-def register_teacher():
-    name = request.form.get('teacher_name')
-    email = request.form.get('teacher_email')
-    phone = request.form.get('teacher_phone')
-    position = request.form.get('teacher_position')
-    password = request.form.get('teacher_password')
-    password_confirm = request.form.get('teacher_password_confirm')
-    if password != password_confirm:
-        flash('Mật khẩu nhập lại không khớp!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    # Kiểm tra trùng tên hoặc email với Child, Staff, admin
-    if (Staff.query.filter_by(name=name).first() or
-        Child.query.filter_by(name=name).first() or
-        name == 'admin'):
-        flash('Tên giáo viên đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    if (Staff.query.filter_by(email=email).first() or
-        Child.query.filter_by(email=email).first() or
-        email == 'admin@smalltree.vn'):
-        flash('Email đã tồn tại hoặc trùng với tài khoản khác!', 'danger')
-        return render_template('register.html', title='Đăng ký tài khoản')
-    hashed_pw = generate_password_hash(password)
-    new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=hashed_pw)
-    db.session.add(new_staff)
-    db.session.commit()
-    flash('Đăng ký giáo viên thành công!', 'success')
-    return redirect(url_for('main.about'))
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1051,44 +916,49 @@ def create_test_account():
 
 @main.route('/accounts', methods=['GET', 'POST'])
 def accounts():
-    # Chỉ cho phép đăng nhập bằng tài khoản administrator duy nhất
-    ADMIN_USERNAME = 'admin'
-    ADMIN_PASSWORD = 'admin123'
-    if session.get('role') != 'admin':
+    from app.models import Staff, Child
+    admin = Staff.query.filter_by(position='admin').first()
+    # Nếu chưa có admin, cho phép tạo admin lần đầu
+    if not admin:
         if request.method == 'POST':
-            username = request.form.get('username')
-            password = request.form.get('password')
-            if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-                session['user_id'] = 'admin'
-                session['role'] = 'admin'
-                flash('Đăng nhập administrator thành công!', 'success')
-                parents = Child.query.all()
-                teachers = Staff.query.all()
-                mobile = is_mobile()
-                return render_template('accounts.html', parents=parents, teachers=teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
-            else:
-                flash('Sai tài khoản hoặc mật khẩu administrator!', 'danger')
-                return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
-        return render_template('accounts.html', show_modal=True, title='Quản lý tài khoản')
+            username = request.form.get('admin_username')
+            email = request.form.get('admin_email')
+            password = request.form.get('admin_password')
+            password_confirm = request.form.get('admin_password_confirm')
+            if password != password_confirm:
+                flash('Mật khẩu nhập lại không khớp!', 'danger')
+                return render_template('accounts.html', show_admin_create=True, title='Khởi tạo Admin')
+            if Staff.query.filter_by(name=username).first() or Staff.query.filter_by(email=email).first():
+                flash('Tên đăng nhập hoặc email đã tồn tại!', 'danger')
+                return render_template('accounts.html', show_admin_create=True, title='Khởi tạo Admin')
+            hashed_pw = generate_password_hash(password)
+            new_admin = Staff(name=username, email=email, password=hashed_pw, position='admin', contact_info=email)
+            db.session.add(new_admin)
+            db.session.commit()
+            flash('Tạo tài khoản admin thành công! Hãy đăng nhập.', 'success')
+            return redirect(url_for('main.login'))
+        return render_template('accounts.html', show_admin_create=True, title='Khởi tạo Admin')
+    # Nếu đã có admin, chỉ cho phép truy cập nếu đã đăng nhập với vai trò admin
+    if session.get('role') != 'admin':
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.login'))
     parents = Child.query.all()
-    teachers = Staff.query.all()
+    teachers = Staff.query.filter(Staff.position != 'admin').all()
     mobile = is_mobile()
-    # Hide sensitive info for non-admins
-    show_sensitive = session.get('role') == 'admin'
     def mask_user(u):
         return {
             'id': u.id,
             'name': u.name,
-            'email': u.email if show_sensitive else 'Ẩn',
-            'phone': u.phone if show_sensitive else 'Ẩn',
-            'student_code': getattr(u, 'student_code', None) if show_sensitive else 'Ẩn',
-            'class_name': getattr(u, 'class_name', None) if show_sensitive else 'Ẩn',
-            'parent_contact': getattr(u, 'parent_contact', None) if show_sensitive else 'Ẩn',
-            'position': getattr(u, 'position', None) if show_sensitive else 'Ẩn',
+            'email': u.email,
+            'phone': u.phone,
+            'student_code': getattr(u, 'student_code', None),
+            'class_name': getattr(u, 'class_name', None),
+            'parent_contact': getattr(u, 'parent_contact', None),
+            'position': getattr(u, 'position', None),
         }
     masked_parents = [mask_user(p) for p in parents]
     masked_teachers = [mask_user(t) for t in teachers]
-    return render_template('accounts.html', parents=masked_parents, teachers=masked_teachers, show_modal=False, title='Quản lý tài khoản', mobile=mobile)
+    return render_template('accounts.html', parents=masked_parents, teachers=masked_teachers, show_admin_create=False, title='Quản lý tài khoản', mobile=mobile)
 
 @main.route('/curriculum/<int:week_number>/delete', methods=['POST'])
 def delete_curriculum(week_number):
@@ -1163,21 +1033,22 @@ def profile():
                 'role_display': 'Giáo viên',
                 'student_code': '',
                 'class_name': user.position,
-                'birth_date': '',
+                'birth_date': user.birth_date,
                 'parent_contact': '',
             }
     elif role == 'admin':
-        # Nếu là admin, hiển thị thông tin cơ bản
-        info = {
-            'full_name': 'Admin',
-            'email': 'admin@smalltree.vn',
-            'phone': '',
-            'role_display': 'Admin',
-            'student_code': '',
-            'class_name': '',
-            'birth_date': '',
-            'parent_contact': '',
-        }
+        user = Staff.query.get(user_id)
+        if user:
+            info = {
+                'full_name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'role_display': 'Admin',
+                'student_code': '',
+                'class_name': user.position,
+                'birth_date': user.birth_date if hasattr(user, 'birth_date') else '',
+                'parent_contact': '',
+            }
     else:
         flash('Không tìm thấy thông tin tài khoản!', 'danger')
         return redirect(url_for('main.about'))
@@ -1760,6 +1631,7 @@ def import_curriculum():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     file = request.files.get('excel_file')
+
     week_number = request.form.get('week_number')
     class_id = request.form.get('class_id')
     if not class_id:
@@ -1770,6 +1642,16 @@ def import_curriculum():
         return redirect(url_for('main.curriculum'))
     if not week_number:
         flash('Vui lòng nhập số tuần!', 'danger')
+        return redirect(url_for('main.curriculum'))
+    try:
+        class_id = int(class_id)
+    except Exception:
+        flash('Lỗi lớp học không hợp lệ!', 'danger')
+        return redirect(url_for('main.curriculum'))
+    try:
+        week_number = int(week_number)
+    except Exception:
+        flash('Lỗi số tuần không hợp lệ!', 'danger')
         return redirect(url_for('main.curriculum'))
 
     from openpyxl import load_workbook
@@ -1798,6 +1680,7 @@ def import_curriculum():
             curriculum_data[day][slot] = value if value is not None else ""
     import json
     content = json.dumps(curriculum_data, ensure_ascii=False)
+    # Đảm bảo không bị đè curriculum của lớp khác cùng tuần
     week = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
     if week:
         week.content = content
@@ -3606,98 +3489,7 @@ def extract_weekly_menu_from_suggestions(suggestions):
     
     return menu_data
 
-@main.route('/debug-curriculum')
-def debug_curriculum():
-    """Debug curriculum AI import"""
-    try:
-        # Step 1: Test import
-        print("🔍 [DEBUG] Step 1: Testing import...")
-        from app.curriculum_ai import curriculum_ai_service
-        print("✅ [DEBUG] Import successful")
-        
-        # Step 2: Test service object
-        print("🔍 [DEBUG] Step 2: Testing service object...")
-        service_type = type(curriculum_ai_service).__name__
-        print(f"✅ [DEBUG] Service type: {service_type}")
-        
-        return f"""
-        <h2>🔍 Curriculum AI Debug</h2>
-        <p>✅ Import thành công</p>
-        <p>✅ Service type: {service_type}</p>
-        <p><a href='/test-curriculum-ai'>Test chức năng AI</a></p>
-        <p><a href='/login'>Đăng nhập để test full</a></p>
-        """
-        
-    except Exception as e:
-        import traceback
-        error_detail = traceback.format_exc()
-        print(f"❌ [DEBUG ERROR] {str(e)}")
-        print(f"📋 [TRACEBACK] {error_detail}")
-        
-        return f"""
-        <h2>❌ Curriculum AI Debug Error</h2>
-        <p><strong>Error:</strong> {str(e)}</p>
-        <p><strong>Type:</strong> {type(e).__name__}</p>
-        <pre>{error_detail}</pre>
-        """
 
-@main.route('/test-curriculum-ai')
-def test_curriculum_ai():
-    """Test curriculum AI service trực tiếp"""
-    try:
-        # Import curriculum AI service
-        from app.curriculum_ai import curriculum_ai_service
-        
-        print("🧪 [TEST] Testing curriculum AI service...")
-        
-        # Test với parameters đơn giản
-        result = curriculum_ai_service.generate_weekly_curriculum(
-            age_group="2-3 tuổi",
-            week_number=1,
-            themes="Động vật",
-            special_focus="Phát triển ngôn ngữ"
-        )
-        
-        return jsonify({
-            'success': True,
-            'message': 'Curriculum AI service hoạt động bình thường',
-            'result_keys': list(result.keys()) if result else None
-        })
-        
-    except Exception as e:
-        print(f"❌ [TEST ERROR] {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'error_type': type(e).__name__
-        }), 500
-
-@main.route('/create-test-teacher')
-def create_test_teacher():
-    """Tạo tài khoản giáo viên test"""
-    
-    # Kiểm tra xem đã có giáo viên test chưa
-    existing = Staff.query.filter_by(email='gv1@gmail.com').first()
-    if existing:
-        return f"Tài khoản gv1@gmail.com đã tồn tại! ID: {existing.id}, Position: {existing.position}"
-    
-    # Tạo giáo viên mới
-    teacher = Staff(
-        name='Giáo viên Test',
-        position='teacher',
-        contact_info='gv1@gmail.com',
-        email='gv1@gmail.com',
-        phone='0123456789',
-        password=generate_password_hash('123456')
-    )
-    
-    db.session.add(teacher)
-    db.session.commit()
-    
-    return f"✅ Đã tạo tài khoản giáo viên test:<br>Email: gv1@gmail.com<br>Password: 123456<br>ID: {teacher.id}<br><a href='/login'>Đăng nhập ngay</a>"
-
-
-import random
 
 @main.route('/ai-dashboard', methods=['GET', 'POST'])
 def ai_dashboard():
