@@ -28,6 +28,16 @@
             <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
             <input type="text" class="form-control" id="parent_contact" name="parent_contact" value="{{ student.parent_contact }}">
         </div>
+        <div class="mb-3">
+            <label for="avatar" class="form-label">Ảnh đại diện học sinh</label>
+            {% if student.avatar %}
+                <div class="mb-2">
+                    <img src="{{ url_for('static', filename=student.avatar) }}" alt="avatar" class="rounded-circle border" style="width:60px;height:60px;object-fit:cover;">
+                </div>
+            {% endif %}
+            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+            <small class="text-muted">Để trống nếu không muốn thay đổi ảnh đại diện.</small>
+        </div>
         <button type="submit" class="btn btn-success">Lưu thay đổi</button>
         <a href="/students" class="btn btn-secondary ms-2">Quay lại</a>
     </form>

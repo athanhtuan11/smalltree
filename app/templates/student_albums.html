@@ -64,13 +64,23 @@
         <div class="col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-light">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0 fw-bold text-success">
-                            <i class="fas fa-user-graduate"></i> {{ student.name }}
+                    <div class="d-flex flex-column align-items-center justify-content-center">
+                        <div class="mb-2">
+                            {% if student.avatar %}
+                                <img src="{{ url_for('static', filename=student.avatar) }}" alt="avatar" class="student-avatar-lg">
+                            {% else %}
+                                <img src="{{ url_for('static', filename='images/default_avatar.png') }}" alt="avatar" class="student-avatar-lg">
+                            {% endif %}
+                        </div>
+                        <h6 class="card-title mb-0 fw-bold text-success text-center">
+                            {{ student.name }}
                         </h6>
-                        <span class="badge bg-primary">{{ student.student_code or 'N/A' }}</span>
+                        <span class="badge bg-primary mt-1">{{ student.student_code or 'N/A' }}</span>
                     </div>
-                    <small class="text-muted">
+                    <small class="text-muted d-block text-center mt-1">
+                        Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
+                        Sinh: {{ student.birth_date or 'N/A' }}
+                    </small>
                         Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
                         Sinh: {{ student.birth_date or 'N/A' }}
                     </small>
@@ -178,12 +188,24 @@
 </div>
 
 <style>
+</style>
+<style>
+.student-avatar-lg {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #4CAF50;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    background: #fff;
+}
 .card {
     transition: transform 0.2s;
 }
 .card:hover {
     transform: translateY(-2px);
 }
+</style>
 </style>
 {% if mobile %}
 <style>

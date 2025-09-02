@@ -142,6 +142,12 @@
     <div class="d-none d-md-flex flex-row gap-2 mb-3">
         <form action="/curriculum/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="class_id" class="form-select" required style="width:150px;display:inline-block;">
+                <option value="">Chọn lớp</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
             <input type="file" name="excel_file" accept=".xlsx" required style="display:inline-block;">
             <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:90px;display:inline-block;" title="Tuần">
             <button type="submit" class="btn btn-primary">Import Excel</button>

@@ -152,31 +152,39 @@ def create_menu_from_suggestions():
         week_number = datetime.now().isocalendar()[1]
 
     # Kiểm tra đã có thực đơn tuần này chưa
-    existing = Curriculum.query.filter_by(week_number=week_number).first()
-    if existing and not overwrite:
-        return jsonify({'success': False, 'error': f'Thực đơn tuần {week_number} đã tồn tại!', 'week_number': week_number}), 409
-
-    try:
-        if existing and overwrite:
-            existing.content = json.dumps(menu, ensure_ascii=False)
-            db.session.commit()
-            return jsonify({'success': True, 'overwritten': True, 'week_number': week_number})
-        else:
-            new_menu = Curriculum(
-                week_number=week_number,
-                content=json.dumps(menu, ensure_ascii=False)
-            )
-            db.session.add(new_menu)
-            db.session.commit()
-            return jsonify({'success': True, 'overwritten': False, 'week_number': week_number})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-def redirect_no_permission():
-    flash('Bạn không có quyền truy cập chức năng này!', 'danger')
-    return redirect(request.referrer or url_for('main.index'))
-
+    week = Curriculum.query.filter_by(week_number=week_number).first()
+    classes = Class.query.order_by(Class.name).all()
+    if not week:
+        flash('Không tìm thấy chương trình học để chỉnh sửa!', 'danger')
+        return redirect(url_for('main.curriculum'))
+    if request.method == 'POST':
+        new_week_number = request.form.get('week_number', type=int)
+        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
+        curriculum_data = {}
+        for day in days:
+            curriculum_data[day] = {}
+            for slot in morning_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
+            for slot in afternoon_slots:
+                curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
+        class_id = request.form.get('class_id')
+        week.class_id = class_id
+        week.content = json.dumps(curriculum_data, ensure_ascii=False)
+        # Nếu đổi tuần, kiểm tra trùng lặp
+        if new_week_number != week.week_number:
+            existing = Curriculum.query.filter_by(week_number=new_week_number, class_id=class_id).first()
+            if existing:
+                flash(f'Đã tồn tại chương trình học tuần {new_week_number} cho lớp này, không thể đổi!', 'danger')
+                return redirect(url_for('main.edit_curriculum', week_number=week.week_number))
+            week.week_number = new_week_number
+        db.session.commit()
+        flash(f'Đã cập nhật chương trình học tuần {week.week_number}!', 'success')
+        return redirect(url_for('main.curriculum'))
+    data = json.loads(week.content)
+    mobile = is_mobile()
+    return render_template('edit_curriculum.html', week=week, data=data, title=f'Chỉnh sửa chương trình tuần {week.week_number}', mobile=mobile, classes=classes)
 def is_mobile():
     ua = request.user_agent.string.lower()
     return 'mobile' in ua or 'android' in ua or 'iphone' in ua
@@ -560,10 +568,25 @@ def new_student():
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
+        avatar_file = request.files.get('avatar')
+        avatar_path = None
+        if avatar_file and avatar_file.filename:
+            import os
+            from werkzeug.utils import secure_filename
+            ext = os.path.splitext(avatar_file.filename)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif!', 'danger')
+                return redirect(url_for('main.new_student'))
+            filename = f"student_{student_code}_{secure_filename(avatar_file.filename)}"
+            save_dir = os.path.join('app', 'static', 'images', 'students')
+            os.makedirs(save_dir, exist_ok=True)
+            avatar_path = os.path.join(save_dir, filename)
+            avatar_file.save(avatar_path)
+            avatar_path = avatar_path.replace('app/static/', '')  # Đường dẫn tương đối cho url_for
         if not any(c.name == class_name for c in classes):
             flash('Lớp không hợp lệ!', 'danger')
             return redirect(url_for('main.new_student'))
-        new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code)
+        new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code, avatar=avatar_path)
         db.session.add(new_child)
         db.session.commit()
         flash('Đã thêm học sinh mới!', 'success')
@@ -1244,6 +1267,20 @@ def edit_student(student_id):
         student.class_name = class_name
         student.birth_date = request.form.get('birth_date')
         student.parent_contact = request.form.get('parent_contact')
+        avatar_file = request.files.get('avatar')
+        if avatar_file and avatar_file.filename:
+            import os
+            from werkzeug.utils import secure_filename
+            ext = os.path.splitext(avatar_file.filename)[1].lower()
+            if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
+                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif!', 'danger')
+                return redirect(url_for('main.edit_student', student_id=student_id))
+            filename = f"student_{student.student_code}_{secure_filename(avatar_file.filename)}"
+            save_dir = os.path.join('app', 'static', 'images', 'students')
+            os.makedirs(save_dir, exist_ok=True)
+            avatar_path = os.path.join(save_dir, filename)
+            avatar_file.save(avatar_path)
+            student.avatar = avatar_path.replace('app/static/', '')
         db.session.commit()
         flash('Đã lưu thay đổi!', 'success')
         return redirect(url_for('main.student_list'))
@@ -1255,6 +1292,11 @@ def delete_student(student_id):
     if session.get('role') != 'admin' and session.get('role') != 'teacher':
         return redirect_no_permission()
     student = Child.query.get_or_404(student_id)
+    # Xoá toàn bộ album và ảnh liên quan trước khi xoá học sinh
+    for album in student.albums:
+        for photo in album.photos:
+            db.session.delete(photo)
+        db.session.delete(album)
     db.session.delete(student)
     db.session.commit()
     flash('Đã xoá học sinh!', 'success')
@@ -1637,6 +1679,7 @@ def edit_menu(week_number):
         return redirect(url_for('main.menu'))
     import json
     if request.method == 'POST':
+        new_week_number = request.form.get('week_number', type=int)
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
         slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
         menu_data = {}
@@ -1645,12 +1688,19 @@ def edit_menu(week_number):
             for slot in slots:
                 menu_data[day][slot] = request.form.get(f'content_{day}_{slot}')
         week.content = json.dumps(menu_data, ensure_ascii=False)
+        # Nếu đổi tuần, kiểm tra trùng lặp
+        if new_week_number != week.week_number:
+            existing = Curriculum.query.filter_by(week_number=new_week_number).first()
+            if existing:
+                flash(f'Đã tồn tại thực đơn tuần {new_week_number}, không thể đổi!', 'danger')
+                return redirect(url_for('main.edit_menu', week_number=week.week_number))
+            week.week_number = new_week_number
         db.session.commit()
-        flash(f'Đã cập nhật thực đơn tuần {week_number}!', 'success')
+        flash(f'Đã cập nhật thực đơn tuần {week.week_number}!', 'success')
         return redirect(url_for('main.menu'))
     data = json.loads(week.content)
     mobile = is_mobile()
-    return render_template('edit_menu.html', week=week, data=data, title=f'Chỉnh sửa thực đơn tuần {week_number}', mobile=mobile)
+    return render_template('edit_menu.html', week=week, data=data, title=f'Chỉnh sửa thực đơn tuần {week.week_number}', mobile=mobile)
 
 @main.route('/menu/<int:week_number>/delete', methods=['POST'])
 def delete_menu(week_number):
@@ -1711,6 +1761,10 @@ def import_curriculum():
         return redirect_no_permission()
     file = request.files.get('excel_file')
     week_number = request.form.get('week_number')
+    class_id = request.form.get('class_id')
+    if not class_id:
+        flash('Vui lòng chọn lớp!', 'danger')
+        return redirect(url_for('main.curriculum'))
     if not file:
         flash('Vui lòng chọn file Excel!', 'danger')
         return redirect(url_for('main.curriculum'))
@@ -1744,15 +1798,15 @@ def import_curriculum():
             curriculum_data[day][slot] = value if value is not None else ""
     import json
     content = json.dumps(curriculum_data, ensure_ascii=False)
-    week = Curriculum.query.filter_by(week_number=week_number).first()
+    week = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
     if week:
         week.content = content
     else:
-        new_week = Curriculum(week_number=week_number, content=content, material=None)
+        new_week = Curriculum(week_number=week_number, class_id=class_id, content=content, material=None)
         db.session.add(new_week)
     db.session.commit()
     flash('Đã import chương trình học từ Excel!', 'success')
-    return redirect(url_for('main.curriculum'))
+    return redirect(url_for('main.curriculum', class_id=class_id))
 
 @main.route('/curriculum/export', methods=['GET'])
 def export_curriculum_template():
@@ -3675,7 +3729,36 @@ def student_albums():
     else:
         # Giáo viên, admin xem tất cả
         students = Child.query.all()
+        import os
+        updated = False
+        for s in students:
+            # Sửa lại đường dẫn avatar nếu phát hiện sai định dạng
+            if s.avatar and (s.avatar.startswith('app/static/') or s.avatar.startswith('/app/static/')):
+                s.avatar = s.avatar.replace('app/static/', '').lstrip('/')
+                updated = True
+            # Nếu avatar là None/rỗng thì tìm file đầu tiên bắt đầu bằng student_<student_code>
+            if (not s.avatar or s.avatar.strip() == '') and s.student_code:
+                import glob
+                pattern = os.path.join('app', 'static', 'images', 'students', f'student_{s.student_code}*')
+                matches = glob.glob(pattern)
+                if matches:
+                    # Lấy tên file đầu tiên tìm được
+                    rel_path = os.path.relpath(matches[0], os.path.join('app', 'static'))
+                    s.avatar = rel_path.replace('\\', '/')
+                    updated = True
+        if updated:
+            db.session.commit()
         albums = StudentAlbum.query.join(Child).order_by(StudentAlbum.date_created.desc()).all()
+    # Đảm bảo students và albums luôn là list
+    students = students or []
+    albums = albums or []
+    # DEBUG: In ra avatar và kiểm tra file tồn tại (sau khi đã gán students)
+    import os
+    for s in students:
+        print(f"[DEBUG] student: {s.name}, avatar: {s.avatar}")
+        if s.avatar:
+            abs_path = os.path.join('app', 'static', s.avatar)
+            print(f"[DEBUG] avatar file exists: {os.path.exists(abs_path)} - {abs_path}")
     # Tính thống kê
     today = date.today()
     albums_today = [album for album in albums if album.date_created == today]

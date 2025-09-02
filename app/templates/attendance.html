@@ -89,8 +89,8 @@
                 </thead>
                 <tbody>
                     {% for student in students %}
-                    <tr>
-                        <td>{{ student.name }}</td>
+                    <tr style="background: #f1f8e9;">
+                        <td><span style="color:#1976d2; font-weight:bold; font-size:1.08em;">{{ student.name }}</span></td>
                         <td>{{ student.student_code }}</td>
                         <td>{{ student.class_name if student.class_name else '' }}</td>
                         <td>{{ student.birth_date if student.birth_date else '' }}</td>
@@ -99,15 +99,15 @@
                             <div class="d-flex flex-column flex-md-row gap-2 attendance-radio-mobile">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_yes_{{ student.id }}" value="yes" {% if student.status == 'Có mặt' %}checked{% endif %}>
-                                    <label class="form-check-label" for="present_yes_{{ student.id }}">Có mặt</label>
+                                    <label class="form-check-label" for="present_yes_{{ student.id }}" style="color:#388e3c; font-weight:bold;">Có mặt</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_absent_excused_{{ student.id }}" value="absent_excused" {% if student.status == 'Vắng mặt có phép' %}checked{% endif %}>
-                                    <label class="form-check-label" for="present_absent_excused_{{ student.id }}">Vắng mặt có phép</label>
+                                    <label class="form-check-label" for="present_absent_excused_{{ student.id }}" style="color:#f9a825; font-weight:bold;">Vắng mặt có phép</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="present_{{ student.id }}" id="present_absent_unexcused_{{ student.id }}" value="absent_unexcused" {% if student.status == 'Vắng mặt không phép' %}checked{% endif %}>
-                                    <label class="form-check-label" for="present_absent_unexcused_{{ student.id }}">Vắng mặt không phép</label>
+                                    <label class="form-check-label" for="present_absent_unexcused_{{ student.id }}" style="color:#d32f2f; font-weight:bold;">Vắng mặt không phép</label>
                                 </div>
                             </div>
                         </td>

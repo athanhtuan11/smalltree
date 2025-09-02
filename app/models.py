@@ -21,6 +21,7 @@ class Child(db.Model):
     phone = db.Column(db.String(20))
     password = db.Column(db.String(100))
     student_code = db.Column(db.String(20), unique=True, nullable=True)
+    avatar = db.Column(db.String(300))  # Đường dẫn ảnh đại diện học sinh
 
 class Staff(db.Model):
     id = db.Column(db.Integer, primary_key=True)

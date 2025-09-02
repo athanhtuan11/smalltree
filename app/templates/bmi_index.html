@@ -14,6 +14,11 @@
         <a href="/attendance" class="btn btn-secondary fw-bold">Quay lại điểm danh</a>
     </div>
     <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Tính toán Chỉ Số BMI cho học sinh</h2>
+    <div class="alert alert-info mb-3" style="font-size:0.98em;">
+        <b>Công thức tính BMI:</b> <br>
+        <span>BMI = Cân nặng (kg) / (Chiều cao (m))<sup>2</sup></span><br>
+        <span><i>Ví dụ:</i> Nếu trẻ nặng <b>15kg</b> và cao <b>1.0m</b>, thì BMI = 15 / (1.0<sup>2</sup>) = <b>15.0</b></span>
+    </div>
     <div class="row g-3">
         {% for student in students %}
         <div class="col-12 col-md-6 col-lg-4">
@@ -43,17 +48,18 @@
                         </div>
                         <div class="col-6">
                             <label class="form-label mb-0" style="font-size:0.95em;">Chỉ số BMI</label>
-                            <div class="fw-bold text-primary">{% if bmi and bmi_id == student.id %}{{ bmi }}{% else %}-{% endif %}</div>
-                            {% if bmi and bmi_id == student.id %}
+                            {% set latest_bmi = (bmi_history[student.id][0].bmi if bmi_history and bmi_history[student.id]|length > 0 else None) %}
+                            <div class="fw-bold text-primary">{{ latest_bmi if latest_bmi else '-' }}</div>
+                            {% if latest_bmi is not none %}
                             <div class="mt-1">
-                                {% if bmi < 18.5 %}
-                                <span class="badge bg-warning text-dark">Thiếu cân</span>
-                                {% elif bmi < 25 %}
-                                <span class="badge bg-success">Bình thường</span>
-                                {% elif bmi < 30 %}
-                                <span class="badge bg-orange text-white" style="background-color:#ff9800;">Thừa cân</span>
+                                {% if latest_bmi < 5 %}
+                                <span class="badge bg-warning text-dark">Thiếu cân: &lt;5</span>
+                                {% elif latest_bmi < 85 %}
+                                <span class="badge bg-success">Bình thường: 5 – 85</span>
+                                {% elif latest_bmi < 95 %}
+                                <span class="badge bg-orange text-white" style="background-color:#ff9800;">Thừa cân: 85 – 95</span>
                                 {% else %}
-                                <span class="badge bg-danger">Béo phì</span>
+                                <span class="badge bg-danger">Béo phì: &gt;95</span>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -86,10 +92,11 @@
                                         <td>{{ record.height }}</td>
                                         <td>{{ record.bmi }}</td>
                                         <td>
-                                            {% if record.bmi < 18.5 %}Thiếu cân
-                                            {% elif record.bmi < 25 %}Bình thường
-                                            {% elif record.bmi < 30 %}Thừa cân
-                                            {% else %}Béo phì
+                                            {# Demo: Giả lập phân loại theo phần trăm, thực tế cần dữ liệu percentile #}
+                                            {% if record.bmi < 5 %}Thiếu cân: &lt;5
+                                            {% elif record.bmi < 85 %}Bình thường hoặc khỏe mạnh: 5 – 85
+                                            {% elif record.bmi < 95 %}Thừa cân (Nguy cơ béo phì): 85 – 95
+                                            {% else %}Béo phì: &gt;95
                                             {% endif %}
                                         </td>
                                         <td>

@@ -5,7 +5,7 @@
         <a href="/attendance" class="btn btn-secondary fw-bold">Quay lại điểm danh</a>
     </div>
     <h2>Tạo học sinh mới</h2>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="name" class="form-label">Họ và tên</label>
@@ -31,7 +31,27 @@
             <label for="student_code" class="form-label">Mã số học sinh</label>
             <input type="text" class="form-control" id="student_code" name="student_code" required>
         </div>
+        <div class="mb-3">
+            <label for="avatar" class="form-label">Ảnh đại diện học sinh</label>
+            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(event)">
+            <div class="mt-2">
+                <img id="avatarPreview" src="{{ url_for('static', filename='images/default_avatar.png') }}" alt="avatar preview" style="width:72px;height:72px;object-fit:cover;border-radius:50%;border:2px solid #4CAF50;display:none;">
+            </div>
+        </div>
         <button type="submit" class="btn btn-primary">Thêm học sinh</button>
     </form>
+    <script>
+    function previewAvatar(event) {
+        const [file] = event.target.files;
+        const preview = document.getElementById('avatarPreview');
+        if (file) {
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+        } else {
+            preview.src = '';
+            preview.style.display = 'none';
+        }
+    }
+    </script>
 </div>
 {% endblock %}
