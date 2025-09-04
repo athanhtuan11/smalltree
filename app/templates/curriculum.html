@@ -227,6 +227,7 @@
                     <tbody>
                         <tr class="table-info"><td colspan="6" class="fw-bold text-success text-center">Buổi sáng</td></tr>
                         {% set morning_slots = [
+                            ('7-17h', 'morning_0'),
                             ('7-8h', 'morning_1'),
                             ('8h-8h30', 'morning_2'),
                             ('8h30-9h', 'morning_3'),
@@ -237,9 +238,25 @@
                         {% for label, key in morning_slots %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
-                            <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
-                            {% endfor %}
+                            {% if key in ['morning_1', 'morning_2', 'morning_6'] %}
+                                <td colspan="5">
+                                    {% if key == 'morning_1' %}
+                                        Đón trẻ - STEAM (massage kích thích giác quan) - Ăn sáng
+                                    {% elif key == 'morning_2' %}
+                                        Thể dục buổi sáng - Trò chuyện đầu ngày - Kiểm tra thân thể
+                                    {% elif key == 'morning_6' %}
+                                        Vệ sinh ăn trưa - ngủ trưa
+                                    {% endif %}
+                                </td>
+                            {% else %}
+                                {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
+                                <td>
+                                    {% if week.data[day][key] is defined and week.data[day][key] %}
+                                        {{ week.data[day][key]|safe }}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
                         {% endfor %}
                         <tr class="table-info"><td colspan="6" class="fw-bold text-success text-center">Buổi chiều</td></tr>
@@ -252,9 +269,29 @@
                         {% for label, key in afternoon_slots %}
                         <tr>
                             <td class="fw-bold text-success">{{ label }}</td>
-                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
-                            <td>{{ week.data[day][key]|safe if week.data[day][key] is defined else '' }}</td>
-                            {% endfor %}
+                            {% if key in ['afternoon_1', 'afternoon_3', 'afternoon_4'] %}
+                                <td colspan="5">
+                                    {% if key == 'afternoon_1' %}
+                                        Vệ sinh - uống nước - vận động nhẹ - ăn chiều
+                                    {% elif key == 'afternoon_3' %}
+                                        Yoga/dance
+                                    {% elif key == 'afternoon_4' %}
+                                        Trả trẻ - trao đổi với phụ huynh
+                                    {% endif %}
+                                </td>
+                            {% elif key == 'afternoon_2' %}
+                                {% for day in ['mon', 'tue', 'wed', 'thu', 'fri'] %}
+                                <td>
+                                    {% if week.data[day][key] is defined and week.data[day][key] %}
+                                        {{ week.data[day][key]|safe }}
+                                    {% elif day == 'tue' or day == 'thu' %}
+                                        Hoạt động với giáo cụ
+                                    {% elif day == 'wed' or day == 'fri' %}
+                                        Lego time
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>

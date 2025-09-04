@@ -69,6 +69,7 @@ class AttendanceRecord(db.Model):
     toilet = db.Column(db.String(10))
     toilet_times = db.Column(db.Integer)
     note = db.Column(db.String(255))
+    __table_args__ = (db.UniqueConstraint('child_id', 'date', name='uq_attendance_child_date'),)
 
 class BmiRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)

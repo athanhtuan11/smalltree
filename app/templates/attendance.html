@@ -54,11 +54,11 @@
     </div>
     <form method="get" action="">
         <div class="row mb-3">
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label for="attendance_date" class="form-label">Chọn ngày điểm danh:</label>
                 <input type="date" id="attendance_date" name="attendance_date" class="form-control" value="{{ current_date }}" onchange="this.form.submit()">
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <label for="class_name" class="form-label">Lọc theo lớp:</label>
                 <select id="class_name" name="class_name" class="form-select" onchange="this.form.submit()">
                     <option value="">Tất cả lớp</option>
@@ -67,9 +67,72 @@
                     {% endfor %}
                 </select>
             </div>
+            <div class="col-md-4">
+                <label for="student_search" class="form-label">Tìm học sinh:</label>
+                <input type="text" id="student_search" class="form-control" placeholder="Nhập tên học sinh..." autocomplete="off">
+                <div id="student_suggestions" class="list-group position-absolute w-100" style="z-index:1000; max-height:220px; overflow-y:auto; border-radius:0.5rem; box-shadow:0 2px 8px rgba(60,60,60,0.18); font-size:0.97em;"></div>
+            </div>
         </div>
     </form>
-    <form method="post">
+    <style>
+    #student_suggestions.list-group {
+        min-width: 180px;
+        max-width: 100%;
+        background: #fff;
+        border: 1px solid #bdbdbd;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(60,60,60,0.18);
+        font-size: 0.97em;
+    }
+    #student_suggestions .list-group-item {
+        padding: 6px 14px;
+        cursor: pointer;
+        border: none;
+        border-bottom: 1px solid #f1f1f1;
+        background: #fff;
+        transition: background 0.15s;
+    }
+    #student_suggestions .list-group-item:last-child {
+        border-bottom: none;
+    }
+    #student_suggestions .list-group-item:hover, #student_suggestions .list-group-item:focus {
+        background: #e8f5e9;
+        color: #388e3c;
+    }
+    </style>
+    <script>
+    // Lấy danh sách tên học sinh từ server (render sẵn vào JS)
+    var studentNames = {{ students|map(attribute='name')|list|tojson|safe }};
+    var searchInput = document.getElementById('student_search');
+    var suggestions = document.getElementById('student_suggestions');
+    searchInput.addEventListener('input', function() {
+        var val = this.value.trim().toLowerCase();
+        suggestions.innerHTML = '';
+        if (val.length === 0) return;
+        var matches = studentNames.filter(function(n) { return n.toLowerCase().includes(val); });
+        matches.slice(0, 10).forEach(function(name) {
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'list-group-item list-group-item-action';
+            item.textContent = name;
+            item.onclick = function() {
+                searchInput.value = name;
+                suggestions.innerHTML = '';
+                // Scroll tới dòng học sinh tương ứng
+                var row = Array.from(document.querySelectorAll('table tbody tr')).find(function(tr) { return tr.textContent.includes(name); });
+                if (row) row.scrollIntoView({behavior:'smooth', block:'center'});
+            };
+            suggestions.appendChild(item);
+        });
+    });
+    // Ẩn gợi ý khi click ngoài
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !suggestions.contains(e.target)) {
+            suggestions.innerHTML = '';
+        }
+    });
+    </script>
+    <form method="post" action="{{ url_for('main.save_attendance') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="attendance_date" value="{{ current_date }}">
         <input type="hidden" name="class_name" value="{{ selected_class }}">
@@ -116,77 +179,78 @@
                                 </div>
                             </div>
                         </td>
+                        <td></td>
                     </tr>
                     <!-- Nhận xét trong ngày cho từng học sinh -->
                     <tr>
-                        <td colspan="6">
+                        <td colspan="7">
                             <div class="table-responsive student-note-block">
-                                <table class="table table-bordered table-sm mb-0 student-note-table">
-                                    <thead class="table-light student-note-header-custom">
-                                        <tr>
-                                            <th style="width:30%">Nội dung</th>
-                                            <th>Ghi chú chi tiết</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td>Ăn sáng</td>
-                                            <td>
-                                                <select name="breakfast_{{ student.id }}" class="form-select form-select-sm">
-                                                    <option value="" {% if not student.breakfast %}selected{% endif %}>--Chọn--</option>
-                                                    <option value="Hết" {% if student.breakfast=='Hết' %}selected{% endif %}>Hết</option>
-                                                    <option value="1/2" {% if student.breakfast=='1/2' %}selected{% endif %}>1/2</option>
-                                                    <option value="Không ăn" {% if student.breakfast=='Không ăn' %}selected{% endif %}>Không ăn</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Ăn trưa</td>
-                                            <td>
-                                                <select name="lunch_{{ student.id }}" class="form-select form-select-sm">
-                                                    <option value="" {% if not student.lunch %}selected{% endif %}>--Chọn--</option>
-                                                    <option value="Hết" {% if student.lunch=='Hết' %}selected{% endif %}>Hết</option>
-                                                    <option value="1/2" {% if student.lunch=='1/2' %}selected{% endif %}>1/2</option>
-                                                    <option value="Không ăn" {% if student.lunch=='Không ăn' %}selected{% endif %}>Không ăn</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Ăn xế</td>
-                                            <td>
-                                                <select name="snack_{{ student.id }}" class="form-select form-select-sm">
-                                                    <option value="" {% if not student.snack %}selected{% endif %}>--Chọn--</option>
-                                                    <option value="Hết" {% if student.snack=='Hết' %}selected{% endif %}>Hết</option>
-                                                    <option value="1/2" {% if student.snack=='1/2' %}selected{% endif %}>1/2</option>
-                                                    <option value="Không ăn" {% if student.snack=='Không ăn' %}selected{% endif %}>Không ăn</option>
-                                                </select>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Đi vệ sinh (ỉa)</td>
-                                            <td>
-                                                <select name="toilet_{{ student.id }}" class="form-select form-select-sm mb-1">
-                                                    <option value="" {% if not student.toilet %}selected{% endif %}>--Chọn--</option>
-                                                    <option value="Có" {% if student.toilet=='Có' %}selected{% endif %}>Có</option>
-                                                    <option value="Không" {% if student.toilet=='Không' %}selected{% endif %}>Không</option>
-                                                </select>
-                                                <span class="ms-2">Số lần:</span>
-                                                <select name="toilet_times_{{ student.id }}" class="form-select form-select-sm d-inline-block" style="width:auto; min-width:60px;">
-                                                    <option value="" {% if not student.toilet_times %}selected{% endif %}>--</option>
-                                                    {% for i in range(1,6) %}
-                                                    <option value="{{ i }}" {% if student.toilet_times==i %}selected{% endif %}>{{ i }}</option>
-                                                    {% endfor %}
-                                                </select>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Ghi chú khác</td>
-                                            <td>
-                                                <input type="text" name="note_{{ student.id }}" class="form-control form-control-sm" value="{{ student.note or '' }}" placeholder="Nhập ghi chú...">
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                            <table class="table table-bordered table-sm mb-0 student-note-table">
+                                <thead class="table-light student-note-header-custom">
+                                    <tr>
+                                        <th style="width:30%">Nội dung</th>
+                                        <th>Ghi chú chi tiết</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Ăn sáng</td>
+                                        <td>
+                                            <select name="breakfast_{{ student.id }}" class="form-select form-select-sm">
+                                                <option value="" {% if not student.breakfast %}selected{% endif %}>--Chọn--</option>
+                                                <option value="Hết" {% if student.breakfast=='Hết' %}selected{% endif %}>Hết</option>
+                                                <option value="1/2" {% if student.breakfast=='1/2' %}selected{% endif %}>1/2</option>
+                                                <option value="Không ăn" {% if student.breakfast=='Không ăn' %}selected{% endif %}>Không ăn</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ăn trưa</td>
+                                        <td>
+                                            <select name="lunch_{{ student.id }}" class="form-select form-select-sm">
+                                                <option value="" {% if not student.lunch %}selected{% endif %}>--Chọn--</option>
+                                                <option value="Hết" {% if student.lunch=='Hết' %}selected{% endif %}>Hết</option>
+                                                <option value="1/2" {% if student.lunch=='1/2' %}selected{% endif %}>1/2</option>
+                                                <option value="Không ăn" {% if student.lunch=='Không ăn' %}selected{% endif %}>Không ăn</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ăn xế</td>
+                                        <td>
+                                            <select name="snack_{{ student.id }}" class="form-select form-select-sm">
+                                                <option value="" {% if not student.snack %}selected{% endif %}>--Chọn--</option>
+                                                <option value="Hết" {% if student.snack=='Hết' %}selected{% endif %}>Hết</option>
+                                                <option value="1/2" {% if student.snack=='1/2' %}selected{% endif %}>1/2</option>
+                                                <option value="Không ăn" {% if student.snack=='Không ăn' %}selected{% endif %}>Không ăn</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Đi vệ sinh (ỉa)</td>
+                                        <td>
+                                            <select name="toilet_{{ student.id }}" class="form-select form-select-sm mb-1">
+                                                <option value="" {% if not student.toilet %}selected{% endif %}>--Chọn--</option>
+                                                <option value="Có" {% if student.toilet=='Có' %}selected{% endif %}>Có</option>
+                                                <option value="Không" {% if student.toilet=='Không' %}selected{% endif %}>Không</option>
+                                            </select>
+                                            <span class="ms-2">Số lần:</span>
+                                            <select name="toilet_times_{{ student.id }}" class="form-select form-select-sm d-inline-block" style="width:auto; min-width:60px;">
+                                                <option value="" {% if not student.toilet_times %}selected{% endif %}>--</option>
+                                                {% for i in range(1,6) %}
+                                                <option value="{{ i }}" {% if student.toilet_times==i %}selected{% endif %}>{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ghi chú khác</td>
+                                        <td>
+                                            <input type="text" name="note_{{ student.id }}" class="form-control form-control-sm" value="{{ student.note or '' }}" placeholder="Nhập ghi chú...">
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
                             </div>
                         </td>
                     </tr>
@@ -196,7 +260,18 @@
                 </tbody>
             </table>
         </div>
-        <button type="submit" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">Lưu điểm danh</button>
+    <button type="submit" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}" id="save-all-btn">Lưu điểm danh</button>
+<script>
+// Khi nhấn nút Lưu điểm danh chung, scroll lên đầu trang
+document.addEventListener('DOMContentLoaded', function() {
+    var saveAllBtn = document.getElementById('save-all-btn');
+    if (saveAllBtn) {
+        saveAllBtn.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+});
+</script>
     </form>
 </div>
 {% if session['role'] == 'parent' %}

@@ -48,7 +48,7 @@ app.log
 *.pid
 # Upload files và user content
 uploads/
-static/images/activities/
+static/images/
 static/uploads/
 static/student_albums/
 # Backup files

@@ -1,8 +1,3 @@
-# Helper for permission denial
-from flask import flash, redirect, url_for
-def redirect_no_permission():
-    flash('Bạn không có quyền truy cập chức năng này!', 'danger')
-    return redirect(url_for('main.login'))
 from werkzeug.security import generate_password_hash
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress
@@ -12,26 +7,10 @@ from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re, secrets
 
 
-# Import optional dependencies with error handling
-try:
-    from docx import Document
-    from docx.shared import Pt
-    DOCX_AVAILABLE = True
-except ImportError:
-    print("Warning: python-docx not available")
-    DOCX_AVAILABLE = False
-    Document = None
-    Pt = None
-
-
-
-
-
-
-
 main = Blueprint('main', __name__)
-
-
+def redirect_no_permission():
+    flash('Bạn không có quyền truy cập chức năng này!', 'danger')
+    return redirect(url_for('main.login'))
 
 # CRUD Class
 from app.models import Class
@@ -89,6 +68,54 @@ def delete_class(class_id):
 
 
 
+
+@main.route('/attendance/save', methods=['POST'])
+def save_attendance():
+    if not session.get('role'):
+        flash('Bạn phải đăng nhập mới truy cập được trang này!', 'danger')
+        return redirect(url_for('main.about'))
+    from datetime import date
+    attendance_date = request.form.get('attendance_date') or date.today().strftime('%Y-%m-%d')
+    selected_class = request.form.get('class_name')
+    # Lưu hàng loạt (không có student_id riêng lẻ)
+    if selected_class and selected_class != 'None':
+        students = Child.query.filter_by(class_name=selected_class).all()
+    else:
+        students = Child.query.all()
+    for student in students:
+        present_value = request.form.get(f'present_{student.id}')
+        if present_value == 'yes':
+            status = 'Có mặt'
+        elif present_value == 'absent_excused':
+            status = 'Vắng mặt có phép'
+        elif present_value == 'absent_unexcused':
+            status = 'Vắng mặt không phép'
+        else:
+            status = 'Vắng'
+        breakfast = request.form.get(f'breakfast_{student.id}')
+        lunch = request.form.get(f'lunch_{student.id}')
+        snack = request.form.get(f'snack_{student.id}')
+        toilet = request.form.get(f'toilet_{student.id}')
+        toilet_times = request.form.get(f'toilet_times_{student.id}') or None
+        note = request.form.get(f'note_{student.id}')
+        record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
+        if record:
+            record.status = status
+            record.breakfast = breakfast
+            record.lunch = lunch
+            record.snack = snack
+            record.toilet = toilet
+            record.toilet_times = toilet_times
+            record.note = note
+        else:
+            record = AttendanceRecord(child_id=student.id, date=attendance_date, status=status,
+                                     breakfast=breakfast, lunch=lunch, snack=snack, toilet=toilet, toilet_times=toilet_times, note=note)
+            db.session.add(record)
+    db.session.commit()
+    #flash('Đã lưu điểm danh!', 'success')
+    if not selected_class or selected_class == 'None':
+        return redirect(url_for('main.attendance', attendance_date=attendance_date))
+    return redirect(url_for('main.attendance', attendance_date=attendance_date, class_name=selected_class))
 
 def is_mobile():
     ua = request.user_agent.string.lower()
@@ -428,7 +455,7 @@ def new_curriculum():
         week_number = request.form.get('week_number')
         class_id = request.form.get('class_id')
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6', 'morning_7']
+        morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
@@ -443,8 +470,28 @@ def new_curriculum():
         db.session.commit()
         flash('Đã thêm chương trình học mới!', 'success')
         return redirect(url_for('main.curriculum'))
+    # Set default data for new curriculum form
+    days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+    afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
+    default_data = {}
+    for i, day in enumerate(days):
+        default_data[day] = {}
+        for slot in morning_slots:
+            default_data[day][slot] = ""
+        for j, slot in enumerate(afternoon_slots):
+            if slot == 'afternoon_2':
+                # 15h-15h30
+                if i == 1 or i == 3:  # Thứ 3, Thứ 5
+                    default_data[day][slot] = "Hoạt động với giáo cụ"
+                elif i == 2 or i == 4:  # Thứ 4, Thứ 6
+                    default_data[day][slot] = "Lego time"
+                else:
+                    default_data[day][slot] = ""
+            else:
+                default_data[day][slot] = ""
     mobile = is_mobile()
-    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes)
+    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes, data=default_data)
 
 
 @main.route('/curriculum')
@@ -490,9 +537,17 @@ def new_student():
     if session.get('role') != 'admin' and session.get('role') != 'teacher':
         return redirect_no_permission()
     classes = Class.query.order_by(Class.name).all()
+    # Sinh mã số học sinh tự động: lấy max student_code dạng số, +1
+    from sqlalchemy import func, cast, Integer
+    last_code = db.session.query(func.max(cast(Child.student_code, Integer))).scalar()
+    if last_code is None:
+        next_code = '001'
+    else:
+        next_code = str(int(last_code) + 1).zfill(3)
     if request.method == 'POST':
         name = request.form.get('name')
-        student_code = request.form.get('student_code')
+        # student_code lấy từ hidden input, đã sinh sẵn
+        student_code = request.form.get('student_code') or next_code
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
@@ -520,7 +575,7 @@ def new_student():
         flash('Đã thêm học sinh mới!', 'success')
         return redirect(url_for('main.attendance'))
     mobile = is_mobile()
-    return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile, classes=classes)
+    return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile, classes=classes, next_code=next_code)
 
 @main.route('/attendance', methods=['GET', 'POST'])
 def attendance():
@@ -598,6 +653,8 @@ def attendance():
             student.note = note
         db.session.commit()
         flash('Đã lưu điểm danh!', 'success')
+        if not selected_class or selected_class == 'None':
+            return redirect(url_for('main.attendance', attendance_date=attendance_date))
         return redirect(url_for('main.attendance', attendance_date=attendance_date, class_name=selected_class))
     mobile = is_mobile()
     return render_template('attendance.html', students=students, title='Điểm danh', current_date=attendance_date, mobile=mobile, class_names=class_names, selected_class=selected_class)
@@ -1662,24 +1719,35 @@ def import_curriculum():
 
     # Đọc dữ liệu theo mẫu mới:
     days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-    morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+    morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
     afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
     curriculum_data = {}
 
-    # Sáng: dòng 4-9 (A4-A9)
+    # Sáng: dòng 4-10 (A4-A10)
     for col_idx, day in enumerate(days):
         curriculum_data[day] = {}
         for slot_idx, slot in enumerate(morning_slots):
-            row = 4 + slot_idx  # dòng 4-9
+            row = 4 + slot_idx  # dòng 4-10
             col = 2 + col_idx   # B=2, C=3, ... G=7
             value = ws.cell(row=row, column=col).value
             curriculum_data[day][slot] = value if value is not None else ""
         # Chiều: dòng 11-14 (A11-A14)
         for slot_idx, slot in enumerate(afternoon_slots):
-            row = 11 + slot_idx  # dòng 11-14
+            row = 11 + slot_idx  # dòng 11-14 (A12=afternoon_1, A13=afternoon_2, ...)
             col = 2 + col_idx
             value = ws.cell(row=row, column=col).value
-            curriculum_data[day][slot] = value if value is not None else ""
+            if slot == 'afternoon_2':
+                # Đảm bảo chỉ lấy đúng dòng 13 (A13) cho 15h-15h30
+                if col_idx == 0:
+                    curriculum_data[day][slot] = ""
+                elif col_idx == 1 or col_idx == 3:
+                    curriculum_data[day][slot] = value if value is not None else "Hoạt động với giáo cụ"
+                elif col_idx == 2 or col_idx == 4:
+                    curriculum_data[day][slot] = value if value is not None else "Lego time"
+                else:
+                    curriculum_data[day][slot] = value if value is not None else ""
+            else:
+                curriculum_data[day][slot] = value if value is not None else ""
     import json
     content = json.dumps(curriculum_data, ensure_ascii=False)
     # Đảm bảo không bị đè curriculum của lớp khác cùng tuần
@@ -1743,32 +1811,118 @@ def export_curriculum_template():
     ws['A3'].border = border
 
     morning_slots = [
-        ("7-8h", 4), ("8h-8h30", 5), ("8h30-9h", 6), ("9h-9h40", 7), ("9h40-10h30", 8), ("10h30-14h", 9)
+        ("7-17h", 4), ("7-8h", 5), ("8h-8h30", 6), ("8h30-9h", 7), ("9h-9h40", 8), ("9h40-10h30", 9), ("10h30-14h", 10)
     ]
-    for label, row in morning_slots:
+    for idx, (label, row) in enumerate(morning_slots):
         ws.cell(row=row, column=1, value=label).font = bold
         ws.cell(row=row, column=1).alignment = center
         ws.cell(row=row, column=1).border = border
-        for col in range(2, 8):
-            ws.cell(row=row, column=col).border = border
+        if idx == 0:
+            # Slot 7-17h: điền giá trị mặc định cho từng thứ
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+                if col == 3:
+                    ws.cell(row=row, column=col, value="Toán học")
+                elif col == 4:
+                    ws.cell(row=row, column=col, value="Ngôn Ngữ")
+                elif col == 5:
+                    ws.cell(row=row, column=col, value="Stemax")
+                elif col == 6:
+                    ws.cell(row=row, column=col, value="Trải Nghiệm")
+        elif idx == 1:
+            # Merge cell cho 7-8h (B5:G5)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Đón trẻ - STEAM (massage kích thích giác quan) - Ăn sáng"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        elif idx == 2:
+            # Merge cell cho 8h-8h30 (B6:G6)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Thể dục buổi sáng - Trò chuyện đầu ngày - Kiểm tra thân thể"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        elif idx == 6:
+            # Merge cell cho 10h30-14h (B10:G10)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Vệ sinh ăn trưa - ngủ trưa"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        else:
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
 
     # Section: Buổi chiều
-    ws.merge_cells('A10:G10')
-    ws['A10'] = "Buổi chiều"
-    ws['A10'].font = bold
-    ws['A10'].alignment = center
-    ws['A10'].fill = fill
-    ws['A10'].border = border
+    ws.merge_cells('A11:G11')
+    ws['A11'] = "Buổi chiều"
+    ws['A11'].font = bold
+    ws['A11'].alignment = center
+    ws['A11'].fill = fill
+    ws['A11'].border = border
 
     afternoon_slots = [
-        ("14h15-15h", 11), ("15h-15h30", 12), ("15h45-16h", 13), ("16h-17h", 14)
+        ("14h15-15h", 12), ("15h-15h30", 13), ("15h45-16h", 14), ("16h-17h", 15)
     ]
-    for label, row in afternoon_slots:
+    for idx, (label, row) in enumerate(afternoon_slots):
         ws.cell(row=row, column=1, value=label).font = bold
         ws.cell(row=row, column=1).alignment = center
         ws.cell(row=row, column=1).border = border
-        for col in range(2, 8):
-            ws.cell(row=row, column=col).border = border
+        if idx == 0:
+            # Merge cell cho 14h15-15h (B12:G12)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Vệ sinh - uống nước - vận động nhẹ - ăn chiều"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        elif idx == 1:
+            # Set default values for 15h-15h30 slot
+            # Thứ 3 (col=3): Hoạt động với giáo cụ
+            # Thứ 4 (col=4): Lego time
+            # Thứ 5 (col=5): Hoạt động với giáo cụ
+            # Thứ 6 (col=6): Lego time
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+                if col == 3 or col == 5:
+                    ws.cell(row=row, column=col, value="Hoạt động với giáo cụ")
+                elif col == 4 or col == 6:
+                    ws.cell(row=row, column=col, value="Lego time")
+        elif idx == 2:
+            # Merge cell cho 15h45-16h (B14:G14)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Yoga/dance"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        elif idx == 3:
+            # Merge cell cho 16h-17h (B15:G15)
+            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+            merged_cell = ws.cell(row=row, column=2)
+            merged_cell.value = "Trả trẻ - trao đổi với phụ huynh"
+            merged_cell.alignment = center
+            merged_cell.font = Font(bold=False)
+            merged_cell.border = border
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
+        else:
+            for col in range(2, 8):
+                ws.cell(row=row, column=col).border = border
 
     # Set column widths
     ws.column_dimensions['A'].width = 16

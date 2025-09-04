@@ -15,6 +15,16 @@
             <label for="week_number" class="form-label">Tuần số</label>
             <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>
         </div>
+        <script>
+        // Auto-fill week number input with current week of year
+        document.addEventListener('DOMContentLoaded', function() {
+            var weekInput = document.getElementById('week_number');
+            var now = new Date();
+            var onejan = new Date(now.getFullYear(),0,1);
+            var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+            if (weekInput) weekInput.value = week;
+        });
+        </script>
         <div class="mb-3">
             <label for="class_id" class="form-label">Chọn lớp</label>
             <select class="form-select" id="class_id" name="class_id" required>
@@ -45,6 +55,7 @@
                 <tbody>
                     <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi sáng</td></tr>
                     {% set morning_slots = [
+                        ('7-17h', 'morning_0'),
                         ('7-8h', 'morning_1'),
                         ('8h-8h30', 'morning_2'),
                         ('8h30-9h', 'morning_3'),
@@ -55,9 +66,26 @@
                     {% for label, key in morning_slots %}
                     <tr>
                         <td class="fw-bold text-success">{{ label }}</td>
-                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
-                        <td><textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">{% if data and data[day][key] %}{{ data[day][key] }}{% else %}{% endif %}</textarea></td>
-                        {% endfor %}
+                        {% if key in ['morning_1', 'morning_2', 'morning_6'] %}
+                            <td colspan="6">
+                                <textarea class="form-control curriculum-textarea" name="merged_{{ key }}" onclick="openPopup(this)">
+                                    {% if key == 'morning_1' %}Đón trẻ - STEAM (massage kích thích giác quan) - Ăn sáng{% elif key == 'morning_2' %}Thể dục buổi sáng - Trò chuyện đầu ngày - Kiểm tra thân thể{% elif key == 'morning_6' %}Vệ sinh ăn trưa - ngủ trưa{% endif %}
+                                </textarea>
+                            </td>
+                        {% else %}
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                                {% set day_idx = loop.index0 %}
+                                <td>
+                                    <textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">
+                                        {%- if data and data[day][key] -%}
+                                            {{ data[day][key] }}
+                                        {%- elif key == 'morning_0' -%}
+                                            {%- if day_idx == 1 -%}Toán học{%- elif day_idx == 2 -%}Ngôn Ngữ{%- elif day_idx == 3 -%}Stemax{%- elif day_idx == 4 -%}Trải Nghiệm{%- endif -%}
+                                        {%- endif -%}
+                                    </textarea>
+                                </td>
+                            {% endfor %}
+                        {% endif %}
                     </tr>
                     {% endfor %}
                     <tr class="table-info"><td colspan="7" class="fw-bold text-success text-center">Buổi chiều</td></tr>
@@ -70,9 +98,27 @@
                     {% for label, key in afternoon_slots %}
                     <tr>
                         <td class="fw-bold text-success">{{ label }}</td>
-                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
-                        <td><textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">{% if data and data[day][key] %}{{ data[day][key] }}{% else %}{% endif %}</textarea></td>
-                        {% endfor %}
+                        {% if key in ['afternoon_1', 'afternoon_3', 'afternoon_4'] %}
+                            <td colspan="6">
+                                <textarea class="form-control curriculum-textarea" name="merged_{{ key }}" onclick="openPopup(this)">
+                                    {% if key == 'afternoon_1' %}Vệ sinh - uống nước - vận động nhẹ - ăn chiều{% elif key == 'afternoon_3' %}Yoga/dance{% elif key == 'afternoon_4' %}Trả trẻ - trao đổi với phụ huynh{% endif %}
+                                </textarea>
+                            </td>
+                        {% elif key == 'afternoon_2' %}
+                            {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'] %}
+                                <td>
+                                    <textarea class="form-control curriculum-textarea" name="{{ day }}_{{ key }}" onclick="openPopup(this)">
+                                        {%- if data and data[day][key] -%}
+                                            {{ data[day][key] }}
+                                        {%- elif day == 'tue' or day == 'thu' -%}
+                                            Hoạt động với giáo cụ
+                                        {%- elif day == 'wed' or day == 'fri' -%}
+                                            Lego time
+                                        {%- endif -%}
+                                    </textarea>
+                                </td>
+                            {% endfor %}
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
