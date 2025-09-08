@@ -363,39 +363,161 @@ def new_activity():
         new_post = Activity(title=title, description=content, date=date_val, image=image_url, class_id=class_id)
         db.session.add(new_post)
         db.session.commit()
+        
+        # Lưu activity_id vào session để upload batch sau
+        session['temp_activity_id'] = new_post.id
+        
         # Tạo thư mục lưu ảnh hoạt động
         activity_dir = os.path.join('app', 'static', 'images', 'activities', str(new_post.id))
         os.makedirs(activity_dir, exist_ok=True)
-        # Lưu nhiều ảnh hoạt động
+        
+        # Xử lý ảnh upload truyền thống (fallback nếu không có client-side compression)
         files = request.files.getlist('images')
-        for file in files:
-            if file and getattr(file, 'filename', None):
-                ext = os.path.splitext(file.filename)[1].lower()
-                if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                    continue
-                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                img_path = os.path.join(activity_dir, img_filename)
-                try:
-                    file.stream.seek(0)
-                    img = Image.open(file.stream)
-                    img.thumbnail((1200, 800))
-                    img.save(img_path)
-                    rel_path = f'images/activities/{new_post.id}/{img_filename}'
-                    db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
-                except Exception as e:
-                    import traceback
-                    print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                    traceback.print_exc()
-                    flash(f"Lỗi upload ảnh: {file.filename} - {e}", 'danger')
-                    continue
-        db.session.commit()
-        flash('Đã đăng bài viết mới!', 'success')
+        if files and files[0].filename:  # Có ảnh upload truyền thống
+            print("[INFO] Fallback: Xử lý upload truyền thống")
+            total_files = len(files)
+            processed_count = 0
+            success_count = 0
+            
+            for file in files:
+                if file and getattr(file, 'filename', None):
+                    ext = os.path.splitext(file.filename)[1].lower()
+                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
+                        processed_count += 1
+                        continue
+                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                    img_path = os.path.join(activity_dir, img_filename)
+                    try:
+                        file.stream.seek(0)
+                        img = Image.open(file.stream)
+                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
+                        if ext.lower() in ['.jpg', '.jpeg']:
+                            img.save(img_path, 'JPEG', quality=85, optimize=True)
+                        else:
+                            img.save(img_path, optimize=True)
+                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
+                        success_count += 1
+                    except Exception as e:
+                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
+                processed_count += 1
+            
+            db.session.commit()
+            if success_count > 0:
+                flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
+            else:
+                flash('Đã đăng bài viết mới!', 'success')
+        else:
+            flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
+        total_files = len(files)
+        processed_count = 0
+        success_count = 0
+        
+        print(f"[INFO] Bắt đầu xử lý {total_files} ảnh hoạt động...")
+        
+        # Xử lý batch để tránh timeout
+        batch_size = 20
+        for i in range(0, total_files, batch_size):
+            batch_files = files[i:i+batch_size]
+            print(f"[INFO] Xử lý batch {i//batch_size + 1}: {len(batch_files)} ảnh")
+            
+            for file in batch_files:
+                if file and getattr(file, 'filename', None):
+                    ext = os.path.splitext(file.filename)[1].lower()
+                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
+                        processed_count += 1
+                        continue
+                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                    img_path = os.path.join(activity_dir, img_filename)
+                    try:
+                        file.stream.seek(0)
+                        img = Image.open(file.stream)
+                        # Tối ưu kích thước cho web: 800x600 thay vì 1200x800
+                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
+                        # Tối ưu chất lượng JPEG để giảm dung lượng
+                        if ext.lower() in ['.jpg', '.jpeg']:
+                            img.save(img_path, 'JPEG', quality=85, optimize=True)
+                        else:
+                            img.save(img_path, optimize=True)
+                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
+                        success_count += 1
+                    except Exception as e:
+                        import traceback
+                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
+                        traceback.print_exc()
+                        # Không flash lỗi từng ảnh để tránh spam, chỉ log
+                processed_count += 1
+            
+            # Commit từng batch để tránh memory overflow
+            db.session.commit()
+            print(f"[INFO] Hoàn thành batch {i//batch_size + 1}, đã xử lý {processed_count}/{total_files} ảnh")
+        
+        if success_count > 0:
+            flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
+        else:
+            flash('Đã đăng bài viết mới!', 'success')
+        
+        print(f"[INFO] Hoàn tất xử lý {success_count}/{total_files} ảnh hoạt động")
         return redirect(url_for('main.activities'))
     mobile = is_mobile()
     from datetime import date
     current_date_iso = date.today().isoformat()
     return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=mobile, current_date_iso=current_date_iso, classes=classes)
+
+# Route riêng để upload batch ảnh (từ client-side compression)
+@main.route('/activities/upload-batch', methods=['POST'])
+def upload_batch_images():
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    activity_id = request.form.get('activity_id') or session.get('temp_activity_id')
+    if not activity_id:
+        return jsonify({'success': False, 'error': 'No activity ID'}), 400
+    
+    files = request.files.getlist('batch_images')
+    activity_dir = os.path.join('app', 'static', 'images', 'activities', str(activity_id))
+    os.makedirs(activity_dir, exist_ok=True)
+    
+    success_count = 0
+    for file in files:
+        if file and file.filename:
+            try:
+                # File đã được nén client-side, chỉ cần lưu
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                img_path = os.path.join(activity_dir, img_filename)
+                file.save(img_path)
+                
+                rel_path = f'images/activities/{activity_id}/{img_filename}'
+                db.session.add(ActivityImage(
+                    filename=img_filename,
+                    filepath=rel_path,
+                    upload_date=datetime.now(),
+                    activity_id=activity_id
+                ))
+                success_count += 1
+            except Exception as e:
+                print(f"[ERROR] Upload batch error: {e}")
+                continue
+    
+    db.session.commit()
+    print(f"[INFO] Uploaded {success_count} images to activity {activity_id}")
+    return jsonify({'success': True, 'uploaded': success_count})
+
+# Test route để kiểm tra upload ảnh
+@main.route('/test-activity-images/<int:activity_id>')
+def test_activity_images(activity_id):
+    activity = Activity.query.get_or_404(activity_id)
+    images = ActivityImage.query.filter_by(activity_id=activity_id).all()
+    return jsonify({
+        'activity_id': activity_id,
+        'activity_title': activity.title,
+        'image_count': len(images),
+        'images': [{'filename': img.filename, 'filepath': img.filepath} for img in images]
+    })
 
 @main.route('/activities/<int:id>/delete', methods=['POST'])
 def delete_activity(id):

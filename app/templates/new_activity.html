@@ -44,8 +44,26 @@
         <div class="mb-3">
             <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
             <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple>
+            <div class="form-text text-info">
+                <small>💡 <strong>Tối ưu cho 50-100 ảnh:</strong> Ảnh sẽ được tự động nén xuống ~200KB/ảnh trước khi upload.</small>
+            </div>
+            <div id="compress-progress" class="mt-2" style="display:none;">
+                <div class="progress mb-2">
+                    <div class="progress-bar bg-info" role="progressbar" style="width: 0%" id="compress-bar"></div>
+                </div>
+                <small class="text-muted">Đang nén ảnh: <span id="compress-text">0/0</span></small>
+            </div>
+            <div id="upload-progress" class="mt-2" style="display:none;">
+                <div class="progress">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                </div>
+                <small class="text-muted mt-1 d-block">Đang upload: <span id="progress-text">0/0</span></small>
+            </div>
         </div>
-        <button type="submit" class="btn btn-success">Đăng bài</button>
+        <button type="submit" class="btn btn-success" id="submit-btn">
+            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+            Đăng bài
+        </button>
         <a href="/activities" class="btn btn-outline-secondary ms-2">Quay lại</a>
     </form>
 </div>
@@ -68,7 +86,137 @@ var quill = new Quill('#quillEditor', {
 });
 function submitQuillContent() {
     document.getElementById('description').value = quill.root.innerHTML;
-    return true;
+    
+    // Kiểm tra nếu có ảnh được chọn
+    const fileInput = document.getElementById('images');
+    const files = Array.from(fileInput.files);
+    
+    // Nếu có ít hơn 5 ảnh, dùng upload truyền thống (đơn giản hơn)
+    if (files.length === 0 || files.length < 5) {
+        console.log('Sử dụng upload truyền thống cho', files.length, 'ảnh');
+        return true; // Submit form bình thường
+    }
+    
+    // Nếu có ≥5 ảnh, dùng client-side compression
+    console.log('Sử dụng client-side compression cho', files.length, 'ảnh');
+    compressAndUploadImages(files);
+    return false; // Prevent normal form submit
+}
+
+// Hàm nén ảnh client-side
+function compressImage(file, maxWidth = 800, maxHeight = 600, quality = 0.7) {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = function() {
+            // Tính toán kích thước mới giữ tỷ lệ
+            let { width, height } = img;
+            if (width > height) {
+                if (width > maxWidth) {
+                    height = height * (maxWidth / width);
+                    width = maxWidth;
+                }
+            } else {
+                if (height > maxHeight) {
+                    width = width * (maxHeight / height);
+                    height = maxHeight;
+                }
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Vẽ và nén ảnh
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob(resolve, 'image/jpeg', quality);
+        };
+        
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+// Nén và upload batch
+async function compressAndUploadImages(files) {
+    const submitBtn = document.getElementById('submit-btn');
+    const compressProgress = document.getElementById('compress-progress');
+    const compressBar = document.getElementById('compress-bar');
+    const compressText = document.getElementById('compress-text');
+    const uploadProgress = document.getElementById('upload-progress');
+    
+    submitBtn.querySelector('.spinner-border').classList.remove('d-none');
+    submitBtn.disabled = true;
+    compressProgress.style.display = 'block';
+    
+    const compressedFiles = [];
+    
+    // Bước 1: Nén tất cả ảnh
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+            const compressed = await compressImage(file);
+            compressedFiles.push({
+                file: compressed,
+                name: file.name.replace(/\.[^/.]+$/, '.jpg') // Đổi extension thành .jpg
+            });
+        }
+        
+        const percent = ((i + 1) / files.length) * 100;
+        compressBar.style.width = percent + '%';
+        compressText.textContent = `${i + 1}/${files.length}`;
+    }
+    
+    // Bước 2: Upload từng batch nhỏ (10 ảnh/lần)
+    compressProgress.style.display = 'none';
+    uploadProgress.style.display = 'block';
+    
+    const batchSize = 10;
+    let uploaded = 0;
+    
+    for (let i = 0; i < compressedFiles.length; i += batchSize) {
+        const batch = compressedFiles.slice(i, i + batchSize);
+        await uploadBatch(batch);
+        uploaded += batch.length;
+        
+        const percent = (uploaded / compressedFiles.length) * 100;
+        uploadProgress.querySelector('.progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = `${uploaded}/${compressedFiles.length}`;
+    }
+    
+    // Submit form cuối cùng không có ảnh (đã upload riêng)
+    const form = document.getElementById('activity-form');
+    const imageInput = document.getElementById('images');
+    imageInput.remove(); // Xóa input file để không upload lại
+    form.submit();
+}
+
+// Upload 1 batch ảnh
+async function uploadBatch(compressedFiles) {
+    const formData = new FormData();
+    formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
+    
+    const activityId = window.currentActivityId; // Sẽ được set từ server
+    if (!activityId) {
+        console.error('No activity ID found');
+        return;
+    }
+    
+    compressedFiles.forEach((item, index) => {
+        formData.append('batch_images', item.file, item.name);
+    });
+    formData.append('activity_id', activityId);
+    
+    try {
+        const response = await fetch('/activities/upload-batch', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        console.log('Batch uploaded:', result);
+    } catch (error) {
+        console.error('Upload batch error:', error);
+    }
 }
 </script>
 {% endblock %}
