@@ -374,93 +374,54 @@ def new_activity():
         # Xử lý ảnh upload truyền thống (fallback nếu không có client-side compression)
         files = request.files.getlist('images')
         if files and files[0].filename:  # Có ảnh upload truyền thống
-            print("[INFO] Fallback: Xử lý upload truyền thống")
+            print(f"[INFO] Xử lý upload truyền thống: {len(files)} ảnh")
             total_files = len(files)
-            processed_count = 0
             success_count = 0
             
-            for file in files:
-                if file and getattr(file, 'filename', None):
-                    ext = os.path.splitext(file.filename)[1].lower()
-                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                        processed_count += 1
-                        continue
-                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                    img_path = os.path.join(activity_dir, img_filename)
-                    try:
-                        file.stream.seek(0)
-                        img = Image.open(file.stream)
-                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
-                        if ext.lower() in ['.jpg', '.jpeg']:
-                            img.save(img_path, 'JPEG', quality=85, optimize=True)
-                        else:
-                            img.save(img_path, optimize=True)
-                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
-                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
-                        success_count += 1
-                    except Exception as e:
-                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                processed_count += 1
+            # Tối ưu batch size cho 60-70 ảnh: 10 ảnh/batch để tránh memory overflow
+            batch_size = 10
+            for i in range(0, total_files, batch_size):
+                batch_files = files[i:i+batch_size]
+                print(f"[INFO] Xử lý batch {i//batch_size + 1}/{(total_files-1)//batch_size + 1}: {len(batch_files)} ảnh")
+                
+                for file in batch_files:
+                    if file and getattr(file, 'filename', None):
+                        ext = os.path.splitext(file.filename)[1].lower()
+                        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
+                            continue
+                        safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                        img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                        img_path = os.path.join(activity_dir, img_filename)
+                        try:
+                            file.stream.seek(0)
+                            img = Image.open(file.stream)
+                            # Tối ưu kích thước: resize nhỏ hơn cho web
+                            img.thumbnail((800, 600), Image.Resampling.LANCZOS)
+                            if ext.lower() in ['.jpg', '.jpeg']:
+                                img.save(img_path, 'JPEG', quality=75, optimize=True)  # Giảm quality để tiết kiệm bộ nhớ
+                            else:
+                                img.save(img_path, optimize=True)
+                            rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                            db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
+                            success_count += 1
+                        except Exception as e:
+                            print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
+                            continue
+                
+                # Commit từng batch để tránh memory overflow  
+                try:
+                    db.session.commit()
+                    print(f"[INFO] Batch {i//batch_size + 1} hoàn thành: {success_count} ảnh thành công")
+                except Exception as e:
+                    print(f"[ERROR] Lỗi commit batch: {e}")
+                    db.session.rollback()
             
-            db.session.commit()
             if success_count > 0:
                 flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
             else:
                 flash('Đã đăng bài viết mới!', 'success')
         else:
             flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
-        total_files = len(files)
-        processed_count = 0
-        success_count = 0
-        
-        print(f"[INFO] Bắt đầu xử lý {total_files} ảnh hoạt động...")
-        
-        # Xử lý batch để tránh timeout
-        batch_size = 20
-        for i in range(0, total_files, batch_size):
-            batch_files = files[i:i+batch_size]
-            print(f"[INFO] Xử lý batch {i//batch_size + 1}: {len(batch_files)} ảnh")
-            
-            for file in batch_files:
-                if file and getattr(file, 'filename', None):
-                    ext = os.path.splitext(file.filename)[1].lower()
-                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                        processed_count += 1
-                        continue
-                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                    img_path = os.path.join(activity_dir, img_filename)
-                    try:
-                        file.stream.seek(0)
-                        img = Image.open(file.stream)
-                        # Tối ưu kích thước cho web: 800x600 thay vì 1200x800
-                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
-                        # Tối ưu chất lượng JPEG để giảm dung lượng
-                        if ext.lower() in ['.jpg', '.jpeg']:
-                            img.save(img_path, 'JPEG', quality=85, optimize=True)
-                        else:
-                            img.save(img_path, optimize=True)
-                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
-                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
-                        success_count += 1
-                    except Exception as e:
-                        import traceback
-                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                        traceback.print_exc()
-                        # Không flash lỗi từng ảnh để tránh spam, chỉ log
-                processed_count += 1
-            
-            # Commit từng batch để tránh memory overflow
-            db.session.commit()
-            print(f"[INFO] Hoàn thành batch {i//batch_size + 1}, đã xử lý {processed_count}/{total_files} ảnh")
-        
-        if success_count > 0:
-            flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
-        else:
-            flash('Đã đăng bài viết mới!', 'success')
-        
-        print(f"[INFO] Hoàn tất xử lý {success_count}/{total_files} ảnh hoạt động")
         return redirect(url_for('main.activities'))
     mobile = is_mobile()
     from datetime import date
@@ -4014,3 +3975,69 @@ def delete_album(album_id):
     
     flash('✅ Đã xóa album!', 'success')
     return redirect(url_for('main.student_albums_detail', student_id=student_id))
+
+# Route debug upload limits cho 60-70 ảnh
+@main.route('/debug-upload-test')
+def debug_upload_test():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    return '''
+    <h2>🔍 Test Upload Logic - 60-70 ảnh</h2>
+    <p><strong>MAX_CONTENT_LENGTH:</strong> ''' + str(current_app.config.get('MAX_CONTENT_LENGTH', 0) // (1024*1024)) + '''MB</p>
+    
+    <h3>Test Upload Traditional (< 30 ảnh)</h3>
+    <form id="traditionalForm" enctype="multipart/form-data" action="/debug-process-upload" method="post">
+        <input type="file" name="test_files" multiple accept="image/*" id="traditionalInput">
+        <br><br>
+        <button type="submit">Test Traditional Upload</button>
+        <div id="traditionalResults"></div>
+    </form>
+    
+    <hr>
+    
+    <h3>Test Client-Side Compression (>= 30 ảnh)</h3>
+    <form id="compressionForm" enctype="multipart/form-data">
+        <input type="file" name="test_files" multiple accept="image/*" id="compressionInput">
+        <br><br>
+        <button type="button" onclick="testCompression()">Test Compression Upload</button>
+        <div id="compressionResults"></div>
+    </form>
+    
+    <script>
+    function testCompression() {
+        const files = document.getElementById('compressionInput').files;
+        document.getElementById('compressionResults').innerHTML = 
+            `<p>🔄 Testing compression for ${files.length} files...</p>
+             <p><strong>Logic:</strong> ${files.length >= 30 ? 'Client-side compression' : 'Traditional upload'}</p>`;
+        
+        if (files.length >= 30) {
+            alert('Would use client-side compression for ' + files.length + ' files!');
+        } else {
+            alert('Would use traditional upload for ' + files.length + ' files!');
+        }
+    }
+    </script>
+    '''
+
+@main.route('/debug-process-upload', methods=['POST'])
+def debug_process_upload():
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    files = request.files.getlist('test_files')
+    file_count = len(files)
+    
+    results = {
+        'file_count': file_count,
+        'method': 'traditional' if file_count < 30 else 'client_compression',
+        'max_content_mb': current_app.config.get('MAX_CONTENT_LENGTH', 0) // (1024*1024),
+        'files_with_content': len([f for f in files if f.filename]),
+        'status': 'success'
+    }
+    
+    return f'''
+    <h3>✅ Upload Test Results</h3>
+    <pre>{json.dumps(results, indent=2)}</pre>
+    <p><a href="/debug-upload-test">← Back to test</a></p>
+    '''

@@ -7,7 +7,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.join(os.path.abspath(os.path.dirname(__file__)), "app", "site.db")}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = True
-    MAX_CONTENT_LENGTH = 64 * 1024 * 1024  # 64MB, đủ cho ảnh đã nén client-side
+    MAX_CONTENT_LENGTH = 200 * 1024 * 1024  # 200MB cho 100 ảnh @ 2MB/ảnh
     
     # LLM Farm API Configuration - Bosch GenAI Platform
     LLM_FARM_API_KEY = os.environ.get('LLM_FARM_API_KEY') or '5707f722220e48a889aecccce0406a74'

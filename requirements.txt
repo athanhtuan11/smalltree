@@ -7,8 +7,7 @@ Flask-Migrate==3.1.0
 Jinja2==3.0.3
 Werkzeug==2.0.3
 
-# Production Server
-gsmalltree-website==20.1.0
+# Production Server (removed invalid package)
 
 # Forms & Validation
 WTForms==3.0.1

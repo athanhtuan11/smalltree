@@ -91,20 +91,22 @@ function submitQuillContent() {
     const fileInput = document.getElementById('images');
     const files = Array.from(fileInput.files);
     
-    // Nếu có ít hơn 5 ảnh, dùng upload truyền thống (đơn giản hơn)
-    if (files.length === 0 || files.length < 5) {
-        console.log('Sử dụng upload truyền thống cho', files.length, 'ảnh');
+    // Debug: In ra số lượng ảnh
+    console.log('Số ảnh được chọn:', files.length);
+    
+    // Tự động chọn phương pháp tối ưu dựa trên số ảnh
+    if (files.length >= 30) {
+        console.log('Nhiều ảnh (>=30), sử dụng client-side compression cho', files.length, 'ảnh');
+        compressAndUploadImages(files);
+        return false; // Ngăn submit form, xử lý riêng
+    } else {
+        console.log('Ít ảnh (<30), sử dụng upload truyền thống cho', files.length, 'ảnh');
         return true; // Submit form bình thường
     }
-    
-    // Nếu có ≥5 ảnh, dùng client-side compression
-    console.log('Sử dụng client-side compression cho', files.length, 'ảnh');
-    compressAndUploadImages(files);
-    return false; // Prevent normal form submit
 }
 
-// Hàm nén ảnh client-side
-function compressImage(file, maxWidth = 800, maxHeight = 600, quality = 0.7) {
+// Hàm nén ảnh client-side - Tối ưu cho 60-70 ảnh
+function compressImage(file, maxWidth = 800, maxHeight = 600, quality = 0.6) {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -167,21 +169,31 @@ async function compressAndUploadImages(files) {
         compressText.textContent = `${i + 1}/${files.length}`;
     }
     
-    // Bước 2: Upload từng batch nhỏ (10 ảnh/lần)
+    // Bước 2: Upload từng batch nhỏ (3 ảnh/lần để tránh timeout với 60-70 ảnh)
     compressProgress.style.display = 'none';
     uploadProgress.style.display = 'block';
     
-    const batchSize = 10;
+    const batchSize = 3;  // Giảm từ 5 xuống 3 cho ổn định
     let uploaded = 0;
     
     for (let i = 0; i < compressedFiles.length; i += batchSize) {
         const batch = compressedFiles.slice(i, i + batchSize);
-        await uploadBatch(batch);
-        uploaded += batch.length;
+        try {
+            const result = await uploadBatch(batch);
+            uploaded += result.uploaded || batch.length;
+        } catch (error) {
+            console.error(`Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+            // Tiếp tục với batch tiếp theo thay vì dừng hoàn toàn
+        }
         
         const percent = (uploaded / compressedFiles.length) * 100;
         uploadProgress.querySelector('.progress-bar').style.width = percent + '%';
         document.getElementById('progress-text').textContent = `${uploaded}/${compressedFiles.length}`;
+        
+        // Thêm delay nhỏ giữa các batch để giảm tải server
+        if (i + batchSize < compressedFiles.length) {
+            await new Promise(resolve => setTimeout(resolve, 500)); // 0.5s delay
+        }
     }
     
     // Submit form cuối cùng không có ảnh (đã upload riêng)
@@ -191,15 +203,15 @@ async function compressAndUploadImages(files) {
     form.submit();
 }
 
-// Upload 1 batch ảnh
-async function uploadBatch(compressedFiles) {
+// Upload 1 batch ảnh với retry logic
+async function uploadBatch(compressedFiles, retryCount = 0) {
     const formData = new FormData();
     formData.append('csrf_token', document.querySelector('input[name="csrf_token"]').value);
     
     const activityId = window.currentActivityId; // Sẽ được set từ server
     if (!activityId) {
         console.error('No activity ID found');
-        return;
+        throw new Error('No activity ID');
     }
     
     compressedFiles.forEach((item, index) => {
@@ -208,15 +220,42 @@ async function uploadBatch(compressedFiles) {
     formData.append('activity_id', activityId);
     
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+        
         const response = await fetch('/activities/upload-batch', {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const result = await response.json();
-        console.log('Batch uploaded:', result);
+        console.log('Batch uploaded successfully:', result);
+        return result;
     } catch (error) {
         console.error('Upload batch error:', error);
+        
+        // Retry logic cho network errors (tối đa 2 lần)
+        if (retryCount < 2 && (error.name === 'AbortError' || error.message.includes('fetch'))) {
+            console.log(`Retrying batch upload (attempt ${retryCount + 1}/2)...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s
+            return uploadBatch(compressedFiles, retryCount + 1);
+        }
+        
+        throw error;
     }
 }
+
+// Set activity ID từ server (nếu có temp_activity_id trong session)
+{% if session.get('temp_activity_id') %}
+window.currentActivityId = {{ session.get('temp_activity_id') }};
+console.log('Activity ID loaded:', window.currentActivityId);
+{% endif %}
 </script>
 {% endblock %}
