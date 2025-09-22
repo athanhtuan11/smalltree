@@ -2330,7 +2330,7 @@ def export_food_safety_process(week_number):
             ws1['O2'].font = Font(bold=True, size=10)
             ws1['O2'].fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
             info_data = [
-                (3, 'A', f"Người kiểm tra: Hoàng Thanh Tuấn - Bếp trưởng", 'O', "Mẫu số 1.1"),
+                (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'O', "Mẫu số 1.1"),
                 (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'O', f"Số học sinh: {student_count}"),
                 (5, 'A', "Địa điểm: Bếp ăn Trường MNĐL Cây Nhỏ", 'O', "Phiên bản: v2.0")
             ]
@@ -2454,7 +2454,7 @@ def export_food_safety_process(week_number):
             signature_data = [
                 (signature_row, 'D', "BẾP TRƯỞNG", 'K', "HIỆU TRƯỞNG"),
                 (signature_row + 1, 'D', "(Ký, ghi rõ họ tên)", 'K', "(Ký, ghi rõ họ tên)"),
-                (signature_row + 5, 'D', "Nguyễn Thị Vân", 'K', "Nguyễn Thị Vân"),
+                (signature_row + 5, 'D', "Hoàng Thanh Tuấn", 'K', "Nguyễn Thị Vân"),
                 (signature_row + 6, 'D', f"Ngày {day_date.day}/{day_date.month}/{day_date.year}",
                  'K',
                  f"Ngày {day_date.day}/{day_date.month}/{day_date.year}")
@@ -2543,7 +2543,7 @@ def export_food_safety_process(week_number):
             ws2['N2'].font = Font(bold=True, size=10)
             ws2['N2'].fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
             info_data2 = [
-                (3, 'A', f"Người kiểm tra: Hoàng Thanh Tuấn - Bếp trưởng", 'N', "Mẫu số 1.2"),
+                (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'N', "Mẫu số 1.2"),
                 (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'N', f"Số học sinh: {student_count}"),
                 (5, 'A', "Địa điểm: Kho thực phẩm khô - MNĐL Cây Nhỏ", 'N', "")
             ]
@@ -2716,7 +2716,7 @@ def export_food_safety_process(week_number):
             ws3['M2'].font = Font(bold=True, size=10)
             ws3['M2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data3 = [
-                (3, 'A', f"Người kiểm tra: Hoàng Thanh Tuấn - Bếp trưởng", 'M', "Mẫu số 2.0"),
+                (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'M', "Mẫu số 2.0"),
                 (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'M', f"Số học sinh: {student_count}"),
                 (5, 'A', "Địa điểm: Bếp chế biến - MNĐL Cây Nhỏ", 'M', "")
             ]
@@ -2932,7 +2932,7 @@ def export_food_safety_process(week_number):
             ws4['J2'].font = Font(bold=True, size=10)
             ws4['J2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data4 = [
-                (3, 'A', f"Người kiểm tra: Hoàng Thanh Tuấn - Bếp trưởng", 'J', "Mẫu số 3.0"),
+                (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'J', "Mẫu số 3.0"),
                 (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'J', f"Số học sinh: {student_count}"),
                 (5, 'A', "Địa điểm: Phòng ăn - MNĐL Cây Nhỏ", 'J', "")
             ]
