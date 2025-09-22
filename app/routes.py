@@ -2665,7 +2665,7 @@ def export_food_safety_process(week_number):
             signature_data2 = [
                 (signature_row2, 'D', "THỦ KHO", 'K', "HIỆU TRƯỞNG"),
                 (signature_row2 + 1, 'D', "(Ký, ghi rõ họ tên)", 'K', "(Ký, ghi rõ họ tên)"),
-                (signature_row2 + 5, 'D', "Nguyễn Văn Kho", 'K', "Nguyễn Thị Vân"),
+                (signature_row2 + 5, 'D', "Hoàng Thanh Tuấn", 'K', "Nguyễn Thị Vân"),
                 (signature_row2 + 6, 'D', f"Ngày {day_date.day}/{day_date.month}/{day_date.year}", 'K', f"Ngày {day_date.day}/{day_date.month}/{day_date.year}")
             ]
             for row, col_d, text_d, col_k, text_k in signature_data2:
@@ -3294,7 +3294,7 @@ def export_food_safety_process(week_number):
             ws6['J2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data4 = [
                 (1, 'A', f"Phòng GD&ĐT: XÃ ĐỨC TRỌNG", 'J', ""),
-                (2, 'A', f"Đơn vị: MG Phú An", 'J', ""),
+                (2, 'A', f"Đơn vị: MẦM NON CÂY NHỎ", 'J', ""),
                 (3, 'A', f"Số suất: {student_count}", 'F', "")
             ]
             for row, col_a, text_a, col_m, text_m in info_data4:
