@@ -2401,10 +2401,10 @@ def export_food_safety_process(week_number):
                     '',  # Để trống SỐ CHỨNG TỪ/SỐ HOÁ ĐƠN
                     supplier_info.get('food_safety_cert', ''),
                     "",
+                    '✓',
                     '',
                     '✓',
-                    '' if ingredient_info.get('usage_frequency', 5) > 3 else '',
-                    '✓',
+                    '',
                     ""
                 ]
                 for j, value in enumerate(data_row, 1):
