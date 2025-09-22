@@ -169,3 +169,64 @@ class StudentProgress(db.Model):
     
     # Relationship
     student = db.relationship('Child', backref=db.backref('progress_records', lazy=True))
+
+class Menu(db.Model):
+    """Model cho thực đơn hàng tuần"""
+    id = db.Column(db.Integer, primary_key=True)
+    week_number = db.Column(db.Integer, nullable=False)  # Tuần thứ mấy trong năm
+    year = db.Column(db.Integer, nullable=False, default=2025)
+    
+    # Thứ 2
+    monday_morning = db.Column(db.Text)
+    monday_snack = db.Column(db.Text)
+    monday_dessert = db.Column(db.Text)
+    monday_lunch = db.Column(db.Text)
+    monday_afternoon = db.Column(db.Text)
+    monday_lateafternoon = db.Column(db.Text)
+    
+    # Thứ 3
+    tuesday_morning = db.Column(db.Text)
+    tuesday_snack = db.Column(db.Text)
+    tuesday_dessert = db.Column(db.Text)
+    tuesday_lunch = db.Column(db.Text)
+    tuesday_afternoon = db.Column(db.Text)
+    tuesday_lateafternoon = db.Column(db.Text)
+    
+    # Thứ 4
+    wednesday_morning = db.Column(db.Text)
+    wednesday_snack = db.Column(db.Text)
+    wednesday_dessert = db.Column(db.Text)
+    wednesday_lunch = db.Column(db.Text)
+    wednesday_afternoon = db.Column(db.Text)
+    wednesday_lateafternoon = db.Column(db.Text)
+    
+    # Thứ 5
+    thursday_morning = db.Column(db.Text)
+    thursday_snack = db.Column(db.Text)
+    thursday_dessert = db.Column(db.Text)
+    thursday_lunch = db.Column(db.Text)
+    thursday_afternoon = db.Column(db.Text)
+    thursday_lateafternoon = db.Column(db.Text)
+    
+    # Thứ 6
+    friday_morning = db.Column(db.Text)
+    friday_snack = db.Column(db.Text)
+    friday_dessert = db.Column(db.Text)
+    friday_lunch = db.Column(db.Text)
+    friday_afternoon = db.Column(db.Text)
+    friday_lateafternoon = db.Column(db.Text)
+    
+    # Thứ 7
+    saturday_morning = db.Column(db.Text)
+    saturday_snack = db.Column(db.Text)
+    saturday_dessert = db.Column(db.Text)
+    saturday_lunch = db.Column(db.Text)
+    saturday_afternoon = db.Column(db.Text)
+    saturday_lateafternoon = db.Column(db.Text)
+    
+    # Metadata
+    created_date = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_date = db.Column(db.DateTime, onupdate=db.func.current_timestamp())
+    
+    # Unique constraint để tránh trùng lặp tuần
+    __table_args__ = (db.UniqueConstraint('week_number', 'year', name='unique_week_year'),)

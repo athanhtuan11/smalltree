@@ -7,6 +7,22 @@ from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re, secrets
 
+# Check for optional dependencies
+try:
+    import openpyxl
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+
+try:
+    from docx import Document
+    from docx.shared import Inches, Pt
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.shared import OxmlElement, qn
+    from docx.shared import RGBColor
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
 
 main = Blueprint('main', __name__)
 def redirect_no_permission():
@@ -3663,7 +3679,17 @@ def ai_menu_suggestions():
         return jsonify({
             'success': True,
             'menu': menu,
-            'security_info': f"Random menu generated for {user_role} (avoid duplicates)",
+            'suggestions': {
+                'nutrition_tips': [
+                    f"Thực đơn được tối ưu cho trẻ {request.json.get('age_group', '1-3 tuổi')}",
+                    "Đảm bảo cân bằng dinh dưỡng với đầy đủ nhóm thực phẩm",
+                    "Tránh lặp lại món ăn trong cùng bữa trong tuần",
+                    "Bữa trưa có 2 món để tăng đa dạng dinh dưỡng",
+                    "Khuyến khích trẻ thử nhiều loại thực phẩm khác nhau"
+                ],
+                'generated_from': 'SmallTree AI - Nutrition optimized menu system'
+            },
+            'security_info': f"Optimized menu for {user_role} with nutrition balance",
         })
     except Exception as e:
         db.session.rollback()
@@ -3729,6 +3755,124 @@ def extract_weekly_menu_from_suggestions(suggestions):
     
     return menu_data
 
+@main.route('/ai/create-menu-from-suggestions', methods=['POST'])
+def create_menu_from_suggestions():
+    """API endpoint để tạo thực đơn từ AI suggestions"""
+    
+    user_role = session.get('role')
+    if user_role not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'error': 'Không có quyền truy cập'}), 403
+    
+    # Import modules outside try block to avoid reference errors
+    from app.models import Menu, db
+    from datetime import datetime, timedelta
+    
+    print(f"[DEBUG] Received request to create menu from suggestions")
+    print(f"[DEBUG] Request method: {request.method}")
+    print(f"[DEBUG] Content-Type: {request.content_type}")
+    print(f"[DEBUG] Request data: {request.get_data()}")
+
+    try:
+        
+        # Lấy dữ liệu từ request
+        data = request.get_json()
+        if not data or 'menu' not in data:
+            return jsonify({'success': False, 'error': 'Không có dữ liệu thực đơn'}), 400
+        
+        menu_data = data['menu']
+        overwrite = data.get('overwrite', False)
+        
+        # Sử dụng tuần được chọn hoặc tuần hiện tại
+        if 'target_week' in data and 'target_year' in data:
+            week_number = data['target_week']
+            year = data['target_year']
+        else:
+            # Fallback: tính tuần hiện tại
+            today = datetime.now().date()
+            week_start = today - timedelta(days=today.weekday())
+            week_number = week_start.isocalendar()[1]
+            year = week_start.year
+        
+        # Kiểm tra xem thực đơn tuần này đã tồn tại chưa
+        existing_menu = Menu.query.filter_by(week_number=week_number, year=year).first()
+        if existing_menu and not overwrite:
+            return jsonify({
+                'success': False,
+                'error': 'Thực đơn tuần này đã tồn tại',
+                'week_number': week_number,
+                'existing_id': existing_menu.id
+            }), 409
+        
+        # Tạo hoặc cập nhật thực đơn
+        if existing_menu and overwrite:
+            menu_obj = existing_menu
+        else:
+            menu_obj = Menu(week_number=week_number, year=year)
+            db.session.add(menu_obj)
+        
+        # Cập nhật dữ liệu thực đơn
+        for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']:
+            day_data = menu_data.get(day, {})
+            
+            if day == 'mon':
+                menu_obj.monday_morning = day_data.get('morning', '')
+                menu_obj.monday_snack = day_data.get('snack', '')
+                menu_obj.monday_dessert = day_data.get('dessert', '')
+                menu_obj.monday_lunch = day_data.get('lunch', '')
+                menu_obj.monday_afternoon = day_data.get('afternoon', '')
+                menu_obj.monday_lateafternoon = day_data.get('lateafternoon', '')
+            elif day == 'tue':
+                menu_obj.tuesday_morning = day_data.get('morning', '')
+                menu_obj.tuesday_snack = day_data.get('snack', '')
+                menu_obj.tuesday_dessert = day_data.get('dessert', '')
+                menu_obj.tuesday_lunch = day_data.get('lunch', '')
+                menu_obj.tuesday_afternoon = day_data.get('afternoon', '')
+                menu_obj.tuesday_lateafternoon = day_data.get('lateafternoon', '')
+            elif day == 'wed':
+                menu_obj.wednesday_morning = day_data.get('morning', '')
+                menu_obj.wednesday_snack = day_data.get('snack', '')
+                menu_obj.wednesday_dessert = day_data.get('dessert', '')
+                menu_obj.wednesday_lunch = day_data.get('lunch', '')
+                menu_obj.wednesday_afternoon = day_data.get('afternoon', '')
+                menu_obj.wednesday_lateafternoon = day_data.get('lateafternoon', '')
+            elif day == 'thu':
+                menu_obj.thursday_morning = day_data.get('morning', '')
+                menu_obj.thursday_snack = day_data.get('snack', '')
+                menu_obj.thursday_dessert = day_data.get('dessert', '')
+                menu_obj.thursday_lunch = day_data.get('lunch', '')
+                menu_obj.thursday_afternoon = day_data.get('afternoon', '')
+                menu_obj.thursday_lateafternoon = day_data.get('lateafternoon', '')
+            elif day == 'fri':
+                menu_obj.friday_morning = day_data.get('morning', '')
+                menu_obj.friday_snack = day_data.get('snack', '')
+                menu_obj.friday_dessert = day_data.get('dessert', '')
+                menu_obj.friday_lunch = day_data.get('lunch', '')
+                menu_obj.friday_afternoon = day_data.get('afternoon', '')
+                menu_obj.friday_lateafternoon = day_data.get('lateafternoon', '')
+            elif day == 'sat':
+                menu_obj.saturday_morning = day_data.get('morning', '')
+                menu_obj.saturday_snack = day_data.get('snack', '')
+                menu_obj.saturday_dessert = day_data.get('dessert', '')
+                menu_obj.saturday_lunch = day_data.get('lunch', '')
+                menu_obj.saturday_afternoon = day_data.get('afternoon', '')
+                menu_obj.saturday_lateafternoon = day_data.get('lateafternoon', '')
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã {"cập nhật" if overwrite else "tạo"} thực đơn tuần {week_number}/{year} thành công!',
+            'week_number': week_number,
+            'year': year,
+            'menu_id': menu_obj.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] create_menu_from_suggestions: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Lỗi server: {str(e)}'}), 500
 
 
 @main.route('/ai-dashboard', methods=['GET', 'POST'])

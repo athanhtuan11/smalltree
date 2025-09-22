@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}AI Dashboard - LLM Farm{% endblock %}
+{% block title %}AI Dashboard - SMALL TREE{% endblock %}
 
 {% block content %}
 <!-- CSRF Token for JavaScript -->
@@ -189,7 +189,8 @@
                         <div class="col-12">
                             <div class="card">
                                 <div class="card-header bg-primary text-white">
-                                    <h5><i class="fas fa-utensils"></i> Gợi ý thực đơn AI</h5>
+                                    <h5><i class="fas fa-utensils"></i> Gợi ý thực đơn dinh dưỡng AI</h5>
+                                    <small>Tạo thực đơn cân bằng dinh dưỡng từ nguyên liệu có sẵn</small>
                                 </div>
                                 <div class="card-body">
                                     <form id="menuSuggestionForm">
@@ -203,18 +204,22 @@
                                         </div>
                                         <div class="mb-3">
                                             <label for="availableIngredients" class="form-label">Thực phẩm có sẵn</label>
-                                            <textarea class="form-control" id="availableIngredients" rows="3" 
-                                                      placeholder="Nhập thực phẩm có sẵn, mỗi loại một dòng...&#10;VD: Thịt heo, Cà rốt, Cơm, Trứng gà"></textarea>
-                                            <small class="form-text text-muted">AI sẽ tạo thực đơn từ nguyên liệu có sẵn</small>
+                                            <textarea class="form-control" id="availableIngredients" rows="4" 
+                                                      placeholder="Nhập thực phẩm có sẵn, mỗi loại một dòng...&#10;VD: Thịt heo, Cà rốt, Cơm, Trứng gà, Cá, Rau xanh, Trái cây..."></textarea>
+                                            <small class="form-text text-muted">AI sẽ đưa ra gợi ý thực đơn dinh dưỡng và phù hợp từ các nguyên liệu này</small>
                                         </div>
+                                        
+                                        <!-- Chọn tuần để tạo thực đơn -->
                                         <div class="mb-3">
-                                            <label for="dietaryRequirements" class="form-label">Yêu cầu đặc biệt</label>
-                                            <input type="text" class="form-control" id="dietaryRequirements" 
-                                                   placeholder="VD: không gluten, chay, dị ứng sữa...">
+                                            <label for="targetWeek" class="form-label">Tuần cần tạo thực đơn</label>
+                                            <input type="number" class="form-control" id="targetWeek" name="target_week" 
+                                                   min="1" max="53" placeholder="Nhập số tuần (1-53)">
+                                            <small class="form-text text-muted">Nhập số tuần cần tạo thực đơn (VD: 38, 39, 40...)</small>
                                         </div>
+                                        
                                         <div class="d-grid">
                                             <button type="submit" class="btn btn-primary" id="menuSubmitBtn">
-                                                <i class="fas fa-magic"></i> Tạo thực đơn AI
+                                                <i class="fas fa-magic"></i> Tạo gợi ý thực đơn dinh dưỡng
                                             </button>
                                         </div>
                                     </form>
@@ -329,6 +334,55 @@
 document.addEventListener('DOMContentLoaded', function() {
 // Menu Suggestions
     let currentMenuData = null; // Biến toàn cục để lưu data AI
+    let selectedWeek = null; // Tuần được chọn để tạo thực đơn
+    
+    // Initialize week input với tuần hiện tại
+    function initializeWeekInput() {
+        const weekInput = document.getElementById('targetWeek');
+        const today = new Date();
+        const currentWeek = getWeekNumber(today);
+        const currentYear = new Date().getFullYear();
+        
+        weekInput.value = currentWeek;
+        selectedWeek = {week: currentWeek, year: currentYear};
+    }
+    
+    // Helper functions
+    function getWeekNumber(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+    
+    function getMonday(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(d.setDate(diff));
+    }
+    
+    function formatDate(date) {
+        return date.toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'});
+    }
+    
+    // Initialize week input
+    initializeWeekInput();
+    
+    // Week input change event
+    document.getElementById('targetWeek').addEventListener('change', function(e) {
+        const weekNumber = parseInt(e.target.value);
+        const currentYear = new Date().getFullYear();
+        
+        if (weekNumber >= 1 && weekNumber <= 53) {
+            selectedWeek = {week: weekNumber, year: currentYear};
+            console.log('[DEBUG] Selected week:', selectedWeek);
+        } else {
+            alert('Vui lòng nhập số tuần từ 1 đến 53');
+            e.target.value = getWeekNumber(new Date()); // Reset về tuần hiện tại
+        }
+    });
     
     document.getElementById('menuSuggestionForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -339,7 +393,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = {
             age_group: document.getElementById('ageGroup').value,
             available_ingredients: document.getElementById('availableIngredients').value,
-            dietary_requirements: document.getElementById('dietaryRequirements').value,
             count: 5 // Fixed count
         };
         
@@ -419,7 +472,18 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const confirmCreate = confirm('Bạn có muốn tạo thực đơn mới cho tuần hiện tại từ kết quả AI này không?');
+        // Lấy số tuần từ input
+        const weekInput = document.getElementById('targetWeek');
+        const weekNumber = parseInt(weekInput.value);
+        const currentYear = new Date().getFullYear();
+        
+        if (!weekNumber || weekNumber < 1 || weekNumber > 53) {
+            alert('Vui lòng nhập số tuần hợp lệ (1-53).');
+            return;
+        }
+        
+        selectedWeek = {week: weekNumber, year: currentYear};
+        const confirmCreate = confirm(`Bạn có muốn tạo thực đơn mới cho tuần ${selectedWeek.week}/${selectedWeek.year} từ kết quả AI này không?`);
         if (!confirmCreate) return;
         
         // Hiển thị loading
@@ -432,7 +496,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
         
         function createMenu(overwrite = false) {
-            const requestData = { ...currentMenuData, overwrite: overwrite };
+            const requestData = { 
+                ...currentMenuData, 
+                overwrite: overwrite,
+                target_week: selectedWeek.week,
+                target_year: selectedWeek.year
+            };
             
             fetch('/ai/create-menu-from-suggestions', {
                 method: 'POST',
@@ -443,6 +512,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(requestData)
             })
             .then(response => {
+                console.log('[DEBUG] Response status:', response.status);
+                console.log('[DEBUG] Response headers:', response.headers);
+                
                 if (response.status === 409) {
                     // Conflict - menu đã tồn tại
                     return response.json().then(data => {
@@ -461,7 +533,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         return null;
                     });
                 }
-                return response.json();
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Not JSON - probably HTML error page
+                    return response.text().then(text => {
+                        throw new Error(`Server returned HTML instead of JSON: ${text.substring(0, 100)}...`);
+                    });
+                }
             })
             .then(data => {
                 if (data) {
@@ -628,6 +709,19 @@ document.addEventListener('DOMContentLoaded', function() {
             li.className = 'list-group-item p-0';
             li.innerHTML = html;
             listElement.appendChild(li);
+            
+            // Hiển thị nutrition tips nếu có
+            if (currentMenuData && currentMenuData.suggestions && currentMenuData.suggestions.nutrition_tips) {
+                const tipsLi = document.createElement('li');
+                tipsLi.className = 'list-group-item';
+                tipsLi.innerHTML = `
+                    <h6 class="text-primary"><i class="fas fa-lightbulb"></i> Gợi ý dinh dưỡng:</h6>
+                    <ul class="mb-0">
+                        ${currentMenuData.suggestions.nutrition_tips.map(tip => `<li>${tip}</li>`).join('')}
+                    </ul>
+                `;
+                listElement.appendChild(tipsLi);
+            }
         } else if (Array.isArray(suggestions)) {
             suggestions.forEach(suggestion => {
                 const li = document.createElement('li');
