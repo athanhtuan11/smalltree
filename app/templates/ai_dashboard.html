@@ -496,12 +496,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
         
         function createMenu(overwrite = false) {
+            console.log('[DEBUG] currentMenuData:', currentMenuData);
+            console.log('[DEBUG] selectedWeek:', selectedWeek);
+            
             const requestData = { 
-                ...currentMenuData, 
+                menu: currentMenuData.menu,  // Chỉ gửi menu data, không gửi toàn bộ response
                 overwrite: overwrite,
                 target_week: selectedWeek.week,
                 target_year: selectedWeek.year
             };
+            
+            console.log('[DEBUG] requestData to send:', requestData);
             
             fetch('/ai/create-menu-from-suggestions', {
                 method: 'POST',
