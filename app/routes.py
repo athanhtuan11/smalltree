@@ -1272,34 +1272,38 @@ def student_list():
     mobile = is_mobile()
     role = session.get('role')
     user_id = session.get('user_id')
-    def mask_student(s):
-        if role == 'parent':
-            # Phụ huynh chỉ xem được thông tin con mình
-            if s.id != user_id:
-                return None
-            return {
-                'id': s.id,
-                'name': s.name,
-                'email': s.email,
-                'phone': s.phone,
-                'student_code': s.student_code,
-                'class_name': s.class_name,
-                'parent_contact': s.parent_contact,
-                'birth_date': s.birth_date,
-            }
-        # Giáo viên và admin xem được tất cả thông tin
-        return {
-            'id': s.id,
-            'name': s.name,
-            'email': s.email,
-            'phone': s.phone,
-            'student_code': s.student_code,
-            'class_name': s.class_name,
-            'parent_contact': s.parent_contact,
-            'birth_date': s.birth_date,
-        }
-    masked_students = [m for m in (mask_student(s) for s in students) if m]
-    return render_template('student_list.html', students=masked_students, title='Danh sách học sinh', mobile=mobile)
+    
+    # Filter students based on role
+    if role == 'parent':
+        # Phụ huynh chỉ xem được thông tin con mình
+        filtered_students = [s for s in students if s.id == user_id]
+    else:
+        # Giáo viên và admin xem được tất cả
+        filtered_students = students
+    
+    # Create display data with proper masking for sensitive info
+    display_students = []
+    for s in filtered_students:
+        # Mask sensitive data for non-admin roles
+        if role == 'admin':
+            student_data = s
+        else:
+            # Create a simple object that can be accessed with dot notation
+            class StudentDisplay:
+                def __init__(self, student):
+                    self.id = student.id
+                    self.name = student.name
+                    self.student_code = student.student_code if role in ['admin', 'teacher'] else 'Ẩn'
+                    self.class_name = student.class_name if role in ['admin', 'teacher'] else 'Ẩn'
+                    self.parent_contact = student.parent_contact if role in ['admin', 'teacher'] else 'Ẩn'
+                    self.birth_date = student.birth_date
+                    self.avatar = student.avatar
+            
+            student_data = StudentDisplay(s)
+        
+        display_students.append(student_data)
+    
+    return render_template('student_list.html', students=display_students, title='Danh sách học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
 def edit_student(student_id):
@@ -1307,6 +1311,9 @@ def edit_student(student_id):
         return redirect_no_permission()
     student = Child.query.get_or_404(student_id)
     if request.method == 'POST':
+        print(f"[DEBUG] Form data: {dict(request.form)}")
+        print(f"[DEBUG] Files: {dict(request.files)}")
+        
         class_name = request.form.get('class_name')
         if class_name not in ['Kay 01', 'Kay 02']:
             flash('Lớp không hợp lệ!', 'danger')
@@ -1330,16 +1337,25 @@ def edit_student(student_id):
                 flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif! Thông tin khác đã được lưu.', 'warning')
             else:
                 try:
+                    # Delete old avatar if exists
+                    if student.avatar:
+                        old_path = os.path.join('app', 'static', student.avatar)
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                            print(f"[DEBUG] Deleted old avatar: {old_path}")
+                    
                     filename = f"student_{student.student_code}_{secure_filename(avatar_file.filename)}"
                     save_dir = os.path.join('app', 'static', 'images', 'students')
                     os.makedirs(save_dir, exist_ok=True)
                     avatar_path = os.path.join(save_dir, filename)
                     avatar_file.save(avatar_path)
+                    
                     # Normalize path for web (use forward slashes)
                     new_avatar_path = avatar_path.replace('app/static/', '').replace('\\', '/')
                     print(f"[DEBUG] Student {student.student_code} avatar: {student.avatar} → {new_avatar_path}")
                     print(f"[DEBUG] File saved to: {avatar_path}")
                     print(f"[DEBUG] File exists: {os.path.exists(avatar_path)}")
+                    print(f"[DEBUG] File size: {os.path.getsize(avatar_path) if os.path.exists(avatar_path) else 'N/A'}")
                     student.avatar = new_avatar_path
                     avatar_updated = True
                 except Exception as e:
@@ -1350,6 +1366,8 @@ def edit_student(student_id):
             db.session.commit()
             if avatar_updated:
                 flash('Đã lưu thông tin và ảnh đại diện thành công!', 'success')
+                # Redirect back to edit page to see new avatar
+                return redirect(url_for('main.edit_student', student_id=student_id))
             else:
                 flash('Đã lưu thông tin học sinh thành công!', 'success')
         except Exception as e:

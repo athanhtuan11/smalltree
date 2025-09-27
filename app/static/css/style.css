@@ -238,11 +238,23 @@ p {
     object-fit: cover;
 }
 
+/* Avatar styles for student list page */
+.avatar-student-list {
+    width: 45px;
+    height: 45px;
+    object-fit: cover;
+}
+
 /* Mobile responsive for avatar attendance */
 @media (max-width: 768px) {
     .avatar-attendance {
         width: 40px;
         height: 40px;
+    }
+    
+    .avatar-student-list {
+        width: 35px;
+        height: 35px;
     }
     
     .table th:nth-child(2),

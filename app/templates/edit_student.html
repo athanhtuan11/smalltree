@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mt-5">
     <h2 class="mb-4">Chỉnh sửa thông tin học sinh</h2>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="name" class="form-label">Họ và tên</label>
@@ -71,7 +71,7 @@
             <label for="avatar" class="form-label">Ảnh đại diện học sinh</label>
             <div class="mb-2">
                 <img id="avatar-preview" 
-                     src="{% if student.avatar %}{{ url_for('static', filename=student.avatar) }}?v={{ range(1000, 9999) | random }}{% else %}{{ url_for('static', filename='images/default_avatar.png') }}{% endif %}" 
+                     src="{% if student.avatar %}{{ url_for('static', filename=student.avatar) }}{% else %}{{ url_for('static', filename='images/default_avatar.png') }}{% endif %}" 
                      alt="avatar" 
                      class="rounded-circle border" 
                      style="width:80px;height:80px;object-fit:cover;">
@@ -82,7 +82,7 @@
             <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(this)">
             <small class="text-muted">Để trống nếu không muốn thay đổi ảnh đại diện.</small>
         </div>
-        <button type="submit" class="btn btn-success">Lưu thay đổi</button>
+        <button type="submit" class="btn btn-success" onclick="markForReload()">Lưu thay đổi</button>
         <a href="/students" class="btn btn-secondary ms-2">Quay lại</a>
     </form>
 </div>
@@ -97,5 +97,39 @@ function previewAvatar(input) {
         reader.readAsDataURL(input.files[0]);
     }
 }
+
+function markForReload() {
+    // Only mark for reload if avatar file is selected
+    const avatarInput = document.getElementById('avatar');
+    if (avatarInput && avatarInput.files && avatarInput.files.length > 0) {
+        localStorage.setItem('forceAvatarReload', 'true');
+        console.log('Avatar file selected, marked for reload');
+    }
+}
+
+// Add cache busting on page load if avatar exists
+document.addEventListener('DOMContentLoaded', function() {
+    const avatarPreview = document.getElementById('avatar-preview');
+    if (avatarPreview) {
+        // Check if we need to force reload
+        const forceReload = localStorage.getItem('forceAvatarReload');
+        if (forceReload) {
+            localStorage.removeItem('forceAvatarReload');
+            // Force reload with timestamp
+            const currentSrc = avatarPreview.src;
+            if (currentSrc.includes('images/students/')) {
+                avatarPreview.src = currentSrc.split('?')[0] + '?v=' + Date.now();
+                console.log('Force avatar reload:', avatarPreview.src);
+            }
+        } else {
+            const currentSrc = avatarPreview.src;
+            // Only add timestamp if it's a student avatar (not default_avatar.png)
+            if (currentSrc.includes('images/students/') && !currentSrc.includes('?v=')) {
+                avatarPreview.src = currentSrc + '?v=' + Date.now();
+                console.log('Avatar cache busting applied:', avatarPreview.src);
+            }
+        }
+    }
+});
 </script>
 {% endblock %}
