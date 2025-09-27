@@ -69,16 +69,33 @@
         </div>
         <div class="mb-3">
             <label for="avatar" class="form-label">Ảnh đại diện học sinh</label>
-            {% if student.avatar %}
-                <div class="mb-2">
-                    <img src="{{ url_for('static', filename=student.avatar) }}" alt="avatar" class="rounded-circle border" style="width:60px;height:60px;object-fit:cover;">
-                </div>
-            {% endif %}
-            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+            <div class="mb-2">
+                <img id="avatar-preview" 
+                     src="{% if student.avatar %}{{ url_for('static', filename=student.avatar) }}?v={{ range(1000, 9999) | random }}{% else %}{{ url_for('static', filename='images/default_avatar.png') }}{% endif %}" 
+                     alt="avatar" 
+                     class="rounded-circle border" 
+                     style="width:80px;height:80px;object-fit:cover;">
+                <small class="d-block text-muted mt-1">
+                    {% if student.avatar %}Current: {{ student.avatar }}{% else %}No avatar set{% endif %}
+                </small>
+            </div>
+            <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*" onchange="previewAvatar(this)">
             <small class="text-muted">Để trống nếu không muốn thay đổi ảnh đại diện.</small>
         </div>
         <button type="submit" class="btn btn-success">Lưu thay đổi</button>
         <a href="/students" class="btn btn-secondary ms-2">Quay lại</a>
     </form>
 </div>
+
+<script>
+function previewAvatar(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('avatar-preview').src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
 {% endblock %}

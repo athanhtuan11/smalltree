@@ -11,8 +11,11 @@
     .attendance-table-mobile td, .attendance-table-mobile th { padding:0.18em 0.08em; }
     .attendance-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
     .attendance-scroll-hint { font-size:0.92em; color:#388e3c; text-align:center; margin-bottom:3px; }
+    /* Avatar responsive */
+    .avatar-attendance { width: 50px; height: 50px; object-fit: cover; }
     @media (max-width: 576px) {
         .attendance-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+        .avatar-attendance { width: 40px; height: 40px; }
     }
     </style>
 <style>
@@ -143,6 +146,7 @@
             <table class="table table-bordered align-middle {% if mobile %}attendance-table-mobile{% else %}attendance-table-desktop{% endif %}">
                 <thead class="table-success attendance-header-custom">
                     <tr>
+                        <th style="width: 70px;">Avatar</th>
                         <th>Họ và tên</th>
                         <th>Mã số học sinh</th>
                         <th>Lớp</th>
@@ -153,6 +157,19 @@
                 <tbody>
                     {% for student in students %}
                     <tr style="background: #f1f8e9;">
+                        <td class="text-center">
+                            {% if student.avatar %}
+                                <img src="{{ url_for('static', filename=student.avatar) }}?v={{ range(1000, 9999) | random }}" 
+                                     alt="{{ student.name }}" 
+                                     class="rounded-circle border border-success avatar-attendance" 
+                                     onerror="this.src='{{ url_for('static', filename='images/default_avatar.png') }}'">
+                            {% else %}
+                                <img src="{{ url_for('static', filename='images/default_avatar.png') }}" 
+                                     alt="{{ student.name }}" 
+                                     class="rounded-circle border border-secondary avatar-attendance" 
+                                     style="opacity: 0.7;">
+                            {% endif %}
+                        </td>
                         <td>
                             <span style="color:#1976d2; font-weight:bold; font-size:1.08em;">{{ student.name }}</span>
                             {% if session.get('role') in ['admin', 'teacher'] %}

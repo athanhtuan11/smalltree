@@ -651,28 +651,47 @@ def new_student():
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
-        avatar_file = request.files.get('avatar')
+        
+        # Validate class first
+        if not any(c.name == class_name for c in classes):
+            flash('Lớp không hợp lệ!', 'danger')
+            return redirect(url_for('main.new_student'))
+            
+        # Process avatar separately
         avatar_path = None
+        avatar_file = request.files.get('avatar')
         if avatar_file and avatar_file.filename:
             import os
             from werkzeug.utils import secure_filename
             ext = os.path.splitext(avatar_file.filename)[1].lower()
             if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
-                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif!', 'danger')
-                return redirect(url_for('main.new_student'))
-            filename = f"student_{student_code}_{secure_filename(avatar_file.filename)}"
-            save_dir = os.path.join('app', 'static', 'images', 'students')
-            os.makedirs(save_dir, exist_ok=True)
-            avatar_path = os.path.join(save_dir, filename)
-            avatar_file.save(avatar_path)
-            avatar_path = avatar_path.replace('app/static/', '')  # Đường dẫn tương đối cho url_for
-        if not any(c.name == class_name for c in classes):
-            flash('Lớp không hợp lệ!', 'danger')
-            return redirect(url_for('main.new_student'))
-        new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code, avatar=avatar_path)
-        db.session.add(new_child)
-        db.session.commit()
-        flash('Đã thêm học sinh mới!', 'success')
+                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif! Học sinh sẽ được tạo không có ảnh đại diện.', 'warning')
+            else:
+                try:
+                    filename = f"student_{student_code}_{secure_filename(avatar_file.filename)}"
+                    save_dir = os.path.join('app', 'static', 'images', 'students')
+                    os.makedirs(save_dir, exist_ok=True)
+                    avatar_path = os.path.join(save_dir, filename)
+                    avatar_file.save(avatar_path)
+                    # Normalize path for web (use forward slashes)
+                    avatar_path = avatar_path.replace('app/static/', '').replace('\\', '/')
+                except Exception as e:
+                    flash(f'Lỗi khi lưu ảnh đại diện: {str(e)}. Học sinh sẽ được tạo không có ảnh.', 'warning')
+                    avatar_path = None
+        
+        # Create student
+        try:
+            new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code, avatar=avatar_path)
+            db.session.add(new_child)
+            db.session.commit()
+            if avatar_path:
+                flash('Đã thêm học sinh mới với ảnh đại diện!', 'success')
+            else:
+                flash('Đã thêm học sinh mới!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi khi thêm học sinh: {str(e)}', 'danger')
+            
         return redirect(url_for('main.attendance'))
     mobile = is_mobile()
     return render_template('new_attendance.html', title='Tạo học sinh mới', mobile=mobile, classes=classes, next_code=next_code)
@@ -1142,7 +1161,7 @@ def edit_curriculum(week_number):
     import json
     if request.method == 'POST':
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        morning_slots = ['morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+        morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
         curriculum_data = {}
         for day in days:
@@ -1292,27 +1311,51 @@ def edit_student(student_id):
         if class_name not in ['Kay 01', 'Kay 02']:
             flash('Lớp không hợp lệ!', 'danger')
             return redirect(url_for('main.edit_student', student_id=student_id))
+        
+        # Cập nhật thông tin học sinh trước
         student.name = request.form.get('name')
         student.student_code = request.form.get('student_code')
         student.class_name = class_name
         student.birth_date = request.form.get('birth_date')
         student.parent_contact = request.form.get('parent_contact')
+        
+        # Xử lý avatar riêng biệt
+        avatar_updated = False
         avatar_file = request.files.get('avatar')
         if avatar_file and avatar_file.filename:
             import os
             from werkzeug.utils import secure_filename
             ext = os.path.splitext(avatar_file.filename)[1].lower()
             if ext not in ['.jpg', '.jpeg', '.png', '.gif']:
-                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif!', 'danger')
-                return redirect(url_for('main.edit_student', student_id=student_id))
-            filename = f"student_{student.student_code}_{secure_filename(avatar_file.filename)}"
-            save_dir = os.path.join('app', 'static', 'images', 'students')
-            os.makedirs(save_dir, exist_ok=True)
-            avatar_path = os.path.join(save_dir, filename)
-            avatar_file.save(avatar_path)
-            student.avatar = avatar_path.replace('app/static/', '')
-        db.session.commit()
-        flash('Đã lưu thay đổi!', 'success')
+                flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif! Thông tin khác đã được lưu.', 'warning')
+            else:
+                try:
+                    filename = f"student_{student.student_code}_{secure_filename(avatar_file.filename)}"
+                    save_dir = os.path.join('app', 'static', 'images', 'students')
+                    os.makedirs(save_dir, exist_ok=True)
+                    avatar_path = os.path.join(save_dir, filename)
+                    avatar_file.save(avatar_path)
+                    # Normalize path for web (use forward slashes)
+                    new_avatar_path = avatar_path.replace('app/static/', '').replace('\\', '/')
+                    print(f"[DEBUG] Student {student.student_code} avatar: {student.avatar} → {new_avatar_path}")
+                    print(f"[DEBUG] File saved to: {avatar_path}")
+                    print(f"[DEBUG] File exists: {os.path.exists(avatar_path)}")
+                    student.avatar = new_avatar_path
+                    avatar_updated = True
+                except Exception as e:
+                    flash(f'Lỗi khi lưu ảnh đại diện: {str(e)}. Thông tin khác đã được lưu.', 'warning')
+        
+        # Commit tất cả thay đổi
+        try:
+            db.session.commit()
+            if avatar_updated:
+                flash('Đã lưu thông tin và ảnh đại diện thành công!', 'success')
+            else:
+                flash('Đã lưu thông tin học sinh thành công!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi khi lưu thay đổi: {str(e)}', 'danger')
+            
         return redirect(url_for('main.student_list'))
     mobile = is_mobile()
     return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh', mobile=mobile)
@@ -3776,11 +3819,17 @@ def create_menu_from_suggestions():
         
         # Lấy dữ liệu từ request
         data = request.get_json()
+        print(f"[DEBUG] Parsed JSON data: {data}")
+        
         if not data or 'menu' not in data:
+            print(f"[ERROR] No menu data found. Data keys: {data.keys() if data else 'None'}")
             return jsonify({'success': False, 'error': 'Không có dữ liệu thực đơn'}), 400
         
         menu_data = data['menu']
         overwrite = data.get('overwrite', False)
+        
+        print(f"[DEBUG] Menu data: {menu_data}")
+        print(f"[DEBUG] Overwrite: {overwrite}")
         
         # Sử dụng tuần được chọn hoặc tuần hiện tại
         if 'target_week' in data and 'target_year' in data:
@@ -3908,20 +3957,47 @@ def student_albums():
         import os
         updated = False
         for s in students:
+            old_avatar = s.avatar
             # Sửa lại đường dẫn avatar nếu phát hiện sai định dạng
-            if s.avatar and (s.avatar.startswith('app/static/') or s.avatar.startswith('/app/static/')):
-                s.avatar = s.avatar.replace('app/static/', '').lstrip('/')
-                updated = True
-            # Nếu avatar là None/rỗng thì tìm file đầu tiên bắt đầu bằng student_<student_code>
+            if s.avatar:
+                new_avatar = s.avatar
+                # Remove app/static/ prefix nếu có
+                if new_avatar.startswith('app/static/'):
+                    new_avatar = new_avatar.replace('app/static/', '')
+                elif new_avatar.startswith('/app/static/'):
+                    new_avatar = new_avatar.replace('/app/static/', '')
+                # Convert backslashes to forward slashes  
+                new_avatar = new_avatar.replace('\\', '/')
+                # Ensure proper path structure
+                if not new_avatar.startswith('images/students/') and new_avatar:
+                    if new_avatar.startswith('students/'):
+                        new_avatar = 'images/' + new_avatar
+                    elif not new_avatar.startswith('images/'):
+                        new_avatar = 'images/students/' + new_avatar
+                
+                if new_avatar != old_avatar:
+                    s.avatar = new_avatar
+                    updated = True
+                    print(f"[AUTO-FIX] {s.name} ({s.student_code}): {old_avatar} → {new_avatar}")
+            
+            # Nếu avatar là None/rỗng thì tìm file theo student_code hoặc student_id
             if (not s.avatar or s.avatar.strip() == '') and s.student_code:
                 import glob
-                pattern = os.path.join('app', 'static', 'images', 'students', f'student_{s.student_code}*')
+                # Tìm theo student_code trước (format mới)
+                pattern = os.path.join('app', 'static', 'images', 'students', f'student_{s.student_code}_*')
                 matches = glob.glob(pattern)
+                
+                # Nếu không tìm thấy, thử tìm theo student ID (format cũ)
+                if not matches:
+                    pattern = os.path.join('app', 'static', 'images', 'students', f'student_{s.id}_*')
+                    matches = glob.glob(pattern)
+                
                 if matches:
                     # Lấy tên file đầu tiên tìm được
                     rel_path = os.path.relpath(matches[0], os.path.join('app', 'static'))
                     s.avatar = rel_path.replace('\\', '/')
                     updated = True
+                    print(f"[AUTO-DETECT] {s.name} ({s.student_code}): Found avatar {s.avatar}")
         if updated:
             db.session.commit()
         albums = StudentAlbum.query.join(Child).order_by(StudentAlbum.date_created.desc()).all()
@@ -4119,6 +4195,50 @@ def delete_album(album_id):
     
     flash('✅ Đã xóa album!', 'success')
     return redirect(url_for('main.student_albums_detail', student_id=student_id))
+
+@main.route('/fix-avatars', methods=['GET'])
+def fix_avatars():
+    """Route để fix tất cả avatar paths trong database"""
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    
+    students = Child.query.all()
+    fixed_count = 0
+    
+    for student in students:
+        if student.avatar:
+            old_avatar = student.avatar
+            # Fix các format sai
+            new_avatar = old_avatar
+            
+            # Remove app/static/ prefix nếu có
+            if new_avatar.startswith('app/static/'):
+                new_avatar = new_avatar.replace('app/static/', '')
+            elif new_avatar.startswith('/app/static/'):
+                new_avatar = new_avatar.replace('/app/static/', '')
+            
+            # Convert backslashes to forward slashes
+            new_avatar = new_avatar.replace('\\', '/')
+            
+            # Ensure starts with images/students/
+            if not new_avatar.startswith('images/students/'):
+                if new_avatar.startswith('students/'):
+                    new_avatar = 'images/' + new_avatar
+                elif not new_avatar.startswith('images/'):
+                    new_avatar = 'images/students/' + new_avatar
+            
+            if new_avatar != old_avatar:
+                student.avatar = new_avatar
+                fixed_count += 1
+                print(f"[FIX] {student.name} ({student.student_code}): {old_avatar} → {new_avatar}")
+    
+    if fixed_count > 0:
+        db.session.commit()
+        flash(f'✅ Đã fix {fixed_count} avatar paths!', 'success')
+    else:
+        flash('✅ Tất cả avatar paths đã đúng format!', 'info')
+    
+    return redirect(url_for('main.student_albums'))
 
 # Route debug upload limits cho 60-70 ảnh
 @main.route('/debug-upload-test')
