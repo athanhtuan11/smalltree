@@ -355,7 +355,32 @@ def new_activity():
     class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
     form = ActivityCreateForm()
     form.class_id.choices = class_choices
+
+    if request.method == 'POST':
+
+        # Debug file uploads - BOTH from form and request
+        files = request.files.getlist('images')
+
+        # Also try direct access to form field
+        form_files = form.images.data if hasattr(form.images, 'data') else []
+
+        for key in request.files.keys():
+            files_for_key = request.files.getlist(key)
+            
+            for i, file in enumerate(files_for_key):
+                if file and file.filename:
+                    print(f"[DEBUG]   File {i}: {file.filename}, size: {getattr(file, 'content_length', 'unknown')}")
+                else:
+                    print(f"[DEBUG]   File {i}: Empty or no filename")
+        
+        for i, file in enumerate(files):
+            if file and file.filename:
+                print(f"[DEBUG] File {i}: {file.filename}, size: {getattr(file, 'content_length', 'unknown')}")
+            else:
+                print(f"[DEBUG] File {i}: Empty or no filename")
+    
     if form.validate_on_submit():
+        print(f"[DEBUG] Form validation SUCCESS - proceeding to process")
         title = form.title.data
         content = form.description.data
         date_val = datetime.strptime(form.date.data, '%Y-%m-%d') if form.date.data else date.today()
@@ -389,56 +414,63 @@ def new_activity():
         
         # Xử lý ảnh upload truyền thống (fallback nếu không có client-side compression)
         files = request.files.getlist('images')
+        print(f"[DEBUG] Processing {len(files)} files from request.files")
+        
         if files and files[0].filename:  # Có ảnh upload truyền thống
             print(f"[INFO] Xử lý upload truyền thống: {len(files)} ảnh")
             total_files = len(files)
             success_count = 0
             
-            # Tối ưu batch size cho 60-70 ảnh: 10 ảnh/batch để tránh memory overflow
-            batch_size = 10
-            for i in range(0, total_files, batch_size):
-                batch_files = files[i:i+batch_size]
-                print(f"[INFO] Xử lý batch {i//batch_size + 1}/{(total_files-1)//batch_size + 1}: {len(batch_files)} ảnh")
-                
-                for file in batch_files:
-                    if file and getattr(file, 'filename', None):
-                        ext = os.path.splitext(file.filename)[1].lower()
-                        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                            continue
-                        safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                        img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                        img_path = os.path.join(activity_dir, img_filename)
-                        try:
-                            file.stream.seek(0)
-                            img = Image.open(file.stream)
-                            # Tối ưu kích thước: resize nhỏ hơn cho web
-                            img.thumbnail((800, 600), Image.Resampling.LANCZOS)
-                            if ext.lower() in ['.jpg', '.jpeg']:
-                                img.save(img_path, 'JPEG', quality=75, optimize=True)  # Giảm quality để tiết kiệm bộ nhớ
-                            else:
-                                img.save(img_path, optimize=True)
-                            rel_path = f'images/activities/{new_post.id}/{img_filename}'
-                            db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
-                            success_count += 1
-                        except Exception as e:
-                            print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                            continue
-                
-                # Commit từng batch để tránh memory overflow  
-                try:
-                    db.session.commit()
-                    print(f"[INFO] Batch {i//batch_size + 1} hoàn thành: {success_count} ảnh thành công")
-                except Exception as e:
-                    print(f"[ERROR] Lỗi commit batch: {e}")
-                    db.session.rollback()
+            # Đơn giản hóa: Xử lý từng ảnh một cách đơn giản
+            for i, file in enumerate(files):
+                if file and getattr(file, 'filename', None):
+                    print(f"[DEBUG] Processing file {i+1}: {file.filename}")
+                    ext = os.path.splitext(file.filename)[1].lower()
+                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
+                        print(f"[DEBUG] Skipping file {file.filename} - invalid extension: {ext}")
+                        continue
+                    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                    img_path = os.path.join(activity_dir, img_filename)
+                    try:
+                        file.stream.seek(0)
+                        img = Image.open(file.stream)
+                        # Tối ưu kích thước: resize nhỏ hơn cho web
+                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
+                        if ext.lower() in ['.jpg', '.jpeg']:
+                            img.save(img_path, 'JPEG', quality=75, optimize=True)  # Giảm quality để tiết kiệm bộ nhớ
+                        else:
+                            img.save(img_path, optimize=True)
+                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
+                        success_count += 1
+                        print(f"[DEBUG] Successfully processed file {i+1}: {img_filename}")
+                    except Exception as e:
+                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
+                        continue
+            
+            try:
+                db.session.commit()
+                print(f"[DEBUG] Database commit successful: {success_count} images saved")
+            except Exception as e:
+                print(f"[ERROR] Lỗi commit database: {e}")
+                db.session.rollback()
             
             if success_count > 0:
                 flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
             else:
                 flash('Đã đăng bài viết mới!', 'success')
         else:
+            print(f"[DEBUG] No files to process")
             flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
         return redirect(url_for('main.activities'))
+    else:
+        print(f"[DEBUG] Form validation FAILED")
+        print(f"[DEBUG] Validation errors: {form.errors}")
+        # Hiển thị form validation errors to user
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f'{field}: {error}', 'danger')
     mobile = is_mobile()
     from datetime import date
     current_date_iso = date.today().isoformat()
@@ -2637,28 +2669,22 @@ def export_food_safety_process(week_number):
                     dishes.add(dish_name)
 
     # 2. For each dish, get its ingredients and sum up total needed for the week
-    print(f"[DEBUG] Processing {len(dish_appearance_count)} unique dishes")
     for dish_name, appearances in dish_appearance_count.items():
         dish = Dish.query.filter_by(name=dish_name).first()
         if not dish:
-            print(f"[DEBUG] Dish not found: {dish_name}")
             continue
-        print(f"[DEBUG] Processing dish '{dish_name}' (appears {appearances} times)")
-        print(f"[DEBUG] Dish has {len(dish.ingredients)} ingredients")
         for di in dish.ingredients:
             product = di.product
             if not product:
-                print(f"[DEBUG] Product not found for ingredient ID: {di.id}")
                 continue
             key = (di.product.name, di.unit, di.product.category, di.product.supplier)
             # Fix: multiply by appearances to account for how many times dish is served in the week
             qty = di.quantity * student_count * appearances
-            print(f"[DEBUG] Ingredient: {di.product.name}, Quantity: {di.quantity}, Unit: {di.unit}, Students: {student_count}, Appearances: {appearances}, Total: {qty}")
+            
             if key not in ingredient_totals:
                 ingredient_totals[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
             ingredient_totals[key]['total_qty'] += qty
     
-    print(f"[DEBUG] Total ingredient types aggregated: {len(ingredient_totals)}")
     # 3. Split into fresh, dry, fruit by category
     fresh_ingredients_with_qty = []
     dry_ingredients_with_qty = []
@@ -4265,17 +4291,11 @@ def create_menu_from_suggestions():
     # Import modules outside try block to avoid reference errors
     from datetime import datetime, timedelta
     import json
-    
-    print(f"[DEBUG] Received request to create menu from suggestions")
-    print(f"[DEBUG] Request method: {request.method}")
-    print(f"[DEBUG] Content-Type: {request.content_type}")
-    print(f"[DEBUG] Request data: {request.get_data()}")
 
     try:
         
         # Lấy dữ liệu từ request
         data = request.get_json()
-        print(f"[DEBUG] Parsed JSON data: {data}")
         
         if not data or 'menu' not in data:
             print(f"[ERROR] No menu data found. Data keys: {data.keys() if data else 'None'}")
@@ -4283,9 +4303,6 @@ def create_menu_from_suggestions():
         
         menu_data = data['menu']
         overwrite = data.get('overwrite', False)
-        
-        print(f"[DEBUG] Menu data: {menu_data}")
-        print(f"[DEBUG] Overwrite: {overwrite}")
         
         # Sử dụng tuần được chọn hoặc tuần hiện tại
         if 'target_week' in data and 'target_year' in data:
@@ -4311,16 +4328,16 @@ def create_menu_from_suggestions():
         # Tạo hoặc cập nhật thực đơn
         if existing_menu and overwrite:
             menu_obj = existing_menu
-            print(f"[DEBUG] Updating existing menu for week {week_number}/{year}")
+
         else:
             menu_obj = Menu(week_number=week_number, year=year)
             db.session.add(menu_obj)
-            print(f"[DEBUG] Creating new menu for week {week_number}/{year}")
+
         
         # Cập nhật dữ liệu thực đơn
         for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']:
             day_data = menu_data.get(day, {})
-            print(f"[DEBUG] Processing {day}: {day_data}")
+  
             
             if day == 'mon':
                 menu_obj.monday_morning = day_data.get('morning', '')
@@ -4366,8 +4383,7 @@ def create_menu_from_suggestions():
                 menu_obj.saturday_lateafternoon = day_data.get('lateafternoon', '')
         
         db.session.commit()
-        print(f"[DEBUG] Menu saved successfully with ID: {menu_obj.id}")
-        
+ 
         return jsonify({
             'success': True,
             'message': f'Đã {"cập nhật" if overwrite and existing_menu else "tạo"} thực đơn tuần {week_number}/{year} thành công!',

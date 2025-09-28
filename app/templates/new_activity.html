@@ -10,7 +10,8 @@
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="mb-4 fw-bold" style="color:#43a047;">Đăng bài viết mới</h2>
-    <form method="POST" enctype="multipart/form-data" id="activity-form" onsubmit="return submitQuillContent();">
+    <form method="POST" enctype="multipart/form-data" id="activity-form">
+        <!-- Temporarily bypass JavaScript for debugging -->
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
             <label for="title" class="form-label">Tiêu đề <span class="text-danger">*</span></label>
@@ -43,9 +44,13 @@
         </div>
         <div class="mb-3">
             <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
-            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple>
+            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple onchange="debugFiles()">
             <div class="form-text text-info">
                 <small>💡 <strong>Tối ưu cho 50-100 ảnh:</strong> Ảnh sẽ được tự động nén xuống ~200KB/ảnh trước khi upload.</small>
+            </div>
+            <!-- Debug info để test -->
+            <div id="debug-info" class="mt-2" style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: none;">
+                <small><strong>Debug:</strong> <span id="debug-text">Chưa chọn file nào</span></small>
             </div>
             <div id="compress-progress" class="mt-2" style="display:none;">
                 <div class="progress mb-2">
@@ -60,7 +65,7 @@
                 <small class="text-muted mt-1 d-block">Đang upload: <span id="progress-text">0/0</span></small>
             </div>
         </div>
-        <button type="submit" class="btn btn-success" id="submit-btn">
+        <button type="submit" class="btn btn-success" id="submit-btn" onclick="document.getElementById('description').value = quill.root.innerHTML;">
             <span class="spinner-border spinner-border-sm d-none" role="status"></span>
             Đăng bài
         </button>
@@ -84,6 +89,28 @@ var quill = new Quill('#quillEditor', {
         ]
     }
 });
+// Debug function để test file selection
+function debugFiles() {
+    const fileInput = document.getElementById('images');
+    const files = Array.from(fileInput.files);
+    const debugInfo = document.getElementById('debug-info');
+    const debugText = document.getElementById('debug-text');
+    
+    debugInfo.style.display = 'block';
+    
+    if (files.length === 0) {
+        debugText.innerHTML = 'Chưa chọn file nào';
+    } else {
+        let info = `Đã chọn ${files.length} file(s):<br>`;
+        files.forEach((file, index) => {
+            info += `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(1)}KB, ${file.type})<br>`;
+        });
+        debugText.innerHTML = info;
+    }
+    
+    console.log('File selection changed:', files);
+}
+
 function submitQuillContent() {
     document.getElementById('description').value = quill.root.innerHTML;
     
@@ -91,18 +118,45 @@ function submitQuillContent() {
     const fileInput = document.getElementById('images');
     const files = Array.from(fileInput.files);
     
-    // Debug: In ra số lượng ảnh
+    // Debug: In ra thông tin chi tiết
+    console.log('=== CLIENT-SIDE DEBUG ===');
     console.log('Số ảnh được chọn:', files.length);
+    console.log('Chi tiết files:', files);
+    console.log('FileInput element:', fileInput);
+    console.log('FileInput value:', fileInput.value);
+    console.log('FileInput files property:', fileInput.files);
     
-    // Tự động chọn phương pháp tối ưu dựa trên số ảnh
-    if (files.length >= 30) {
-        console.log('Nhiều ảnh (>=30), sử dụng client-side compression cho', files.length, 'ảnh');
-        compressAndUploadImages(files);
-        return false; // Ngăn submit form, xử lý riêng
-    } else {
-        console.log('Ít ảnh (<30), sử dụng upload truyền thống cho', files.length, 'ảnh');
-        return true; // Submit form bình thường
+    // Kiểm tra form data sẽ được gửi
+    const formData = new FormData(document.getElementById('activity-form'));
+    console.log('FormData entries:');
+    for (let [key, value] of formData.entries()) {
+        if (value instanceof File) {
+            console.log(key + ':', value.name, '(' + value.size + ' bytes)');
+        } else {
+            console.log(key + ':', value);
+        }
     }
+    
+    // Kiểm tra từng file
+    files.forEach((file, index) => {
+        console.log(`File ${index + 1}:`, {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            lastModified: file.lastModified
+        });
+    });
+    
+    // Alert để dễ thấy
+    if (files.length > 0) {
+        alert(`DEBUG: Đã chọn ${files.length} file(s). Check console for details.`);
+    } else {
+        alert('DEBUG: Không có file nào được chọn!');
+    }
+    
+    // Đơn giản hóa: LUÔN dùng traditional upload để test
+    console.log('Sử dụng traditional upload để test');
+    return true; // Submit form bình thường
 }
 
 // Hàm nén ảnh client-side - Tối ưu cho 60-70 ảnh
