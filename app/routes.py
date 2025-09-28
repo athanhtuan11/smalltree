@@ -191,12 +191,15 @@ except ImportError:
 
 @main.route('/dish-list')
 def dish_list():
-    from app.models import Dish
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    dishes = Dish.query.all()
-    dish_infos = []
-    return render_template('dish_list.html', dishes=dishes)
+    try:
+        dishes = Dish.query.all()
+        mobile = is_mobile()
+        return render_template('dish_list.html', dishes=dishes, mobile=mobile)
+    except Exception as e:
+        flash(f'Lỗi khi tải danh sách món ăn: {str(e)}', 'danger')
+        return redirect(url_for('main.menu'))
 
 # Route để bật/tắt trạng thái món ăn
 @main.route('/dish/<int:dish_id>/toggle-active', methods=['POST'])

@@ -61,7 +61,7 @@
     <!-- Students Grid -->
     <div class="row">
         {% for student in students %}
-        <div class="col-lg-4 col-md-6 col-12 mb-4">
+        <div class="col-xl-3 col-lg-4 col-md-6 col-12 mb-4">
             <div class="card h-100 shadow-sm">
                 <div class="card-header bg-light">
                     <div class="d-flex flex-column align-items-center justify-content-center">
@@ -80,6 +80,8 @@
                     <small class="text-muted d-block text-center mt-1">
                         Lớp: {{ student.class_name or 'Chưa phân lớp' }} | 
                         Sinh: {% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}N/A{% endif %}
+                    </small>
+                </div>
                 </div>
                 <div class="card-body">
                     {% set student_albums = albums|selectattr('student_id', 'equalto', student.id)|list %}
@@ -197,9 +199,58 @@
 }
 .card {
     transition: transform 0.2s;
+    max-width: 100%;
 }
 .card:hover {
     transform: translateY(-2px);
+}
+
+/* Desktop layout optimization */
+@media (min-width: 1200px) {
+    .col-xl-3 {
+        max-width: 24%;
+        flex: 0 0 24%;
+    }
+}
+
+@media (min-width: 992px) and (max-width: 1199px) {
+    .col-lg-4 {
+        max-width: 32%;
+        flex: 0 0 32%;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+    .col-md-6 {
+        max-width: 48%;
+        flex: 0 0 48%;
+    }
+}
+
+/* Card content optimization */
+.card-body {
+    padding: 1rem;
+    font-size: 0.9rem;
+}
+
+.card-footer {
+    padding: 0.75rem;
+    border-top: 1px solid #dee2e6;
+}
+
+.card-header {
+    padding: 1rem;
+    background-color: #f8f9fa;
+}
+
+/* Button spacing */
+.d-flex.gap-1 {
+    gap: 0.25rem !important;
+}
+
+.btn-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
 }
 </style>
 </style>
