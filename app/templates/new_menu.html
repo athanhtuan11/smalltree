@@ -17,15 +17,74 @@
     <form method="POST" id="menuForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
-            <label for="week_number" class="form-label">Tuần số (Hiện tại: {{ current_week }}/{{ current_year }})</label>
-            <input type="number" class="form-control rounded menu-textarea" id="week_number" name="week_number" min="1" 
-                   {% if error_week %}value="{{ error_week }}"{% else %}value="{{ current_week }}"{% endif %} required>
+            <label for="week_number" class="form-label">Tuần số <small class="text-muted"></small>(Hiện tại: {{ current_week }}/{{ current_year }})</small></label>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="number" class="form-control rounded menu-textarea" id="week_number" name="week_number" min="1" 
+                       {% if error_week %}value="{{ error_week }}"{% else %}value="{{ current_week }}"{% endif %} required>
+                <div id="week_range_display" class="text-muted" style="min-width:220px; font-size:0.95em;"></div>
+            </div>
             {% if error_week %}
             <div class="text-danger mt-1">
                 <small><i class="fas fa-exclamation-triangle"></i> Tuần {{ error_week }}/{{ current_year }} đã có thực đơn. Vui lòng chọn tuần khác.</small>
             </div>
             {% endif %}
         </div>
+
+        <!-- Server-provided values for week and date range (hidden) -->
+        <input type="hidden" id="server_week" value="{{ current_week }}">
+        <input type="hidden" id="server_year" value="{{ current_year }}">
+        <input type="hidden" id="server_week_start" value="{{ current_week_start if current_week_start is defined else '' }}">
+        <input type="hidden" id="server_week_end" value="{{ current_week_end if current_week_end is defined else '' }}">
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var weekInput = document.getElementById('week_number');
+            var serverWeekEl = document.getElementById('server_week');
+            var serverYearEl = document.getElementById('server_year');
+            var serverStartEl = document.getElementById('server_week_start');
+            var serverEndEl = document.getElementById('server_week_end');
+            var serverWeek = serverWeekEl ? parseInt(serverWeekEl.value) : null;
+            var serverYear = serverYearEl ? parseInt(serverYearEl.value) : null;
+            var serverWeekStart = serverStartEl ? serverStartEl.value : '';
+            var serverWeekEnd = serverEndEl ? serverEndEl.value : '';
+
+            if (weekInput) {
+                if (serverWeek) weekInput.value = serverWeek;
+            }
+
+            var display = document.getElementById('week_range_display');
+            function getMondayOfWeek(year, weekNumber) {
+                const jan4 = new Date(year, 0, 4);
+                const jan4Day = jan4.getDay() || 7;
+                const monday = new Date(jan4);
+                monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+                return monday;
+            }
+            function formatDate(d) {
+                const dd = String(d.getDate()).padStart(2, '0');
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const yy = String(d.getFullYear());
+                return `${dd}/${mm}/${yy}`;
+            }
+            function updateWeekRange() {
+                var w = parseInt(weekInput.value) || serverWeek || 1;
+                var y = serverYear || new Date().getFullYear();
+                if (serverWeek && w === serverWeek && serverWeekStart && serverWeekEnd) {
+                    display.textContent = `(${serverWeekStart} - ${serverWeekEnd})`;
+                    return;
+                }
+                try {
+                    const m = getMondayOfWeek(y, w);
+                    const end = new Date(m);
+                    end.setDate(m.getDate() + 6);
+                    display.textContent = `(${formatDate(m)} - ${formatDate(end)})`;
+                } catch (e) {
+                    display.textContent = '';
+                }
+            }
+            updateWeekRange();
+            if (weekInput) weekInput.addEventListener('input', updateWeekRange);
+        });
+        </script>
         <div class="mb-3">
             <label class="form-label">Nội dung từng ngày</label>
             <div class="table-responsive" style="margin-left:-12px; margin-right:-12px;">

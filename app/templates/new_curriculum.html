@@ -12,17 +12,76 @@
     <form method="POST" id="curriculumForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="mb-3">
-            <label for="week_number" class="form-label">Tuần số</label>
-            <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>
+            <label for="week_number" class="form-label">Tuần số <small class="text-muted">(Hiện tại: {{ current_week }}/{{ current_year }})</small></label>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="number" class="form-control rounded curriculum-textarea" id="week_number" name="week_number" min="1" required>
+                <div id="week_range_display" class="text-muted" style="min-width:220px; font-size:0.95em;"></div>
+            </div>
         </div>
+
+        <!-- Hidden server-provided values to avoid injecting Jinja directly into JS -->
+        <input type="hidden" id="server_week" value="{{ current_week }}">
+        <input type="hidden" id="server_year" value="{{ current_year }}">
+        <input type="hidden" id="server_week_start" value="{{ current_week_start }}">
+        <input type="hidden" id="server_week_end" value="{{ current_week_end }}">
+
         <script>
-        // Auto-fill week number input with current week of year
+        // Auto-fill week number input with current week and show start/end dates
         document.addEventListener('DOMContentLoaded', function() {
             var weekInput = document.getElementById('week_number');
-            var now = new Date();
-            var onejan = new Date(now.getFullYear(),0,1);
-            var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
-            if (weekInput) weekInput.value = week;
+            var serverWeekEl = document.getElementById('server_week');
+            var serverYearEl = document.getElementById('server_year');
+            var serverStartEl = document.getElementById('server_week_start');
+            var serverEndEl = document.getElementById('server_week_end');
+            var serverWeek = serverWeekEl ? parseInt(serverWeekEl.value) : null;
+            var serverYear = serverYearEl ? parseInt(serverYearEl.value) : null;
+            var serverWeekStart = serverStartEl ? serverStartEl.value : '';
+            var serverWeekEnd = serverEndEl ? serverEndEl.value : '';
+
+            if (weekInput) {
+                if (serverWeek) weekInput.value = serverWeek;
+                else {
+                    var now = new Date();
+                    var onejan = new Date(now.getFullYear(),0,1);
+                    var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+                    weekInput.value = week;
+                }
+            }
+
+            var display = document.getElementById('week_range_display');
+            function updateWeekRange() {
+                var w = parseInt(weekInput.value) || serverWeek || 1;
+                var y = serverYear || new Date().getFullYear();
+                // If the server provided start/end for the default week, show them
+                if (serverWeek && w === serverWeek && serverWeekStart && serverWeekEnd) {
+                    display.textContent = `(${serverWeekStart} - ${serverWeekEnd})`;
+                    return;
+                }
+                // Compute Monday of the ISO week
+                function getMondayOfWeek(year, weekNumber) {
+                    const jan4 = new Date(year, 0, 4);
+                    const jan4Day = jan4.getDay() || 7;
+                    const monday = new Date(jan4);
+                    monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+                    return monday;
+                }
+                function formatDate(d) {
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const yy = String(d.getFullYear());
+                    return `${dd}/${mm}/${yy}`;
+                }
+                try {
+                    const m = getMondayOfWeek(y, w);
+                    const end = new Date(m);
+                    end.setDate(m.getDate() + 6);
+                    display.textContent = `(${formatDate(m)} - ${formatDate(end)})`;
+                } catch (e) {
+                    display.textContent = '';
+                }
+            }
+            updateWeekRange();
+            if (weekInput) weekInput.addEventListener('input', updateWeekRange);
         });
         </script>
         <div class="mb-3">

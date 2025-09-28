@@ -644,7 +644,26 @@ def new_curriculum():
             else:
                 default_data[day][slot] = ""
     mobile = is_mobile()
-    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes, data=default_data)
+    # Compute current week and week start/end (Monday-Sunday) for display
+    from datetime import datetime, timedelta, date
+    today = datetime.now().date()
+    week_start = today - timedelta(days=today.weekday())
+    current_week = week_start.isocalendar()[1]
+    current_year = week_start.year
+    try:
+        first_iso_week_ref = date(current_year, 1, 4)
+        week_start_iso = first_iso_week_ref + timedelta(days=(current_week - 1) * 7)
+        week_start_iso = week_start_iso - timedelta(days=week_start_iso.isoweekday() - 1)
+        week_end_iso = week_start_iso + timedelta(days=6)
+        current_week_start = week_start_iso.strftime('%d/%m/%Y')
+        current_week_end = week_end_iso.strftime('%d/%m/%Y')
+    except Exception:
+        current_week_start = week_start.strftime('%d/%m/%Y')
+        current_week_end = (week_start + timedelta(days=6)).strftime('%d/%m/%Y')
+
+    return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes, data=default_data,
+                           current_week=current_week, current_year=current_year,
+                           current_week_start=current_week_start, current_week_end=current_week_end)
 
 
 @main.route('/curriculum')
