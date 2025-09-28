@@ -1193,19 +1193,24 @@ def accounts():
 def delete_curriculum(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    
-    # Get class_id from form data to ensure we delete the right curriculum
-    class_id = request.form.get('class_id', type=int)
-    if not class_id:
-        flash('Cần chỉ định lớp học để xóa chương trình!', 'danger')
-        return redirect(url_for('main.curriculum'))
-        
-    # Filter by both week_number AND class_id to avoid deleting wrong curriculum
+    # Get class_id from form data. If empty string or missing, treat as None (global curriculum)
+    class_id_raw = request.form.get('class_id')
+    if class_id_raw is None or class_id_raw == '':
+        class_id = None
+    else:
+        try:
+            class_id = int(class_id_raw)
+        except Exception:
+            class_id = None
+
+    # Filter by both week_number AND class_id (including None) to avoid deleting wrong curriculum
     week = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
     if week:
+        # Read related data before deleting to avoid DetachedInstanceError (lazy load after detach)
+        class_name = week.class_obj.name if week.class_obj else ''
         db.session.delete(week)
         db.session.commit()
-        flash(f'Đã xoá chương trình học tuần {week_number} của lớp {week.class_obj.name if week.class_obj else ""}!', 'success')
+        flash(f'Đã xoá chương trình học tuần {week_number} của lớp {class_name}!', 'success')
     else:
         flash('Không tìm thấy chương trình học để xoá!', 'danger')
     return redirect(url_for('main.curriculum'))
