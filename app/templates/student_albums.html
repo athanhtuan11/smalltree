@@ -58,12 +58,12 @@
         </div>
     </div>
 
-    <!-- Students Grid -->
-    <div class="row">
+    <!-- Students Grid: 4 per row on desktop, 2 per row on phones -->
+    <div class="row g-4">
         {% for student in students %}
-        <div class="col-xl-3 col-lg-4 col-md-6 col-12 mb-4">
-            <div class="card h-100 shadow-sm">
-                <div class="card-header bg-light">
+        <div class="col-6 col-lg-3 d-flex align-items-stretch">
+            <div class="card h-100 shadow-sm album-card w-100">
+                <div class="card-header bg-light text-center">
                     <div class="d-flex flex-column align-items-center justify-content-center">
                         <div class="mb-2">
                             {% if student.avatar %}
@@ -82,36 +82,24 @@
                         Sinh: {% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}N/A{% endif %}
                     </small>
                 </div>
-                </div>
                 <div class="card-body">
                     {% set student_albums = albums|selectattr('student_id', 'equalto', student.id)|list %}
-                    
-                    <div class="mb-3">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <div class="text-primary">
-                                    <i class="fas fa-photo-video fa-lg"></i>
-                                    <div class="fw-bold">{{ student_albums|length }}</div>
-                                    <small>Album</small>
-                                </div>
+                    <div class="mb-3 text-center small">
+                        <div class="d-flex justify-content-between">
+                            <div class="w-33 text-primary">
+                                <i class="fas fa-photo-video fa-lg"></i>
+                                <div class="fw-bold">{{ student_albums|length }}</div>
+                                <small>Album</small>
                             </div>
-                            <div class="col-4">
-                                <div class="text-success">
-                                    <i class="fas fa-images fa-lg"></i>
-                                    <div class="fw-bold">
-                                        {{ student_albums | map(attribute='photos') | map('length') | sum if student_albums else 0 }}
-                                    </div>
-                                    <small>Ảnh</small>
-                                </div>
+                            <div class="w-33 text-success">
+                                <i class="fas fa-images fa-lg"></i>
+                                <div class="fw-bold">{{ student_albums | map(attribute='photos') | map('length') | sum if student_albums else 0 }}</div>
+                                <small>Ảnh</small>
                             </div>
-                            <div class="col-4">
-                                <div class="text-warning">
-                                    <i class="fas fa-chart-line fa-lg"></i>
-                                    <div class="fw-bold">
-                                        {{ student.progress_records|length if student.progress_records else 0 }}
-                                    </div>
-                                    <small>Đánh giá</small>
-                                </div>
+                            <div class="w-33 text-warning">
+                                <i class="fas fa-chart-line fa-lg"></i>
+                                <div class="fw-bold">{{ student.progress_records|length if student.progress_records else 0 }}</div>
+                                <small>Đánh giá</small>
                             </div>
                         </div>
                     </div>
@@ -134,14 +122,12 @@
                                         {% endif %}
                                     </div>
                                 </div>
-                                <a href="{{ url_for('main.view_album', album_id=album.id) }}" 
-                                   class="btn btn-sm btn-outline-primary">
+                                <a href="{{ url_for('main.view_album', album_id=album.id) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="fas fa-eye"></i>
                                 </a>
                             </div>
                         </div>
                         {% endfor %}
-                        
                         {% if student_albums|length > 2 %}
                         <small class="text-muted">và {{ student_albums|length - 2 }} album khác...</small>
                         {% endif %}
@@ -153,16 +139,13 @@
                     </div>
                     {% endif %}
                 </div>
-                
                 <div class="card-footer bg-white">
                     <div class="d-flex gap-1">
-                        <a href="{{ url_for('main.student_albums_detail', student_id=student.id) }}" 
-                           class="btn btn-primary btn-sm flex-grow-1">
+                        <a href="{{ url_for('main.student_albums_detail', student_id=student.id) }}" class="btn btn-primary btn-sm flex-grow-1">
                             <i class="fas fa-folder-open"></i> Xem album
                         </a>
                         {% if session.role in ['admin', 'teacher'] %}
-                        <a href="{{ url_for('main.create_student_album', student_id=student.id) }}" 
-                           class="btn btn-success btn-sm">
+                        <a href="{{ url_for('main.create_student_album', student_id=student.id) }}" class="btn btn-success btn-sm">
                             <i class="fas fa-plus"></i> Thêm
                         </a>
                         {% endif %}
@@ -186,82 +169,42 @@
 </div>
 
 <style>
-</style>
-<style>
+/* Student Albums styling: compact, modern cards */
 .student-avatar-lg {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
     object-fit: cover;
     border-radius: 50%;
     border: 3px solid #4CAF50;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     background: #fff;
 }
-.card {
-    transition: transform 0.2s;
-    max-width: 100%;
+.album-card {
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    border: none;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    display: flex;
+    flex-direction: column;
 }
-.card:hover {
-    transform: translateY(-2px);
-}
+.album-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.10); }
+.card-header { padding: 1rem; background: #fbfbfb; border-top-left-radius: 14px; border-top-right-radius: 14px; }
+.card-body { padding: 0.9rem 1rem; flex: 1 1 auto; }
+.card-footer { padding: 0.7rem 1rem; background: #fff; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+.d-flex.gap-1 { gap: 0.35rem !important; }
+.w-33 { width: 33%; }
 
-/* Desktop layout optimization */
-@media (min-width: 1200px) {
-    .col-xl-3 {
-        max-width: 24%;
-        flex: 0 0 24%;
-    }
+/* Responsive: 4 per row on desktop (>=992px), 2 per row on phones */
+@media (min-width: 992px) {
+    .col-lg-3 { flex: 0 0 25%; max-width: 25%; }
 }
-
-@media (min-width: 992px) and (max-width: 1199px) {
-    .col-lg-4 {
-        max-width: 32%;
-        flex: 0 0 32%;
-    }
+@media (max-width: 991.98px) {
+    .col-6 { flex: 0 0 50%; max-width: 50%; }
 }
-
-@media (min-width: 768px) and (max-width: 991px) {
-    .col-md-6 {
-        max-width: 48%;
-        flex: 0 0 48%;
-    }
-}
-
-/* Card content optimization */
-.card-body {
-    padding: 1rem;
-    font-size: 0.9rem;
-}
-
-.card-footer {
-    padding: 0.75rem;
-    border-top: 1px solid #dee2e6;
-}
-
-.card-header {
-    padding: 1rem;
-    background-color: #f8f9fa;
-}
-
-/* Button spacing */
-.d-flex.gap-1 {
-    gap: 0.25rem !important;
-}
-
-.btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
+@media (max-width: 575.98px) {
+    .student-avatar-lg { width: 64px; height: 64px; }
+    .card-body { padding: 0.75rem; }
+    .card-footer { padding: 0.5rem; }
 }
 </style>
-</style>
-{% if mobile %}
-<style>
-.card-body {
-    padding: 0.75rem;
-}
-.card-footer {
-    padding: 0.5rem;
-}
-</style>
-{% endif %}
 {% endblock %}
