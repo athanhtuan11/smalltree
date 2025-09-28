@@ -114,89 +114,227 @@
                         <span class="d-none d-md-inline">Thực đơn các tuần</span>
                         <span class="d-md-none">Thực đơn</span>
                 </h2>
-                {% if session.get('role') in ['admin', 'teacher'] %}
-                <a href="{{ url_for('main.new_menu') }}" class="btn btn-success btn-sm menu-btn-uniform">
-                        <i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Thêm </span>Thực đơn
-                </a>
-                {% endif %}
         </div>
-    <!-- Action Buttons Section -->
+    <!-- Action Buttons Section - Desktop -->
     {% if session.get('role') in ['admin', 'teacher'] %}
-        <div class="d-none d-md-block mb-3 menu-btn-uniform-group">
-            <div class="row g-2 align-items-center">
-                <div class="col-auto">
-                    <form action="/menu/import" method="post" enctype="multipart/form-data" class="d-flex align-items-center" style="gap: 6px;">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="file" name="excel_file" accept=".xlsx" required style="width:140px;">
-                        <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:70px;" title="Tuần">
-                        <button type="submit" class="btn btn-primary btn-sm menu-btn-uniform">Import Excel</button>
-                    </form>
+        <div class="d-none d-md-flex align-items-center gap-3 mb-3 p-3 bg-light rounded">
+            <!-- Import Section -->
+            <form action="/menu/import" method="post" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="file" name="excel_file" accept=".xlsx" required style="width:160px;" class="form-control form-control-sm">
+                <div class="d-flex flex-column">
+                    <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:70px;" title="Tuần" class="form-control form-control-sm">
+                    <small id="import-week-range" class="text-info text-nowrap" style="font-size:0.7em;"></small>
                 </div>
-                <div class="col-auto">
-                    <a href="/menu/export" class="btn btn-success btn-sm menu-btn-uniform">Export Excel</a>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm menu-btn-uniform">
-                        <i class="fas fa-list"></i> Danh sách món ăn
-                    </a>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm menu-btn-uniform">
-                        <i class="bi bi-truck"></i> Quản lý nhà cung cấp
-                    </a>
-                </div>
-                <div class="col-auto">
-                    <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm menu-btn-uniform">
-                        <i class="fas fa-robot"></i> Tạo Nhanh Thực Đơn
-                    </a>
-                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Import</button>
+            </form>
+            
+            <!-- Divider -->
+            <div class="vr" style="height:40px;"></div>
+            
+            <!-- Action Buttons -->
+            <div class="d-flex gap-2">
+                <a href="/menu/export" class="btn btn-success btn-sm">Export Excel</a>
+                <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-list"></i> Món ăn
+                </a>
+                <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm">
+                    <i class="bi bi-truck"></i> Nhà cung cấp
+                </a>
+                <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm">
+                    <i class="fas fa-robot"></i> AI Thực đơn
+                </a>
+                <a href="{{ url_for('main.new_menu') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Thêm Thực đơn
+                </a>
             </div>
         </div>
     
     <!-- Mobile Action Buttons -->
-    <div class="d-md-none mobile-btn-group mb-3 menu-btn-uniform-group">
-        <form action="/menu/import" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mobile-form-row">
-                <input type="file" name="excel_file" accept=".xlsx" required class="form-control">
-                <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Số tuần (1-53)" class="form-control">
-                <button type="submit" class="btn btn-primary btn-sm menu-btn-uniform">
-                    <i class="fas fa-upload"></i> Import Excel
-                </button>
+    <div class="d-md-none mb-3">
+        <!-- Import/Export Section for Mobile -->
+        <div class="border rounded p-2 bg-light mb-2">
+            <form action="/menu/import" method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Tuần" class="form-control form-control-sm">
+                        <small id="import-week-range-mobile" class="text-info" style="font-size:0.7em;"></small>
+                    </div>
+                    <div class="col-6">
+                        <input type="file" name="excel_file" accept=".xlsx" required class="form-control form-control-sm">
+                    </div>
+                    <div class="col-6">
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="fas fa-upload"></i> Import
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <a href="/menu/export" class="btn btn-success btn-sm w-100">
+                            <i class="fas fa-download"></i> Export
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Quick Actions for Mobile -->
+        <div class="row g-2">
+            <div class="col-6">
+                <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm w-100">
+                    <i class="fas fa-list"></i> Món ăn
+                </a>
             </div>
-        </form>
-        <a href="/menu/export" class="btn btn-success btn-sm menu-btn-uniform">
-            <i class="fas fa-download"></i> Export Excel
-        </a>
-        <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm menu-btn-uniform">
-            <i class="fas fa-list"></i> Danh sách món ăn
-        </a>
-        <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm menu-btn-uniform">
-            <i class="bi bi-truck"></i> Quản lý nhà cung cấp
-        </a>
-        <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm menu-btn-uniform">
-            <i class="fas fa-robot"></i> Tạo Nhanh Thực Đơn
-        </a>
+            <div class="col-6">
+                <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm w-100">
+                    <i class="bi bi-truck"></i> Nhà cung cấp
+                </a>
+            </div>
+            <div class="col-6">
+                <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm w-100">
+                    <i class="fas fa-robot"></i> AI Thực đơn
+                </a>
+            </div>
+            <div class="col-6">
+                <a href="{{ url_for('main.new_menu') }}" class="btn btn-primary btn-sm w-100">
+                    <i class="fas fa-plus"></i> Thêm Thực đơn
+                </a>
+            </div>
+        </div>
     </div>
     {% endif %}
     <script>
-    // Auto-fill week number input with current week of year
+    // Helper function để tính ISO week number (đồng bộ với ai_dashboard)
+    function getWeekNumber(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+    
+    // Helper function để tính thứ 2 của tuần
+    function getMondayOfWeek(year, weekNumber) {
+        const jan4 = new Date(year, 0, 4);
+        const jan4Day = jan4.getDay() || 7;
+        const monday = new Date(jan4);
+        monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+        return monday;
+    }
+    
+    // Helper function format ngày
+    function formatDate(date) {
+        return date.toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'});
+    }
+    
+    // Helper function để format display tuần với ngày tháng (đồng bộ với curriculum)
+    function formatWeekDisplay(weekNumber, year) {
+        const monday = getMondayOfWeek(year, weekNumber);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        const mondayStr = formatDate(monday);
+        const sundayStr = formatDate(sunday);
+        
+        return `Tuần ${weekNumber} (${mondayStr} - ${sundayStr})`;
+    }
+    
+    // Auto-fill week number input với tuần hiện tại (ISO week)
+    // Helper function để tính thứ 2 của tuần
+    function getMondayOfWeek(year, weekNumber) {
+        const jan4 = new Date(year, 0, 4);
+        const jan4Day = jan4.getDay() || 7;
+        const monday = new Date(jan4);
+        monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+        return monday;
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
         var weekInput = document.getElementById('import-week-number');
         var weekInputMobile = document.getElementById('import-week-number-mobile');
         
         var now = new Date();
-        var onejan = new Date(now.getFullYear(),0,1);
-        var week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
+        var week = getWeekNumber(now);
+        var currentYear = now.getFullYear();
         
-        if (weekInput) weekInput.value = week;
-        if (weekInputMobile) weekInputMobile.value = week;
+        if (weekInput) {
+            weekInput.value = week;
+            updateImportWeekRange(week, currentYear);
+        }
+        if (weekInputMobile) {
+            weekInputMobile.value = week;
+            updateImportWeekRangeMobile(week, currentYear);
+        }
+        
+        // Thêm event listeners cho input week
+        if (weekInput) {
+            weekInput.addEventListener('input', function(e) {
+                const weekNumber = parseInt(e.target.value);
+                if (weekNumber >= 1 && weekNumber <= 53) {
+                    updateImportWeekRange(weekNumber, currentYear);
+                } else {
+                    document.getElementById('import-week-range').textContent = '';
+                }
+            });
+        }
+        
+        if (weekInputMobile) {
+            weekInputMobile.addEventListener('input', function(e) {
+                const weekNumber = parseInt(e.target.value);
+                if (weekNumber >= 1 && weekNumber <= 53) {
+                    updateImportWeekRangeMobile(weekNumber, currentYear);
+                } else {
+                    document.getElementById('import-week-range-mobile').textContent = '';
+                }
+            });
+        }
+        
+        // Cập nhật tất cả tiêu đề tuần với ngày tháng
+        updateMenuWeekTitles();
     });
+    
+    // Helper function để cập nhật hiển thị ngày tháng cho import week (desktop)
+    function updateImportWeekRange(weekNumber, year) {
+        const rangeElement = document.getElementById('import-week-range');
+        if (rangeElement && weekNumber >= 1 && weekNumber <= 53) {
+            const monday = getMondayOfWeek(year, weekNumber);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            
+            rangeElement.textContent = `(${formatDate(monday)} - ${formatDate(sunday)})`;
+        }
+    }
+    
+    // Helper function để cập nhật hiển thị ngày tháng cho import week (mobile)
+    function updateImportWeekRangeMobile(weekNumber, year) {
+        const rangeElement = document.getElementById('import-week-range-mobile');
+        if (rangeElement && weekNumber >= 1 && weekNumber <= 53) {
+            const monday = getMondayOfWeek(year, weekNumber);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            
+            rangeElement.textContent = `(${formatDate(monday)} - ${formatDate(sunday)})`;
+        }
+    }
+
+    function updateMenuWeekTitles() {
+        const weekTitles = document.querySelectorAll('[id^="menu-week-title-"]');
+        weekTitles.forEach(title => {
+            const matches = title.id.match(/menu-week-title-(\d+)/);
+            if (matches) {
+                const weekNumber = parseInt(matches[1]);
+                const currentYear = new Date().getFullYear();
+                title.textContent = formatWeekDisplay(weekNumber, currentYear);
+            }
+        });
+    }
     </script>
     {% for week in menu %}
     <div class="card mb-4 shadow rounded-4 border-0">
         <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
-            <h4 class="fw-bold mb-2 mb-md-0">Tuần {{ week.week_number }}</h4>
+            <div>
+                <h4 class="fw-bold mb-1" id="menu-week-title-{{ week.week_number }}">Tuần {{ week.week_number }}/{{ week.year }}</h4>
+            </div>
             {% if session.get('role') in ['admin', 'teacher'] %}
                 <div class="d-flex flex-column flex-md-row gap-2 menu-btn-uniform-group">
                     <a href="{{ url_for('main.edit_menu', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm menu-btn-uniform">Chỉnh sửa</a>

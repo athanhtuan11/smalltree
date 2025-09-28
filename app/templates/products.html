@@ -43,6 +43,7 @@
                                     <th>Loại</th>
                                     <th>Nhà cung cấp</th>
                                     <th>Đơn vị</th>
+                                    <th>Giá cả (VNĐ)</th>
                                     <th>Thao tác</th>
                                 </tr>
                             </thead>
@@ -66,6 +67,13 @@
                                         <br><small class="text-muted">{{ product.supplier.contact_person or '-' }}</small>
                                     </td>
                                     <td>{{ product.unit }}</td>
+                                    <td>
+                                        {% if product.price %}
+                                            <span class="text-success fw-bold">{{ "{:,.0f}".format(product.price) }} đ/{{ product.unit }}</span>
+                                        {% else %}
+                                            <small class="text-muted">Chưa có giá</small>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <a href="{{ url_for('main.edit_product', product_id=product.id) }}" 

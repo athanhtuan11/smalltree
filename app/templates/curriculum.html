@@ -113,14 +113,52 @@
             <span class="d-none d-md-inline">Chương trình học các tuần</span>
             <span class="d-md-none">Chương trình học</span>
         </h2>
-        {% if session.get('role') in ['admin', 'teacher'] %}
-        <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-success {% if mobile %}curriculum-btn-mobile{% endif %}">
-            <i class="fas fa-plus"></i> <span class="d-none d-sm-inline">Thêm </span>Chương trình
-        </a>
-        {% endif %}
     </div>
     
-    <!-- Filter Section -->
+    <!-- Filter and Action Section - Desktop -->
+    {% if session.get('role') in ['admin', 'teacher'] %}
+    <div class="d-none d-md-flex flex-row align-items-center gap-3 mb-3 p-3 bg-light rounded">
+        <!-- Filter Section -->
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label for="class_id" class="form-label mb-0 fw-bold text-nowrap">Lọc theo lớp:</label>
+            <select id="class_id" name="class_id" class="form-select" onchange="this.form.submit()" style="width:120px;">
+                <option value="">Tất cả lớp</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        
+        <!-- Divider -->
+        <div class="vr" style="height:30px;"></div>
+        
+        <!-- Import Section -->
+        <form action="/curriculum/import" method="post" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="class_id" class="form-select" required style="width:120px;">
+                <option value="">Chọn lớp</option>
+                {% for c in classes %}
+                <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="file" name="excel_file" accept=".xlsx" required style="width:160px;">
+            <div class="d-flex flex-column">
+                <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:70px;" title="Tuần">
+                <small id="import-week-range" class="text-info text-nowrap" style="font-size:0.7em;"></small>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Import Excel</button>
+        </form>
+        
+        <!-- Export and Create Buttons -->
+        <div class="d-flex gap-2">
+            <a href="/curriculum/export" class="btn btn-success btn-sm">Export Excel</a>
+            <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Thêm Chương trình
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <!-- Filter Only - For Non-Admin Users -->
     <form method="get" class="mb-3">
         <div class="row g-2 align-items-center">
             <div class="col-auto">
@@ -136,42 +174,78 @@
             </div>
         </div>
     </form>
-    
-    <!-- Action Buttons Section -->
-    {% if session.get('role') in ['admin', 'teacher'] %}
-    <div class="d-none d-md-flex flex-row gap-2 mb-3">
-        <form action="/curriculum/import" method="post" enctype="multipart/form-data" style="display:inline-block;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <select name="class_id" class="form-select" required style="width:150px;display:inline-block;">
-                <option value="">Chọn lớp</option>
-                {% for c in classes %}
-                <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
-                {% endfor %}
-            </select>
-            <input type="file" name="excel_file" accept=".xlsx" required style="display:inline-block;">
-            <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:90px;display:inline-block;" title="Tuần">
-            <button type="submit" class="btn btn-primary">Import Excel</button>
-        </form>
-        <a href="/curriculum/export" class="btn btn-success">Export Excel</a>
-    </div>
-    
+    {% endif %}
     <!-- Mobile Action Buttons -->
-    <div class="d-md-none mobile-btn-group mb-3">
-        <form action="/curriculum/import" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mobile-form-row">
-                <input type="file" name="excel_file" accept=".xlsx" required class="form-control">
-                <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Số tuần (1-53)" class="form-control">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-upload"></i> Import Excel
-                </button>
-                <a href="/curriculum/export" class="btn btn-success mt-2">
-                    <i class="fas fa-download"></i> Export Excel
-                </a>
+    <div class="d-md-none mb-3">
+        {% if session.get('role') in ['admin', 'teacher'] %}
+        <!-- Filter Section for Mobile -->
+        <form method="get" class="mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <label for="class_id_mobile" class="form-label mb-0 fw-bold" style="font-size:0.9em;">Lọp lớp:</label>
+                <select id="class_id_mobile" name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Tất cả</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
         </form>
+        
+        <!-- Import/Export Section for Mobile -->
+        <div class="row g-2">
+            <div class="col-12">
+                <form action="/curriculum/import" method="post" enctype="multipart/form-data" class="border rounded p-2 bg-light">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <select name="class_id" class="form-select form-select-sm" required>
+                                <option value="">Chọn lớp</option>
+                                {% for c in classes %}
+                                <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Tuần" class="form-control form-control-sm">
+                            <small id="import-week-range-mobile" class="text-info" style="font-size:0.7em;"></small>
+                        </div>
+                        <div class="col-12">
+                            <input type="file" name="excel_file" accept=".xlsx" required class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-upload"></i> Import
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <a href="/curriculum/export" class="btn btn-success btn-sm w-100">
+                                <i class="fas fa-download"></i> Export
+                            </a>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <a href="{{ url_for('main.new_curriculum') }}" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-plus"></i> Thêm Chương trình
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <!-- Filter Only for Non-Admin Mobile Users -->
+        <form method="get">
+            <div class="d-flex align-items-center gap-2">
+                <label for="class_id_mobile" class="form-label mb-0 fw-bold">Lọc lớp:</label>
+                <select id="class_id_mobile" name="class_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">Tất cả lớp</option>
+                    {% for c in classes %}
+                    <option value="{{ c.id }}" {% if selected_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+        {% endif %}
     </div>
-    {% endif %}
     <script>
     // Auto-fill week number input with current week of year
     document.addEventListener('DOMContentLoaded', function() {
@@ -190,16 +264,17 @@
     <div class="card mb-4 shadow rounded-4 border-0">
         <div class="card-header bg-success text-white rounded-top-4 d-flex flex-column flex-md-row justify-content-between align-items-center">
             <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
-                <h4 class="fw-bold mb-0">Tuần {{ week.week_number }}</h4>
+                <h4 class="fw-bold mb-0" id="week-title-{{ week.week_number }}">Tuần {{ week.week_number }}</h4>
                 {% if week.class_name %}
                 <span class="badge bg-light text-success ms-md-2" style="font-size:1em;">Lớp: {{ week.class_name }}</span>
                 {% endif %}
             </div>
             {% if session.get('role') in ['admin', 'teacher'] %}
                 <div class="d-flex flex-column flex-md-row gap-2 curriculum-btn-group-mobile">
-                    <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number) }}" class="btn btn-outline-warning btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Chỉnh sửa</a>
+                    <a href="{{ url_for('main.edit_curriculum', week_number=week.week_number, class_id=week.class_id) }}" class="btn btn-outline-warning btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Chỉnh sửa</a>
                     <form method="POST" action="{{ url_for('main.delete_curriculum', week_number=week.week_number) }}" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá chương trình này?');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="class_id" value="{{ week.class_id }}">
                         <button type="submit" class="btn btn-outline-danger btn-sm {% if mobile %}curriculum-btn-mobile{% endif %}">Xoá</button>
                     </form>
                 </div>
@@ -303,4 +378,121 @@
     <p class="text-center" style="font-size:1.1em;">Chưa có chương trình học nào.</p>
     {% endfor %}
 </div>
+
+<script>
+// Helper function để tính ISO week number (đồng bộ với menu và ai_dashboard)
+function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+// Helper function để tính thứ 2 của tuần
+function getMondayOfWeek(year, weekNumber) {
+    const jan4 = new Date(year, 0, 4);
+    const jan4Day = jan4.getDay() || 7;
+    const monday = new Date(jan4);
+    monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+    return monday;
+}
+
+// Helper function để format ngày
+function formatDate(date) {
+    return date.toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'});
+}
+
+// Helper function để format hiển thị tuần với ngày tháng
+function formatWeekDisplay(weekNumber, year) {
+    const monday = getMondayOfWeek(year, weekNumber);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    return `Tuần ${weekNumber} (${formatDate(monday)} - ${formatDate(sunday)})`;
+}
+
+// Auto-fill week number input with current week of year
+document.addEventListener('DOMContentLoaded', function() {
+    var weekInput = document.getElementById('import-week-number');
+    var weekInputMobile = document.getElementById('import-week-number-mobile');
+    
+    var now = new Date();
+    var week = getWeekNumber(now);
+    var currentYear = now.getFullYear();
+    
+    if (weekInput) {
+        weekInput.value = week;
+        updateImportWeekRange(week, currentYear);
+    }
+    if (weekInputMobile) {
+        weekInputMobile.value = week;
+        updateImportWeekRangeMobile(week, currentYear);
+    }
+    
+    // Thêm event listeners cho input week
+    if (weekInput) {
+        weekInput.addEventListener('input', function(e) {
+            const weekNumber = parseInt(e.target.value);
+            if (weekNumber >= 1 && weekNumber <= 53) {
+                updateImportWeekRange(weekNumber, currentYear);
+            } else {
+                document.getElementById('import-week-range').textContent = '';
+            }
+        });
+    }
+    
+    if (weekInputMobile) {
+        weekInputMobile.addEventListener('input', function(e) {
+            const weekNumber = parseInt(e.target.value);
+            if (weekNumber >= 1 && weekNumber <= 53) {
+                updateImportWeekRangeMobile(weekNumber, currentYear);
+            } else {
+                document.getElementById('import-week-range-mobile').textContent = '';
+            }
+        });
+    }
+    
+    // Cập nhật hiển thị tiêu đề tuần với ngày tháng
+    updateWeekDisplays();
+});
+
+// Helper function để cập nhật hiển thị ngày tháng cho import week (desktop)
+function updateImportWeekRange(weekNumber, year) {
+    const rangeElement = document.getElementById('import-week-range');
+    if (rangeElement && weekNumber >= 1 && weekNumber <= 53) {
+        const monday = getMondayOfWeek(year, weekNumber);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        rangeElement.textContent = `(${formatDate(monday)} - ${formatDate(sunday)})`;
+    }
+}
+
+// Helper function để cập nhật hiển thị ngày tháng cho import week (mobile)
+function updateImportWeekRangeMobile(weekNumber, year) {
+    const rangeElement = document.getElementById('import-week-range-mobile');
+    if (rangeElement && weekNumber >= 1 && weekNumber <= 53) {
+        const monday = getMondayOfWeek(year, weekNumber);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        rangeElement.textContent = `(${formatDate(monday)} - ${formatDate(sunday)})`;
+    }
+}
+
+function updateWeekDisplays() {
+    const currentYear = new Date().getFullYear();
+    
+    // Cập nhật tất cả tiêu đề tuần với ngày tháng
+    const weekTitles = document.querySelectorAll('[id^="week-title-"]');
+    weekTitles.forEach(title => {
+        const weekNumber = parseInt(title.id.replace('week-title-', ''));
+        if (weekNumber) {
+            title.textContent = formatWeekDisplay(weekNumber, currentYear);
+        }
+    });
+}
+</script>
+
 {% endblock %}

@@ -32,6 +32,16 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="mb-3">
+            <label for="price" class="form-label">Giá cả (VNĐ)</label>
+            <div class="input-group">
+                <input type="number" class="form-control" id="price" name="price" 
+                       value="{{ form.price.data or product.price or '' }}" 
+                       min="0" step="any" placeholder="0">
+                <span class="input-group-text">VNĐ</span>
+            </div>
+            <small class="text-muted">Giá theo đơn vị (để trống nếu chưa biết giá)</small>
+        </div>
         <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
         <a href="{{ url_for('main.products') }}" class="btn btn-secondary">Hủy</a>
     </form>

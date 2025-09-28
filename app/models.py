@@ -57,6 +57,9 @@ class Curriculum(db.Model):
     material = db.Column(db.String(200), nullable=True)
     # Relationship
     class_obj = db.relationship('Class', backref=db.backref('curriculums', lazy=True))
+    
+    # Unique constraint để tránh trùng lặp tuần + lớp
+    __table_args__ = (db.UniqueConstraint('week_number', 'class_id', name='unique_week_class'),)
 
 class AttendanceRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -99,6 +102,7 @@ class Product(db.Model):
     category = db.Column(db.String(50), nullable=False)  # 'fresh' hoặc 'dry'
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'), nullable=False)
     unit = db.Column(db.String(20), nullable=False)  # kg, lít, gói...
+    price = db.Column(db.Float, nullable=True)  # Giá cả (VNĐ) theo đơn vị
     # usual_quantity = db.Column(db.Float)  # Đã bỏ trường số lượng thường dùng
     is_active = db.Column(db.Boolean, default=True)
 

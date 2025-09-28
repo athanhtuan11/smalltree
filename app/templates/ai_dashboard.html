@@ -18,8 +18,22 @@
         /* Responsive tabs */
         .nav-tabs {
             flex-wrap: wrap;
+            const currentYear = new Date().getFullYear();
+            
+            if (!weekNumber || weekNumber < 1 || weekNumber > 53) {
+                alert('Vui lòng nhập số tuần hợp lệ (1-53).');
+                return;
+            }
+            
+            selectedWeek = {week: weekNumber, year: currentYear};
+            console.log('[DEBUG] selectedWeek was null, initialized to:', selectedWeek);
         }
         
+        console.log('[DEBUG] About to create menu for week:', selectedWeek);
+        console.log('[DEBUG] Menu data available:', !!currentMenuData);
+        
+        const confirmCreate = confirm(`Bạn có muốn tạo thực đơn mới cho tuần ${selectedWeek.week}/${selectedWeek.year} từ kết quả AI này không?`);
+        if (!confirmCreate) return;     
         .nav-tabs .nav-link {
             font-size: 14px;
             padding: 8px 12px;
@@ -215,6 +229,7 @@
                                             <input type="number" class="form-control" id="targetWeek" name="target_week" 
                                                    min="1" max="53" placeholder="Nhập số tuần (1-53)">
                                             <small class="form-text text-muted">Nhập số tuần cần tạo thực đơn (VD: 38, 39, 40...)</small>
+                                            <small class="form-text text-info d-block mt-1" id="weekDateRange"></small>
                                         </div>
                                         
                                         <div class="d-grid">
@@ -345,6 +360,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         weekInput.value = currentWeek;
         selectedWeek = {week: currentWeek, year: currentYear};
+        updateWeekDateRange(currentWeek, currentYear);
+    }
+    
+    // Cập nhật hiển thị ngày tháng của tuần
+    function updateWeekDateRange(weekNumber, year) {
+        const dateRangeElement = document.getElementById('weekDateRange');
+        if (dateRangeElement) {
+            dateRangeElement.textContent = formatWeekDisplay(weekNumber, year);
+        }
+    }
+    
+    // Helper function để tính thứ 2 của tuần (ISO week)
+    function getMondayOfWeek(year, weekNumber) {
+        const jan4 = new Date(year, 0, 4);
+        const jan4Day = jan4.getDay() || 7;
+        const monday = new Date(jan4);
+        monday.setDate(jan4.getDate() - jan4Day + 1 + (weekNumber - 1) * 7);
+        return monday;
     }
     
     // Helper functions
@@ -367,6 +400,18 @@ document.addEventListener('DOMContentLoaded', function() {
         return date.toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit'});
     }
     
+    // Helper function để format display tuần với ngày tháng (đồng bộ với curriculum và menu)
+    function formatWeekDisplay(weekNumber, year) {
+        const monday = getMondayOfWeek(year, weekNumber);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        
+        const mondayStr = formatDate(monday);
+        const sundayStr = formatDate(sunday);
+        
+        return `Tuần ${weekNumber} (${mondayStr} - ${sundayStr})`;
+    }
+    
     // Initialize week input
     initializeWeekInput();
     
@@ -377,10 +422,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (weekNumber >= 1 && weekNumber <= 53) {
             selectedWeek = {week: weekNumber, year: currentYear};
+            updateWeekDateRange(weekNumber, currentYear);
             console.log('[DEBUG] Selected week:', selectedWeek);
         } else {
             alert('Vui lòng nhập số tuần từ 1 đến 53');
-            e.target.value = getWeekNumber(new Date()); // Reset về tuần hiện tại
+            const currentWeek = getWeekNumber(new Date());
+            e.target.value = currentWeek;
+            selectedWeek = {week: currentWeek, year: currentYear};
+            updateWeekDateRange(currentWeek, currentYear);
         }
     });
     

@@ -59,4 +59,5 @@ class ProductForm(FlaskForm):
                           validators=[DataRequired()])
     supplier_id = SelectField('Nhà cung cấp', coerce=int, validators=[DataRequired()])
     unit = StringField('Đơn vị tính', validators=[DataRequired(), Length(min=1, max=20)])
+    price = FloatField('Giá cả (VNĐ)', validators=[Optional(), NumberRange(min=0)])
     submit = SubmitField('Lưu sản phẩm')

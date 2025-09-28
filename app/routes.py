@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from PIL import Image
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -554,6 +554,24 @@ def new_curriculum():
     if request.method == 'POST':
         week_number = request.form.get('week_number')
         class_id = request.form.get('class_id')
+        
+        # Check for duplicate curriculum (same week + same class)
+        existing = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
+        if existing:
+            class_name = Class.query.get(class_id).name if class_id else "Chưa chọn lớp"
+            flash(f'Chương trình học tuần {week_number} cho lớp {class_name} đã tồn tại!', 'danger')
+            classes = Class.query.order_by(Class.name).all()
+            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+            morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
+            afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
+            default_data = {}
+            for day in days:
+                default_data[day] = {}
+                for slot in morning_slots + afternoon_slots:
+                    default_data[day][slot] = ""
+            mobile = is_mobile()
+            return render_template('new_curriculum.html', title='Tạo chương trình mới', mobile=mobile, classes=classes, data=default_data, error_week=week_number, error_class=class_id)
+        
         days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
         morning_slots = ['morning_0', 'morning_1', 'morning_2', 'morning_3', 'morning_4', 'morning_5', 'morning_6']
         afternoon_slots = ['afternoon_1', 'afternoon_2', 'afternoon_3', 'afternoon_4']
@@ -1140,11 +1158,19 @@ def accounts():
 def delete_curriculum(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    week = Curriculum.query.filter_by(week_number=week_number).first()
+    
+    # Get class_id from form data to ensure we delete the right curriculum
+    class_id = request.form.get('class_id', type=int)
+    if not class_id:
+        flash('Cần chỉ định lớp học để xóa chương trình!', 'danger')
+        return redirect(url_for('main.curriculum'))
+        
+    # Filter by both week_number AND class_id to avoid deleting wrong curriculum
+    week = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
     if week:
         db.session.delete(week)
         db.session.commit()
-        flash(f'Đã xoá chương trình học tuần {week_number}!', 'success')
+        flash(f'Đã xoá chương trình học tuần {week_number} của lớp {week.class_obj.name if week.class_obj else ""}!', 'success')
     else:
         flash('Không tìm thấy chương trình học để xoá!', 'danger')
     return redirect(url_for('main.curriculum'))
@@ -1153,7 +1179,15 @@ def delete_curriculum(week_number):
 def edit_curriculum(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    week = Curriculum.query.filter_by(week_number=week_number).first()
+    
+    # Get class_id from URL parameter to ensure we edit the right curriculum
+    class_id = request.args.get('class_id', type=int)
+    if not class_id:
+        flash('Cần chỉ định lớp học để chỉnh sửa chương trình!', 'danger')
+        return redirect(url_for('main.curriculum'))
+        
+    # Filter by both week_number AND class_id to avoid editing wrong curriculum
+    week = Curriculum.query.filter_by(week_number=week_number, class_id=class_id).first()
     classes = Class.query.order_by(Class.name).all()
     if not week:
         flash('Không tìm thấy chương trình học để chỉnh sửa!', 'danger')
@@ -1707,34 +1741,68 @@ def delete_bmi_record(record_id):
 
 @main.route('/menu')
 def menu():
-    weeks = Curriculum.query.order_by(Curriculum.week_number).all()
+    # Chỉ sử dụng Menu model cho thực đơn
+    menus = Menu.query.order_by(Menu.week_number).all()
     menu = []
-    for week in weeks:
-        try:
-            data = json.loads(week.content) if week.content else {}
-            # Ensure all days and slots exist
-            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-            slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
-            for day in days:
-                if day not in data:
-                    data[day] = {}
-                for slot in slots:
-                    if slot not in data[day]:
-                        data[day][slot] = ''
-        except Exception as e:
-            print(f"Error parsing JSON for week {week.week_number}: {e}")
-            data = {}
-            # Initialize empty structure
-            days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-            slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
-            for day in days:
-                data[day] = {}
-                for slot in slots:
-                    data[day][slot] = ''
+    
+    for menu_item in menus:
+        # Convert structured Menu fields to template format
+        data = {
+            'mon': {
+                'morning': menu_item.monday_morning or '',
+                'snack': menu_item.monday_snack or '',
+                'dessert': menu_item.monday_dessert or '',
+                'lunch': menu_item.monday_lunch or '',
+                'afternoon': menu_item.monday_afternoon or '',
+                'lateafternoon': menu_item.monday_lateafternoon or ''
+            },
+            'tue': {
+                'morning': menu_item.tuesday_morning or '',
+                'snack': menu_item.tuesday_snack or '',
+                'dessert': menu_item.tuesday_dessert or '',
+                'lunch': menu_item.tuesday_lunch or '',
+                'afternoon': menu_item.tuesday_afternoon or '',
+                'lateafternoon': menu_item.tuesday_lateafternoon or ''
+            },
+            'wed': {
+                'morning': menu_item.wednesday_morning or '',
+                'snack': menu_item.wednesday_snack or '',
+                'dessert': menu_item.wednesday_dessert or '',
+                'lunch': menu_item.wednesday_lunch or '',
+                'afternoon': menu_item.wednesday_afternoon or '',
+                'lateafternoon': menu_item.wednesday_lateafternoon or ''
+            },
+            'thu': {
+                'morning': menu_item.thursday_morning or '',
+                'snack': menu_item.thursday_snack or '',
+                'dessert': menu_item.thursday_dessert or '',
+                'lunch': menu_item.thursday_lunch or '',
+                'afternoon': menu_item.thursday_afternoon or '',
+                'lateafternoon': menu_item.thursday_lateafternoon or ''
+            },
+            'fri': {
+                'morning': menu_item.friday_morning or '',
+                'snack': menu_item.friday_snack or '',
+                'dessert': menu_item.friday_dessert or '',
+                'lunch': menu_item.friday_lunch or '',
+                'afternoon': menu_item.friday_afternoon or '',
+                'lateafternoon': menu_item.friday_lateafternoon or ''
+            },
+            'sat': {
+                'morning': menu_item.saturday_morning or '',
+                'snack': menu_item.saturday_snack or '',
+                'dessert': menu_item.saturday_dessert or '',
+                'lunch': menu_item.saturday_lunch or '',
+                'afternoon': menu_item.saturday_afternoon or '',
+                'lateafternoon': menu_item.saturday_lateafternoon or ''
+            }
+        }
+        
         menu.append({
-            'week_number': week.week_number,
+            'week_number': menu_item.week_number,
             'data': data
         })
+    
     mobile = is_mobile()
     return render_template('menu.html', menu=menu, title='Thực đơn', mobile=mobile)
 
@@ -1743,63 +1811,224 @@ def new_menu():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     if request.method == 'POST':
-        week_number = request.form.get('week_number')
-        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
-        menu_data = {}
-        for day in days:
-            menu_data[day] = {}
-            for slot in slots:
-                menu_data[day][slot] = request.form.get(f'content_{day}_{slot}')
-        content = json.dumps(menu_data, ensure_ascii=False)
-        new_week = Curriculum(week_number=week_number, content=content, material=None)
-        db.session.add(new_week)
+        week_number = int(request.form.get('week_number'))
+        
+        # Check if menu already exists for this week
+        existing_menu = Menu.query.filter_by(week_number=week_number, year=2025).first()
+        if existing_menu:
+            flash(f'Thực đơn tuần {week_number}/2025 đã tồn tại! Vui lòng chọn tuần khác hoặc sửa thực đơn hiện có.', 'danger')
+            # Get all active dishes for re-rendering the form
+            dishes = Dish.query.filter_by(is_active=True).all()
+            mobile = is_mobile()
+            
+            # Calculate current week for display
+            from datetime import datetime, timedelta
+            today = datetime.now().date()
+            week_start = today - timedelta(days=today.weekday())
+            current_week = week_start.isocalendar()[1]
+            current_year = week_start.year
+            
+            return render_template('new_menu.html', title='Tạo thực đơn mới', mobile=mobile, dishes=dishes, 
+                                 error_week=week_number, current_week=current_week, current_year=current_year)
+        
+        # Create new Menu record
+        new_menu = Menu(
+            week_number=week_number,
+            year=2025,  # Current year
+            # Monday
+            monday_morning=request.form.get('content_mon_morning', ''),
+            monday_snack=request.form.get('content_mon_snack', ''),
+            monday_dessert=request.form.get('content_mon_dessert', ''),
+            monday_lunch=request.form.get('content_mon_lunch', ''),
+            monday_afternoon=request.form.get('content_mon_afternoon', ''),
+            monday_lateafternoon=request.form.get('content_mon_lateafternoon', ''),
+            # Tuesday
+            tuesday_morning=request.form.get('content_tue_morning', ''),
+            tuesday_snack=request.form.get('content_tue_snack', ''),
+            tuesday_dessert=request.form.get('content_tue_dessert', ''),
+            tuesday_lunch=request.form.get('content_tue_lunch', ''),
+            tuesday_afternoon=request.form.get('content_tue_afternoon', ''),
+            tuesday_lateafternoon=request.form.get('content_tue_lateafternoon', ''),
+            # Wednesday
+            wednesday_morning=request.form.get('content_wed_morning', ''),
+            wednesday_snack=request.form.get('content_wed_snack', ''),
+            wednesday_dessert=request.form.get('content_wed_dessert', ''),
+            wednesday_lunch=request.form.get('content_wed_lunch', ''),
+            wednesday_afternoon=request.form.get('content_wed_afternoon', ''),
+            wednesday_lateafternoon=request.form.get('content_wed_lateafternoon', ''),
+            # Thursday
+            thursday_morning=request.form.get('content_thu_morning', ''),
+            thursday_snack=request.form.get('content_thu_snack', ''),
+            thursday_dessert=request.form.get('content_thu_dessert', ''),
+            thursday_lunch=request.form.get('content_thu_lunch', ''),
+            thursday_afternoon=request.form.get('content_thu_afternoon', ''),
+            thursday_lateafternoon=request.form.get('content_thu_lateafternoon', ''),
+            # Friday
+            friday_morning=request.form.get('content_fri_morning', ''),
+            friday_snack=request.form.get('content_fri_snack', ''),
+            friday_dessert=request.form.get('content_fri_dessert', ''),
+            friday_lunch=request.form.get('content_fri_lunch', ''),
+            friday_afternoon=request.form.get('content_fri_afternoon', ''),
+            friday_lateafternoon=request.form.get('content_fri_lateafternoon', ''),
+            # Saturday
+            saturday_morning=request.form.get('content_sat_morning', ''),
+            saturday_snack=request.form.get('content_sat_snack', ''),
+            saturday_dessert=request.form.get('content_sat_dessert', ''),
+            saturday_lunch=request.form.get('content_sat_lunch', ''),
+            saturday_afternoon=request.form.get('content_sat_afternoon', ''),
+            saturday_lateafternoon=request.form.get('content_sat_lateafternoon', '')
+        )
+        
+        db.session.add(new_menu)
         db.session.commit()
         flash('Đã thêm thực đơn mới!', 'success')
         return redirect(url_for('main.menu'))
+    
+    # Get all active dishes
+    dishes = Dish.query.filter_by(is_active=True).all()
     mobile = is_mobile()
-    return render_template('new_menu.html', title='Tạo thực đơn mới', mobile=mobile)
+    
+    # Calculate current week number for default value
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    week_start = today - timedelta(days=today.weekday())
+    current_week = week_start.isocalendar()[1]
+    current_year = week_start.year
+    
+    return render_template('new_menu.html', title='Tạo thực đơn mới', mobile=mobile, dishes=dishes, 
+                         current_week=current_week, current_year=current_year)
 
 @main.route('/menu/<int:week_number>/edit', methods=['GET', 'POST'])
 def edit_menu(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    week = Curriculum.query.filter_by(week_number=week_number).first()
-    if not week:
+    menu_item = Menu.query.filter_by(week_number=week_number, year=2025).first()
+    if not menu_item:
         flash('Không tìm thấy thực đơn để chỉnh sửa!', 'danger')
         return redirect(url_for('main.menu'))
-    import json
+    
     if request.method == 'POST':
         new_week_number = request.form.get('week_number', type=int)
-        days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        slots = ['morning', 'snack', 'dessert', 'lunch', 'afternoon', 'lateafternoon']
-        menu_data = {}
-        for day in days:
-            menu_data[day] = {}
-            for slot in slots:
-                menu_data[day][slot] = request.form.get(f'content_{day}_{slot}')
-        week.content = json.dumps(menu_data, ensure_ascii=False)
-        # Nếu đổi tuần, kiểm tra trùng lặp
-        if new_week_number != week.week_number:
-            existing = Curriculum.query.filter_by(week_number=new_week_number).first()
+        
+        # Update menu fields
+        menu_item.monday_morning = request.form.get('content_mon_morning', '')
+        menu_item.monday_snack = request.form.get('content_mon_snack', '')
+        menu_item.monday_dessert = request.form.get('content_mon_dessert', '')
+        menu_item.monday_lunch = request.form.get('content_mon_lunch', '')
+        menu_item.monday_afternoon = request.form.get('content_mon_afternoon', '')
+        menu_item.monday_lateafternoon = request.form.get('content_mon_lateafternoon', '')
+        
+        menu_item.tuesday_morning = request.form.get('content_tue_morning', '')
+        menu_item.tuesday_snack = request.form.get('content_tue_snack', '')
+        menu_item.tuesday_dessert = request.form.get('content_tue_dessert', '')
+        menu_item.tuesday_lunch = request.form.get('content_tue_lunch', '')
+        menu_item.tuesday_afternoon = request.form.get('content_tue_afternoon', '')
+        menu_item.tuesday_lateafternoon = request.form.get('content_tue_lateafternoon', '')
+        
+        menu_item.wednesday_morning = request.form.get('content_wed_morning', '')
+        menu_item.wednesday_snack = request.form.get('content_wed_snack', '')
+        menu_item.wednesday_dessert = request.form.get('content_wed_dessert', '')
+        menu_item.wednesday_lunch = request.form.get('content_wed_lunch', '')
+        menu_item.wednesday_afternoon = request.form.get('content_wed_afternoon', '')
+        menu_item.wednesday_lateafternoon = request.form.get('content_wed_lateafternoon', '')
+        
+        menu_item.thursday_morning = request.form.get('content_thu_morning', '')
+        menu_item.thursday_snack = request.form.get('content_thu_snack', '')
+        menu_item.thursday_dessert = request.form.get('content_thu_dessert', '')
+        menu_item.thursday_lunch = request.form.get('content_thu_lunch', '')
+        menu_item.thursday_afternoon = request.form.get('content_thu_afternoon', '')
+        menu_item.thursday_lateafternoon = request.form.get('content_thu_lateafternoon', '')
+        
+        menu_item.friday_morning = request.form.get('content_fri_morning', '')
+        menu_item.friday_snack = request.form.get('content_fri_snack', '')
+        menu_item.friday_dessert = request.form.get('content_fri_dessert', '')
+        menu_item.friday_lunch = request.form.get('content_fri_lunch', '')
+        menu_item.friday_afternoon = request.form.get('content_fri_afternoon', '')
+        menu_item.friday_lateafternoon = request.form.get('content_fri_lateafternoon', '')
+        
+        menu_item.saturday_morning = request.form.get('content_sat_morning', '')
+        menu_item.saturday_snack = request.form.get('content_sat_snack', '')
+        menu_item.saturday_dessert = request.form.get('content_sat_dessert', '')
+        menu_item.saturday_lunch = request.form.get('content_sat_lunch', '')
+        menu_item.saturday_afternoon = request.form.get('content_sat_afternoon', '')
+        menu_item.saturday_lateafternoon = request.form.get('content_sat_lateafternoon', '')
+        
+        # Check for duplicate week number if changed
+        if new_week_number != menu_item.week_number:
+            existing = Menu.query.filter_by(week_number=new_week_number, year=2025).first()
             if existing:
                 flash(f'Đã tồn tại thực đơn tuần {new_week_number}, không thể đổi!', 'danger')
-                return redirect(url_for('main.edit_menu', week_number=week.week_number))
-            week.week_number = new_week_number
+                return redirect(url_for('main.edit_menu', week_number=menu_item.week_number))
+            menu_item.week_number = new_week_number
+            
         db.session.commit()
-        flash(f'Đã cập nhật thực đơn tuần {week.week_number}!', 'success')
+        flash(f'Đã cập nhật thực đơn tuần {menu_item.week_number}!', 'success')
         return redirect(url_for('main.menu'))
-    data = json.loads(week.content)
+    
+    # Convert Menu fields to template format for editing
+    data = {
+        'mon': {
+            'morning': menu_item.monday_morning or '',
+            'snack': menu_item.monday_snack or '',
+            'dessert': menu_item.monday_dessert or '',
+            'lunch': menu_item.monday_lunch or '',
+            'afternoon': menu_item.monday_afternoon or '',
+            'lateafternoon': menu_item.monday_lateafternoon or ''
+        },
+        'tue': {
+            'morning': menu_item.tuesday_morning or '',
+            'snack': menu_item.tuesday_snack or '',
+            'dessert': menu_item.tuesday_dessert or '',
+            'lunch': menu_item.tuesday_lunch or '',
+            'afternoon': menu_item.tuesday_afternoon or '',
+            'lateafternoon': menu_item.tuesday_lateafternoon or ''
+        },
+        'wed': {
+            'morning': menu_item.wednesday_morning or '',
+            'snack': menu_item.wednesday_snack or '',
+            'dessert': menu_item.wednesday_dessert or '',
+            'lunch': menu_item.wednesday_lunch or '',
+            'afternoon': menu_item.wednesday_afternoon or '',
+            'lateafternoon': menu_item.wednesday_lateafternoon or ''
+        },
+        'thu': {
+            'morning': menu_item.thursday_morning or '',
+            'snack': menu_item.thursday_snack or '',
+            'dessert': menu_item.thursday_dessert or '',
+            'lunch': menu_item.thursday_lunch or '',
+            'afternoon': menu_item.thursday_afternoon or '',
+            'lateafternoon': menu_item.thursday_lateafternoon or ''
+        },
+        'fri': {
+            'morning': menu_item.friday_morning or '',
+            'snack': menu_item.friday_snack or '',
+            'dessert': menu_item.friday_dessert or '',
+            'lunch': menu_item.friday_lunch or '',
+            'afternoon': menu_item.friday_afternoon or '',
+            'lateafternoon': menu_item.friday_lateafternoon or ''
+        },
+        'sat': {
+            'morning': menu_item.saturday_morning or '',
+            'snack': menu_item.saturday_snack or '',
+            'dessert': menu_item.saturday_dessert or '',
+            'lunch': menu_item.saturday_lunch or '',
+            'afternoon': menu_item.saturday_afternoon or '',
+            'lateafternoon': menu_item.saturday_lateafternoon or ''
+        }
+    }
+    
+    # Get all active dishes
+    dishes = Dish.query.filter_by(is_active=True).all()
     mobile = is_mobile()
-    return render_template('edit_menu.html', week=week, data=data, title=f'Chỉnh sửa thực đơn tuần {week.week_number}', mobile=mobile)
+    return render_template('edit_menu.html', week=menu_item, data=data, title=f'Chỉnh sửa thực đơn tuần {menu_item.week_number}', mobile=mobile, dishes=dishes)
 
 @main.route('/menu/<int:week_number>/delete', methods=['POST'])
 def delete_menu(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
-    week = Curriculum.query.filter_by(week_number=week_number).first()
-    if week:
-        db.session.delete(week)
+    menu_item = Menu.query.filter_by(week_number=week_number, year=2025).first()
+    if menu_item:
+        db.session.delete(menu_item)
         db.session.commit()
         flash(f'Đã xoá thực đơn tuần {week_number}!', 'success')
     else:
@@ -1811,7 +2040,7 @@ def import_menu():
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     file = request.files.get('excel_file')
-    week_number = request.form.get('week_number')
+    week_number = request.form.get('week_number', type=int)
     if not file:
         flash('Vui lòng chọn file Excel!', 'danger')
         return redirect(url_for('main.menu'))
@@ -1834,14 +2063,101 @@ def import_menu():
             col = j + 2  # B=2, C=3, ... G=7
             value = ws.cell(row=row, column=col).value
             menu_data[day][slot] = value if value is not None else ""
-    import json
-    content = json.dumps(menu_data, ensure_ascii=False)
-    week = Curriculum.query.filter_by(week_number=week_number).first()
-    if week:
-        week.content = content
+    
+    # Check if menu exists for this week
+    menu_item = Menu.query.filter_by(week_number=week_number, year=2025).first()
+    if menu_item:
+        # Update existing menu
+        menu_item.monday_morning = menu_data['mon']['morning']
+        menu_item.monday_snack = menu_data['mon']['snack']
+        menu_item.monday_dessert = menu_data['mon']['dessert']
+        menu_item.monday_lunch = menu_data['mon']['lunch']
+        menu_item.monday_afternoon = menu_data['mon']['afternoon']
+        menu_item.monday_lateafternoon = menu_data['mon']['lateafternoon']
+        
+        menu_item.tuesday_morning = menu_data['tue']['morning']
+        menu_item.tuesday_snack = menu_data['tue']['snack']
+        menu_item.tuesday_dessert = menu_data['tue']['dessert']
+        menu_item.tuesday_lunch = menu_data['tue']['lunch']
+        menu_item.tuesday_afternoon = menu_data['tue']['afternoon']
+        menu_item.tuesday_lateafternoon = menu_data['tue']['lateafternoon']
+        
+        menu_item.wednesday_morning = menu_data['wed']['morning']
+        menu_item.wednesday_snack = menu_data['wed']['snack']
+        menu_item.wednesday_dessert = menu_data['wed']['dessert']
+        menu_item.wednesday_lunch = menu_data['wed']['lunch']
+        menu_item.wednesday_afternoon = menu_data['wed']['afternoon']
+        menu_item.wednesday_lateafternoon = menu_data['wed']['lateafternoon']
+        
+        menu_item.thursday_morning = menu_data['thu']['morning']
+        menu_item.thursday_snack = menu_data['thu']['snack']
+        menu_item.thursday_dessert = menu_data['thu']['dessert']
+        menu_item.thursday_lunch = menu_data['thu']['lunch']
+        menu_item.thursday_afternoon = menu_data['thu']['afternoon']
+        menu_item.thursday_lateafternoon = menu_data['thu']['lateafternoon']
+        
+        menu_item.friday_morning = menu_data['fri']['morning']
+        menu_item.friday_snack = menu_data['fri']['snack']
+        menu_item.friday_dessert = menu_data['fri']['dessert']
+        menu_item.friday_lunch = menu_data['fri']['lunch']
+        menu_item.friday_afternoon = menu_data['fri']['afternoon']
+        menu_item.friday_lateafternoon = menu_data['fri']['lateafternoon']
+        
+        menu_item.saturday_morning = menu_data['sat']['morning']
+        menu_item.saturday_snack = menu_data['sat']['snack']
+        menu_item.saturday_dessert = menu_data['sat']['dessert']
+        menu_item.saturday_lunch = menu_data['sat']['lunch']
+        menu_item.saturday_afternoon = menu_data['sat']['afternoon']
+        menu_item.saturday_lateafternoon = menu_data['sat']['lateafternoon']
     else:
-        new_week = Curriculum(week_number=week_number, content=content, material=None)
-        db.session.add(new_week)
+        # Create new menu
+        new_menu = Menu(
+            week_number=week_number,
+            year=2025,
+            monday_morning=menu_data['mon']['morning'],
+            monday_snack=menu_data['mon']['snack'],
+            monday_dessert=menu_data['mon']['dessert'],
+            monday_lunch=menu_data['mon']['lunch'],
+            monday_afternoon=menu_data['mon']['afternoon'],
+            monday_lateafternoon=menu_data['mon']['lateafternoon'],
+            
+            tuesday_morning=menu_data['tue']['morning'],
+            tuesday_snack=menu_data['tue']['snack'],
+            tuesday_dessert=menu_data['tue']['dessert'],
+            tuesday_lunch=menu_data['tue']['lunch'],
+            tuesday_afternoon=menu_data['tue']['afternoon'],
+            tuesday_lateafternoon=menu_data['tue']['lateafternoon'],
+            
+            wednesday_morning=menu_data['wed']['morning'],
+            wednesday_snack=menu_data['wed']['snack'],
+            wednesday_dessert=menu_data['wed']['dessert'],
+            wednesday_lunch=menu_data['wed']['lunch'],
+            wednesday_afternoon=menu_data['wed']['afternoon'],
+            wednesday_lateafternoon=menu_data['wed']['lateafternoon'],
+            
+            thursday_morning=menu_data['thu']['morning'],
+            thursday_snack=menu_data['thu']['snack'],
+            thursday_dessert=menu_data['thu']['dessert'],
+            thursday_lunch=menu_data['thu']['lunch'],
+            thursday_afternoon=menu_data['thu']['afternoon'],
+            thursday_lateafternoon=menu_data['thu']['lateafternoon'],
+            
+            friday_morning=menu_data['fri']['morning'],
+            friday_snack=menu_data['fri']['snack'],
+            friday_dessert=menu_data['fri']['dessert'],
+            friday_lunch=menu_data['fri']['lunch'],
+            friday_afternoon=menu_data['fri']['afternoon'],
+            friday_lateafternoon=menu_data['fri']['lateafternoon'],
+            
+            saturday_morning=menu_data['sat']['morning'],
+            saturday_snack=menu_data['sat']['snack'],
+            saturday_dessert=menu_data['sat']['dessert'],
+            saturday_lunch=menu_data['sat']['lunch'],
+            saturday_afternoon=menu_data['sat']['afternoon'],
+            saturday_lateafternoon=menu_data['sat']['lateafternoon']
+        )
+        db.session.add(new_menu)
+    
     db.session.commit()
     flash('Đã import thực đơn từ Excel!', 'success')
     return redirect(url_for('main.menu'))
@@ -2191,9 +2507,9 @@ def export_food_safety_process(week_number):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     
-    # Lấy thực đơn của tuần
-    week = Curriculum.query.filter_by(week_number=week_number).first()
-    if not week:
+    # Lấy thực đơn của tuần (sử dụng Menu model)
+    menu_item = Menu.query.filter_by(week_number=week_number, year=2025).first()
+    if not menu_item:
         flash('Không tìm thấy thực đơn!', 'danger')
         return redirect(url_for('main.menu'))
     
@@ -2208,7 +2524,57 @@ def export_food_safety_process(week_number):
     import zipfile
     from datetime import datetime, timedelta
     
-    menu_data = json.loads(week.content)
+    # Convert Menu model data to the same format as old Curriculum JSON
+    menu_data = {
+        'mon': {
+            'morning': menu_item.monday_morning or '',
+            'snack': menu_item.monday_snack or '',
+            'dessert': menu_item.monday_dessert or '',
+            'lunch': menu_item.monday_lunch or '',
+            'afternoon': menu_item.monday_afternoon or '',
+            'lateafternoon': menu_item.monday_lateafternoon or ''
+        },
+        'tue': {
+            'morning': menu_item.tuesday_morning or '',
+            'snack': menu_item.tuesday_snack or '',
+            'dessert': menu_item.tuesday_dessert or '',
+            'lunch': menu_item.tuesday_lunch or '',
+            'afternoon': menu_item.tuesday_afternoon or '',
+            'lateafternoon': menu_item.tuesday_lateafternoon or ''
+        },
+        'wed': {
+            'morning': menu_item.wednesday_morning or '',
+            'snack': menu_item.wednesday_snack or '',
+            'dessert': menu_item.wednesday_dessert or '',
+            'lunch': menu_item.wednesday_lunch or '',
+            'afternoon': menu_item.wednesday_afternoon or '',
+            'lateafternoon': menu_item.wednesday_lateafternoon or ''
+        },
+        'thu': {
+            'morning': menu_item.thursday_morning or '',
+            'snack': menu_item.thursday_snack or '',
+            'dessert': menu_item.thursday_dessert or '',
+            'lunch': menu_item.thursday_lunch or '',
+            'afternoon': menu_item.thursday_afternoon or '',
+            'lateafternoon': menu_item.thursday_lateafternoon or ''
+        },
+        'fri': {
+            'morning': menu_item.friday_morning or '',
+            'snack': menu_item.friday_snack or '',
+            'dessert': menu_item.friday_dessert or '',
+            'lunch': menu_item.friday_lunch or '',
+            'afternoon': menu_item.friday_afternoon or '',
+            'lateafternoon': menu_item.friday_lateafternoon or ''
+        },
+        'sat': {
+            'morning': menu_item.saturday_morning or '',
+            'snack': menu_item.saturday_snack or '',
+            'dessert': menu_item.saturday_dessert or '',
+            'lunch': menu_item.saturday_lunch or '',
+            'afternoon': menu_item.saturday_afternoon or '',
+            'lateafternoon': menu_item.saturday_lateafternoon or ''
+        }
+    }
     
     # Lấy thông tin suppliers chi tiết
     from app.models import Supplier
@@ -2271,33 +2637,59 @@ def export_food_safety_process(week_number):
                     dishes.add(dish_name)
 
     # 2. For each dish, get its ingredients and sum up total needed for the week
+    print(f"[DEBUG] Processing {len(dish_appearance_count)} unique dishes")
     for dish_name, appearances in dish_appearance_count.items():
         dish = Dish.query.filter_by(name=dish_name).first()
         if not dish:
+            print(f"[DEBUG] Dish not found: {dish_name}")
             continue
+        print(f"[DEBUG] Processing dish '{dish_name}' (appears {appearances} times)")
+        print(f"[DEBUG] Dish has {len(dish.ingredients)} ingredients")
         for di in dish.ingredients:
             product = di.product
             if not product:
+                print(f"[DEBUG] Product not found for ingredient ID: {di.id}")
                 continue
             key = (di.product.name, di.unit, di.product.category, di.product.supplier)
-            qty = di.quantity * student_count
+            # Fix: multiply by appearances to account for how many times dish is served in the week
+            qty = di.quantity * student_count * appearances
+            print(f"[DEBUG] Ingredient: {di.product.name}, Quantity: {di.quantity}, Unit: {di.unit}, Students: {student_count}, Appearances: {appearances}, Total: {qty}")
             if key not in ingredient_totals:
                 ingredient_totals[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
             ingredient_totals[key]['total_qty'] += qty
+    
+    print(f"[DEBUG] Total ingredient types aggregated: {len(ingredient_totals)}")
     # 3. Split into fresh, dry, fruit by category
     fresh_ingredients_with_qty = []
     dry_ingredients_with_qty = []
     fruit_ingredients_with_qty = []
+    
+    def convert_to_kg(quantity, unit):
+        """Convert quantity to kg based on unit"""
+        unit = unit.lower()
+        if 'kg' in unit:
+            return quantity
+        elif 'g' in unit or 'gram' in unit:
+            return quantity / 1000
+        elif 'lít' in unit or 'l' in unit:
+            return quantity  # Assume 1 liter = 1 kg for liquids
+        else:
+            # For other units like 'gói', 'hộp', etc., return as is
+            return quantity
+    
     for name, info in ingredient_totals.items():
+        # Properly convert to kg based on unit
+        weight_kg = convert_to_kg(info['total_qty'], info['unit'])
+        
         row = {
             'name': name[0].title() if isinstance(name, tuple) else str(name).title(),
-            'weight_kg': round(info['total_qty'] / 1000, 2),
+            'weight_kg': round(weight_kg, 2),
             'unit': info['unit'],
             'category': info['category'],
             'supplier': info['supplier'],
-            'supplier_info': supplier_dict.get(info['supplier'], {
+            'supplier_info': supplier_dict.get(info['supplier'].name if info['supplier'] else '', {
                 'address': 'Địa chỉ chưa cập nhật',
-                'phone': 'SĐT chưa cập nhật',
+                'phone': 'SĐT chưa cập nhật', 
                 'contact_person': 'Người liên hệ chưa cập nhật',
                 'food_safety_cert': 'Chưa có giấy chứng nhận'
             }),
@@ -2358,11 +2750,11 @@ def export_food_safety_process(week_number):
                             if key not in daily_ingredients:
                                 daily_ingredients[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
                             daily_ingredients[key]['total_qty'] += qty
-            # Phân loại tươi
+            # Phân loại tươi (sử dụng logic giống như tính toán tuần)
             fresh_ingredients = []
             for (name, unit, category, supplier), info in daily_ingredients.items():
                 cat = (category or '').lower()
-                if cat == 'fresh':
+                if 'tươi' in cat or 'rau' in cat or 'thịt' in cat or 'cá' in cat or 'trứng' in cat or cat == 'fresh':
                     # supplier có thể là object, cần lấy tên hoặc chuỗi
                     if hasattr(supplier, 'name'):
                         supplier_name = supplier.name
@@ -2370,9 +2762,13 @@ def export_food_safety_process(week_number):
                         supplier_name = supplier
                     else:
                         supplier_name = ''
+                    
+                    # Use the same convert_to_kg function for consistency
+                    weight_kg = convert_to_kg(info['total_qty'], info['unit'])
+                    
                     fresh_ingredients.append({
                         'name': name,
-                        'weight_kg': round(info['total_qty'] / 1000, 2),
+                        'weight_kg': round(weight_kg, 2),
                         'unit': unit,
                         'category': category,
                         'supplier': supplier_name,
@@ -2585,7 +2981,7 @@ def export_food_safety_process(week_number):
                         supplier_name = ''
                     dry_ingredients.append({
                         'name': name,
-                        'weight_kg': round(info['total_qty'] / 1000, 2),
+                        'weight_kg': round(convert_to_kg(info['total_qty'], info['unit']), 2),
                         'unit': unit,
                         'category': category,
                         'supplier': supplier_name,
@@ -3377,19 +3773,19 @@ def export_food_safety_process(week_number):
             ws6['A5'] = " | ".join(meal_dish_lines)
             ws6['A5'].font = Font(bold=True, size=10, color="006600")
             ws6['A5'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
-            ws6.merge_cells('A5:F5')
+            ws6.merge_cells('A5:G5')
             ws6.row_dimensions[5].height = 48
             ws6['A5'].alignment = Alignment(wrap_text=True, vertical='center', horizontal='left')
             # Thêm dòng tiêu đề lớn phía trên bảng
             ws6['A7'] = "I. Tiếp nhận, kiểm tra chất lượng thực phẩm và chế biến"
             ws6['A7'].font = Font(bold=True, size=12, color="8B0000")
             ws6['A7'].fill = PatternFill(start_color="FFF2E6", end_color="FFF2E6", fill_type="solid")
-            ws6.merge_cells('A7:F7')
+            ws6.merge_cells('A7:G7')
 
             headers6_main = [
                 'STT', 'TÊN THỰC PHẨM',
                 'ĐƠN VỊ TÍNH', 'SỐ LƯỢNG DỰ KIẾN MUA',
-                'THỰC TẾ TIẾP NHÂN',
+                'THỰC TẾ TIẾP NHẬN', 'GIÁ TIỀN (VNĐ)',
                 'NHẬN XÉT'
             ]
             for i, header in enumerate(headers6_main, 1):
@@ -3400,7 +3796,7 @@ def export_food_safety_process(week_number):
                 cell.border = thick_border
             sub_headers6 = [
                 '', '', '',
-                '', '',''
+                '', '', '', ''
             ]
             for i, header in enumerate(sub_headers6, 1):
                 cell = ws6.cell(row=9, column=i, value=header)
@@ -3412,11 +3808,13 @@ def export_food_safety_process(week_number):
             ws6.column_dimensions['C'].width = 18
             ws6.column_dimensions['D'].width = 18
             ws6.column_dimensions['E'].width = 18
-            for col in ['B', 'C', 'D','E']:
+            ws6.column_dimensions['F'].width = 15
+            ws6.column_dimensions['G'].width = 20
+            for col in ['B', 'C', 'D', 'E', 'F', 'G']:
                 cell = ws6[f'{col}8']
                 cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
             # ws6.merge_cells('H8:I8')
-            for i in range(1, 7):   
+            for i in range(1, 8):   
                 cell = ws6.cell(row=10, column=i, value=i)
                 cell.font = Font(bold=True, size=8)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -3425,6 +3823,7 @@ def export_food_safety_process(week_number):
             # Ghi dữ liệu món ăn từng ngày
             row_num = 11
             stt = 1
+            daily_total_cost = 0  # Tổng chi phí trong ngày
             # Tổng hợp nguyên liệu trong ngày (chỉ 1 lần cho ngày hiện tại)
             daily_ingredients = {}
             for meal in menu_data[day_key].values():
@@ -3440,18 +3839,27 @@ def export_food_safety_process(week_number):
                             daily_ingredients[key]['total_qty'] += qty
 
             for (name, unit, category, supplier), info in daily_ingredients.items():
-                # Quy đổi đơn vị nếu cần
+                # Quy đổi đơn vị nếu cần để hiển thị
                 qty = info['total_qty']
                 display_unit = unit
-                display_qty = qty
                 if unit and unit.lower() in ['g', 'gram', 'gr']:
                     display_unit = 'kg'
                     display_qty = round(qty / 1000, 2)
                 elif unit and unit.lower() in ['ml', 'mililít', 'milliliter']:
-                    display_unit = 'lít'
+                    display_unit = 'lít' 
                     display_qty = round(qty / 1000, 2)
                 else:
                     display_qty = round(qty, 2)
+
+                # Tính giá tiền: giá sản phẩm * số lượng dự kiến mua
+                product = info['product']  # Product object
+                total_price = 0
+                if product and product.price:
+                    total_price = round(product.price * display_qty, 0)  # Làm tròn VNĐ
+                    price_display = f"{total_price:,.0f} đ"
+                    daily_total_cost += total_price  # Cộng vào tổng chi phí
+                else:
+                    price_display = "Chưa có giá"
 
                 # name ở đây là TÊN THỰC PHẨM chỉ lấy theo ngày hiện tại, không phải cả tuần
                 data_row6 = [
@@ -3460,6 +3868,7 @@ def export_food_safety_process(week_number):
                     display_unit,  # ĐƠN VỊ
                     display_qty,  # SỐ LƯỢNG DỰ KIẾN MUA
                     '',  # THỰC TẾ TIẾP NHẬN (để trống)
+                    price_display,  # GIÁ TIỀN (VNĐ)
                     "",  # Nhận xét
                 ]
                 for j, value in enumerate(data_row6, 1):
@@ -3472,8 +3881,36 @@ def export_food_safety_process(week_number):
                     elif j == 2:
                         cell.font = Font(bold=True, size=10)
                         cell.fill = PatternFill(start_color="F0FFF0", end_color="F0FFF0", fill_type="solid")
+                    elif j == 6:  # Cột giá tiền
+                        if total_price > 0:
+                            cell.font = Font(bold=True, color="FF6600")
+                            cell.fill = PatternFill(start_color="FFF8E1", end_color="FFF8E1", fill_type="solid")
+                        else:
+                            cell.font = Font(italic=True, color="999999")
                 row_num += 1
                 stt += 1
+            
+            # Thêm dòng tổng cộng
+            if daily_total_cost > 0:
+                ws6.merge_cells(f'A{row_num}:E{row_num}')
+                ws6[f'A{row_num}'] = "TỔNG CHI PHÍ DỰ KIẾN"
+                ws6[f'A{row_num}'].font = Font(bold=True, size=11, color="8B0000")
+                ws6[f'A{row_num}'].alignment = Alignment(horizontal='right', vertical='center')
+                ws6[f'A{row_num}'].fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                
+                ws6[f'F{row_num}'] = f"{daily_total_cost:,.0f} đ"
+                ws6[f'F{row_num}'].font = Font(bold=True, size=12, color="8B0000")
+                ws6[f'F{row_num}'].alignment = Alignment(horizontal='center', vertical='center')
+                ws6[f'F{row_num}'].fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                
+                ws6[f'G{row_num}'] = ""
+                ws6[f'G{row_num}'].fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                
+                # Add borders
+                for col in range(1, 8):
+                    ws6.cell(row=row_num, column=col).border = thick_border
+                
+                row_num += 1
             # Nội Dung khác
             stats_row6 = row_num + 2
             ws6[f'A{stats_row6}'] = "II. Nội Dung Khác"
@@ -3639,7 +4076,8 @@ def new_product():
             name=form.name.data,
             category=form.category.data,
             supplier_id=form.supplier_id.data,
-            unit=form.unit.data
+            unit=form.unit.data,
+            price=form.price.data
         )
         db.session.add(product)
         db.session.commit()
@@ -3825,8 +4263,8 @@ def create_menu_from_suggestions():
         return jsonify({'success': False, 'error': 'Không có quyền truy cập'}), 403
     
     # Import modules outside try block to avoid reference errors
-    from app.models import Menu, db
     from datetime import datetime, timedelta
+    import json
     
     print(f"[DEBUG] Received request to create menu from suggestions")
     print(f"[DEBUG] Request method: {request.method}")
@@ -3860,12 +4298,12 @@ def create_menu_from_suggestions():
             week_number = week_start.isocalendar()[1]
             year = week_start.year
         
-        # Kiểm tra xem thực đơn tuần này đã tồn tại chưa
+        # Kiểm tra xem thực đơn tuần này đã tồn tại chưa (sử dụng model Menu)
         existing_menu = Menu.query.filter_by(week_number=week_number, year=year).first()
         if existing_menu and not overwrite:
             return jsonify({
                 'success': False,
-                'error': 'Thực đơn tuần này đã tồn tại',
+                'error': f'Thực đơn tuần {week_number}/{year} đã tồn tại',
                 'week_number': week_number,
                 'existing_id': existing_menu.id
             }), 409
@@ -3873,13 +4311,16 @@ def create_menu_from_suggestions():
         # Tạo hoặc cập nhật thực đơn
         if existing_menu and overwrite:
             menu_obj = existing_menu
+            print(f"[DEBUG] Updating existing menu for week {week_number}/{year}")
         else:
             menu_obj = Menu(week_number=week_number, year=year)
             db.session.add(menu_obj)
+            print(f"[DEBUG] Creating new menu for week {week_number}/{year}")
         
         # Cập nhật dữ liệu thực đơn
         for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']:
             day_data = menu_data.get(day, {})
+            print(f"[DEBUG] Processing {day}: {day_data}")
             
             if day == 'mon':
                 menu_obj.monday_morning = day_data.get('morning', '')
@@ -3925,13 +4366,15 @@ def create_menu_from_suggestions():
                 menu_obj.saturday_lateafternoon = day_data.get('lateafternoon', '')
         
         db.session.commit()
+        print(f"[DEBUG] Menu saved successfully with ID: {menu_obj.id}")
         
         return jsonify({
             'success': True,
-            'message': f'Đã {"cập nhật" if overwrite else "tạo"} thực đơn tuần {week_number}/{year} thành công!',
+            'message': f'Đã {"cập nhật" if overwrite and existing_menu else "tạo"} thực đơn tuần {week_number}/{year} thành công!',
             'week_number': week_number,
             'year': year,
-            'menu_id': menu_obj.id
+            'menu_id': menu_obj.id,
+            'overwritten': overwrite and existing_menu
         })
         
     except Exception as e:
