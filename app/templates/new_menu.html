@@ -224,11 +224,19 @@ function loadDishesForMeal(mealType) {
     const dishList = document.getElementById('dishList');
     dishList.innerHTML = '';
     
+    // Debug: log all dishes and meal type
+    console.log('Loading dishes for meal type:', mealType);
+    console.log('All dishes:', dishes);
+    
     // Filter dishes that are active and suitable for this meal
-    const suitableDishes = dishes.filter(dish => 
-        dish.is_active && 
-        (dish.meal_times.length === 0 || dish.meal_times.includes(mealType))
-    );
+    const suitableDishes = dishes.filter(dish => {
+        const isActive = dish.is_active;
+        const hasMealTime = dish.meal_times.length === 0 || dish.meal_times.includes(mealType);
+        console.log(`Dish "${dish.name}": active=${isActive}, meal_times=${JSON.stringify(dish.meal_times)}, includes ${mealType}=${hasMealTime}`);
+        return isActive && hasMealTime;
+    });
+    
+    console.log('Suitable dishes:', suitableDishes);
     
     if (suitableDishes.length === 0) {
         dishList.innerHTML = '<p class="text-muted">Chưa có món ăn nào cho bữa này. Vui lòng thêm món ăn trong <a href="/dish-list" target="_blank">Danh sách món ăn</a>.</p>';

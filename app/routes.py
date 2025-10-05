@@ -1948,14 +1948,27 @@ def new_menu():
     mobile = is_mobile()
     
     # Calculate current week number for default value
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, date
     today = datetime.now().date()
     week_start = today - timedelta(days=today.weekday())
     current_week = week_start.isocalendar()[1]
     current_year = week_start.year
     
+    # Compute the Monday (start) and Sunday (end) dates for the current ISO week
+    try:
+        first_iso_week_ref = date(current_year, 1, 4)
+        week_start_iso = first_iso_week_ref + timedelta(days=(current_week - 1) * 7)
+        week_start_iso = week_start_iso - timedelta(days=week_start_iso.isoweekday() - 1)
+        week_end_iso = week_start_iso + timedelta(days=6)
+        current_week_start = week_start_iso.strftime('%d/%m/%Y')
+        current_week_end = week_end_iso.strftime('%d/%m/%Y')
+    except Exception:
+        current_week_start = week_start.strftime('%d/%m/%Y')
+        current_week_end = (week_start + timedelta(days=6)).strftime('%d/%m/%Y')
+    
     return render_template('new_menu.html', title='Tạo thực đơn mới', mobile=mobile, dishes=dishes, 
-                         current_week=current_week, current_year=current_year)
+                         current_week=current_week, current_year=current_year,
+                         current_week_start=current_week_start, current_week_end=current_week_end)
 
 @main.route('/menu/<int:week_number>/edit', methods=['GET', 'POST'])
 def edit_menu(week_number):
