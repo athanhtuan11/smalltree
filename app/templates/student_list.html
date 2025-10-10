@@ -11,7 +11,19 @@
     }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
-    <div class="d-flex justify-content-end mb-3">
+    <div class="d-flex justify-content-between mb-3">
+        {% if session.get('role') in ['admin', 'teacher'] %}
+        <div>
+            <a href="/students/export" class="btn btn-success fw-bold me-2">
+                <i class="bi bi-file-earmark-excel"></i> Xuất danh sách Excel
+            </a>
+            <a href="/students/export-subsidized" class="btn btn-info fw-bold">
+                <i class="bi bi-file-earmark-text"></i> DS miễn giảm học phí
+            </a>
+        </div>
+        {% else %}
+        <div></div>
+        {% endif %}
         <a href="/attendance" class="btn btn-secondary fw-bold">Quay lại điểm danh</a>
     </div>
     <h2 class="mb-4">Danh sách học sinh đã đăng ký</h2>

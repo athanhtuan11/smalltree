@@ -5,7 +5,7 @@ from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff,
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
-import io, zipfile, os, json, re, secrets
+import io, zipfile, os, json, re, secrets, tempfile
 
 # Check for optional dependencies
 try:
@@ -1485,6 +1485,272 @@ def delete_student(student_id):
     db.session.commit()
     flash('Đã xoá học sinh!', 'success')
     return redirect(url_for('main.student_list'))
+
+@main.route('/students/export')
+def export_students():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    if not OPENPYXL_AVAILABLE:
+        flash('Không thể xuất file Excel. Vui lòng cài đặt openpyxl!', 'danger')
+        return redirect(url_for('main.student_list'))
+    
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # Tạo workbook và worksheet
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Danh sách học sinh"
+        
+        # Tạo header
+        headers = ['STT', 'Họ và tên', 'Lớp', 'Mã học sinh', 'Ngày sinh', 'Liên hệ phụ huynh']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="4CAF50", end_color="4CAF50", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+        
+        # Lấy danh sách học sinh và sắp xếp theo tên
+        students = Child.query.order_by(Child.name).all()
+        
+        # Thêm dữ liệu học sinh
+        for row, student in enumerate(students, 2):
+            data = [
+                row - 1,  # STT
+                student.name,
+                student.class_name or '',
+                student.student_code or '',
+                student.birth_date or '',
+                student.parent_contact or ''
+            ]
+            
+            for col, value in enumerate(data, 1):
+                cell = ws.cell(row=row, column=col, value=value)
+                cell.alignment = Alignment(horizontal="center" if col == 1 else "left", vertical="center")
+                cell.border = Border(
+                    left=Side(style='thin'),
+                    right=Side(style='thin'),
+                    top=Side(style='thin'),
+                    bottom=Side(style='thin')
+                )
+        
+        # Tự động điều chỉnh độ rộng cột
+        for col in range(1, len(headers) + 1):
+            column_letter = get_column_letter(col)
+            max_length = 0
+            for row in ws[column_letter]:
+                try:
+                    if len(str(row.value)) > max_length:
+                        max_length = len(str(row.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Tạo file tạm
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            wb.save(tmp.name)
+            tmp_path = tmp.name
+        
+        # Tạo tên file với ngày giờ hiện tại
+        from datetime import datetime
+        filename = f"danh_sach_hoc_sinh_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+    except Exception as e:
+        flash(f'Lỗi khi xuất file Excel: {str(e)}', 'danger')
+        return redirect(url_for('main.student_list'))
+
+@main.route('/students/export-subsidized')
+def export_subsidized_students():
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    if not DOCX_AVAILABLE:
+        flash('Không thể xuất file Word. Vui lòng cài đặt python-docx!', 'danger')
+        return redirect(url_for('main.student_list'))
+    
+    try:
+        from docx import Document
+        from docx.shared import Inches, Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.shared import OxmlElement, qn
+        from docx.shared import RGBColor
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from datetime import datetime
+        
+        # Tạo document mới
+        doc = Document()
+        
+        # Thiết lập margin
+        sections = doc.sections
+        for section in sections:
+            section.top_margin = Inches(0.8)
+            section.bottom_margin = Inches(0.8)
+            section.left_margin = Inches(0.8)
+            section.right_margin = Inches(0.8)
+        
+        # Dòng 1: UBND XÃ ĐỨC TRỌNG
+        p1 = doc.add_paragraph('UBND XÃ ĐỨC TRỌNG')
+        p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p1.runs[0].font.size = Pt(12)
+        p1.runs[0].font.bold = True
+        
+        # Dòng 2: MẦM NON CÂY NHỎ
+        p2 = doc.add_paragraph('MẦM NON CÂY NHỎ')
+        p2.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p2.runs[0].font.size = Pt(12)
+        p2.runs[0].font.bold = True
+        
+        # Thêm khoảng trống
+        doc.add_paragraph('')
+        
+        # Dòng 3: Tiêu đề chính - dòng 1
+        p3 = doc.add_paragraph('DANH SÁCH TRẺ MẦM NON ĐƯỢC MIỄN, GIẢM, HỖ TRỢ HỌC PHÍ')
+        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p3.runs[0].font.size = Pt(16)
+        p3.runs[0].font.bold = True
+        
+        # Dòng 4: Tiêu đề chính - dòng 2
+        p4 = doc.add_paragraph('NĂM HỌC 2025-2026')
+        p4.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p4.runs[0].font.size = Pt(16)
+        p4.runs[0].font.bold = True
+        
+        # Dòng 5: Nghị định
+        p5 = doc.add_paragraph('(Theo nghị định 238/2025/NĐ-CP)')
+        p5.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p5.runs[0].font.size = Pt(11)
+        p5.runs[0].font.italic = True
+        
+        # Thêm khoảng trống
+        doc.add_paragraph('')
+        
+        # Tạo bảng với dữ liệu đã filter theo lớp Kay01-Kay02
+        # Lấy học sinh từ lớp Kay01 đến Kay02
+        students = Child.query.filter(
+            Child.class_name.in_(['Kay01', 'Kay02'])
+        ).order_by(Child.name).all()
+        
+        # Tạo table với 5 cột
+        table = doc.add_table(rows=1, cols=5)
+        table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.style = 'Table Grid'
+        
+        # Header row
+        hdr_cells = table.rows[0].cells
+        headers = ['STT', 'Họ và Tên Học Sinh', 'Ngày tháng năm sinh', 'Học lớp', 'Ghi chú']
+        
+        for i, header in enumerate(headers):
+            hdr_cells[i].text = header
+            # Định dạng header
+            for paragraph in hdr_cells[i].paragraphs:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in paragraph.runs:
+                    run.font.bold = True
+                    run.font.size = Pt(11)
+        
+        # Thêm dữ liệu học sinh
+        for idx, student in enumerate(students, 1):
+            row_cells = table.add_row().cells
+            
+            # STT
+            row_cells[0].text = str(idx)
+            row_cells[0].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Họ và tên
+            row_cells[1].text = student.name or ''
+            
+            # Ngày sinh - format dd/mm/yyyy
+            birth_date = ''
+            if student.birth_date:
+                try:
+                    # Nếu ngày sinh đã ở format dd/mm/yyyy thì giữ nguyên
+                    if '/' in student.birth_date and len(student.birth_date.split('/')) == 3:
+                        birth_date = student.birth_date
+                    # Nếu ở format yyyy-mm-dd thì chuyển đổi sang dd/mm/yyyy
+                    elif '-' in student.birth_date and len(student.birth_date.split('-')) == 3:
+                        date_parts = student.birth_date.split('-')
+                        if len(date_parts) == 3:
+                            birth_date = f"{date_parts[2]}/{date_parts[1]}/{date_parts[0]}"
+                        else:
+                            birth_date = student.birth_date
+                    else:
+                        birth_date = student.birth_date
+                except:
+                    birth_date = student.birth_date or ''
+            row_cells[2].text = birth_date
+            row_cells[2].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Lớp học
+            row_cells[3].text = student.class_name or ''
+            row_cells[3].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Ghi chú (để trống cho việc điền tay sau)
+            row_cells[4].text = ''
+            
+            # Định dạng font cho các cell
+            for cell in row_cells:
+                for paragraph in cell.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.size = Pt(10)
+        
+        # Thiết lập độ rộng cột
+        for i, width in enumerate([Inches(0.5), Inches(2.5), Inches(1.5), Inches(1.2), Inches(1.8)]):
+            for row in table.rows:
+                row.cells[i].width = width
+        
+        # Thêm khoảng trống và chữ ký
+        doc.add_paragraph('')
+        doc.add_paragraph('')
+        
+        # Chữ ký
+        signature_p = doc.add_paragraph('Chủ cơ sở')
+        signature_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        signature_p.runs[0].font.size = Pt(12)
+        signature_p.runs[0].font.bold = True
+        
+        # Thêm 2 dòng trống giữa "Chủ cơ sở" và tên
+        doc.add_paragraph('')
+        
+        name_p = doc.add_paragraph('Nguyễn Thị Vân')
+        name_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        name_p.runs[0].font.size = Pt(12)
+        name_p.runs[0].font.bold = True
+        
+        # Lưu file tạm
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
+            doc.save(tmp.name)
+            tmp_path = tmp.name
+        
+        # Tạo tên file
+        filename = "danh_sach_mien_giam_hoc_phi_2025_2026.docx"
+        
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        
+    except Exception as e:
+        flash(f'Lỗi khi xuất file Word: {str(e)}', 'danger')
+        return redirect(url_for('main.student_list'))
 
 @main.route('/admin/change-password', methods=['GET', 'POST'])
 def change_admin_password():
