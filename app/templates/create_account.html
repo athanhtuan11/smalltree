@@ -57,8 +57,9 @@ function updateFields() {
             <div class="mb-3">
                 <label for="class_name" class="form-label">Lớp <span class="text-danger">*</span></label>
                 <select class="form-select" id="class_name" name="class_name" required>
-                    <option value="Kay 01">Kay 01</option>
-                    <option value="Kay 02">Kay 02</option>
+                    {% for c in classes %}
+                    <option value="{{ c.name }}">{{ c.name }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="mb-3">

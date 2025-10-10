@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from PIL import Image
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -29,8 +29,22 @@ def redirect_no_permission():
     flash('Bạn không có quyền truy cập chức năng này!', 'danger')
     return redirect(url_for('main.login'))
 
+def get_class_order(class_name):
+    """Định nghĩa thứ tự sắp xếp lớp học"""
+    class_order = {
+        'Lớp Mầm': 1,
+        'Lớp Chồi': 2, 
+        'Lớp Lá': 3,
+        'Kay 01': 4,
+        'Kay01': 4,
+        'Kay 02': 5,
+        'Kay02': 5,
+        'Kay 03': 6,
+        'Kay03': 6,
+    }
+    return class_order.get(class_name, 999)  # 999 cho lớp không xác định
+
 # CRUD Class
-from app.models import Class
 
 @main.route('/classes/new', methods=['GET', 'POST'])
 def new_class():
@@ -580,7 +594,6 @@ def activity_detail(id):
     form = DeleteActivityForm()
     return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile, form=form)
 
-from app.models import Class
 @main.route('/curriculum/new', methods=['GET', 'POST'])
 def new_curriculum():
     if session.get('role') not in ['admin', 'teacher']:
@@ -669,7 +682,6 @@ def new_curriculum():
 @main.route('/curriculum')
 def curriculum():
     import secrets
-    from app.models import Class
     if 'csrf_token' not in session or not session['csrf_token']:
         session['csrf_token'] = secrets.token_hex(16)
     class_id = None
@@ -779,7 +791,6 @@ def attendance():
     attendance_date = request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
     selected_class = request.args.get('class_name')
     # Lấy danh sách lớp từ bảng Class
-    from app.models import Class
     class_names = [c.name for c in Class.query.order_by(Class.name).all()]
     # Lọc học sinh theo lớp
     if selected_class:
@@ -1403,12 +1414,15 @@ def edit_student(student_id):
     if session.get('role') != 'admin' and session.get('role') != 'teacher':
         return redirect_no_permission()
     student = Child.query.get_or_404(student_id)
+    classes = Class.query.order_by(Class.name).all()
+    
     if request.method == 'POST':
         print(f"[DEBUG] Form data: {dict(request.form)}")
         print(f"[DEBUG] Files: {dict(request.files)}")
         
         class_name = request.form.get('class_name')
-        if class_name not in ['Kay 01', 'Kay 02']:
+        # Validate class against database
+        if not any(c.name == class_name for c in classes):
             flash('Lớp không hợp lệ!', 'danger')
             return redirect(url_for('main.edit_student', student_id=student_id))
         
@@ -1469,7 +1483,7 @@ def edit_student(student_id):
             
         return redirect(url_for('main.student_list'))
     mobile = is_mobile()
-    return render_template('edit_student.html', student=student, title='Chỉnh sửa học sinh', mobile=mobile)
+    return render_template('edit_student.html', student=student, classes=classes, title='Chỉnh sửa học sinh', mobile=mobile)
 
 @main.route('/students/<int:student_id>/delete', methods=['POST'])
 def delete_student(student_id):
@@ -1519,8 +1533,9 @@ def export_students():
                 bottom=Side(style='thin')
             )
         
-        # Lấy danh sách học sinh và sắp xếp theo lớp, sau đó theo tên
-        students = Child.query.order_by(Child.class_name, Child.name).all()
+        # Lấy danh sách học sinh và sắp xếp theo thứ tự lớp, sau đó theo tên
+        students = Child.query.all()
+        students = sorted(students, key=lambda x: (get_class_order(x.class_name), x.name))
         
         # Thêm dữ liệu học sinh
         for row, student in enumerate(students, 2):
@@ -1641,8 +1656,9 @@ def export_subsidized_students():
         # Thêm khoảng trống
         doc.add_paragraph('')
         
-        # Lấy danh sách học sinh và sắp xếp theo lớp, sau đó theo tên
-        students = Child.query.order_by(Child.class_name, Child.name).all()
+        # Lấy danh sách học sinh và sắp xếp theo thứ tự lớp, sau đó theo tên
+        students = Child.query.all()
+        students = sorted(students, key=lambda x: (get_class_order(x.class_name), x.name))
         
         # Tạo table với 5 cột
         table = doc.add_table(rows=1, cols=5)
@@ -1848,14 +1864,15 @@ def create_account():
         db.session.commit()
         flash('Tạo tài khoản thành công!', 'success')
         return redirect(url_for('main.accounts'))
-    return render_template('create_account.html', title='Tạo tài khoản mới')
+    
+    classes = Class.query.order_by(Class.name).all()
+    return render_template('create_account.html', classes=classes, title='Tạo tài khoản mới')
 
 @main.route('/accounts/<int:user_id>/edit', methods=['GET', 'POST'])
 def edit_account(user_id):
     if session.get('role') != 'admin':
         return redirect_no_permission()
     user_type = request.args.get('type', 'parent')
-    from app.models import Class
     classes = Class.query.order_by(Class.name).all() if user_type == 'parent' else []
     if user_type == 'teacher':
         user = Staff.query.get_or_404(user_id)
@@ -1921,7 +1938,6 @@ def edit_activity(id):
         if not post:
             flash('Không tìm thấy bài viết để chỉnh sửa!', 'danger')
             return redirect(url_for('main.activities'))
-        from app.models import Class
         from app.forms import ActivityEditForm
         classes = Class.query.order_by(Class.name).all()
         class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
