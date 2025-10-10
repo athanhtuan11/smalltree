@@ -1519,8 +1519,8 @@ def export_students():
                 bottom=Side(style='thin')
             )
         
-        # Lấy danh sách học sinh và sắp xếp theo tên
-        students = Child.query.order_by(Child.name).all()
+        # Lấy danh sách học sinh và sắp xếp theo lớp, sau đó theo tên
+        students = Child.query.order_by(Child.class_name, Child.name).all()
         
         # Thêm dữ liệu học sinh
         for row, student in enumerate(students, 2):
@@ -1641,11 +1641,8 @@ def export_subsidized_students():
         # Thêm khoảng trống
         doc.add_paragraph('')
         
-        # Tạo bảng với dữ liệu đã filter theo lớp Kay01-Kay02
-        # Lấy học sinh từ lớp Kay01 đến Kay02
-        students = Child.query.filter(
-            Child.class_name.in_(['Kay01', 'Kay02'])
-        ).order_by(Child.name).all()
+        # Lấy danh sách học sinh và sắp xếp theo lớp, sau đó theo tên
+        students = Child.query.order_by(Child.class_name, Child.name).all()
         
         # Tạo table với 5 cột
         table = doc.add_table(rows=1, cols=5)
