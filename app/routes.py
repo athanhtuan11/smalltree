@@ -44,6 +44,79 @@ def get_class_order(class_name):
     }
     return class_order.get(class_name, 999)  # 999 cho lớp không xác định
 
+def optimize_image(file_stream, max_size=(1200, 900), quality=85):
+    """
+    Tối ưu hóa ảnh: resize và compress
+    Args:
+        file_stream: File stream của ảnh
+        max_size: Kích thước tối đa (width, height)
+        quality: Chất lượng JPEG (1-100)
+    Returns:
+        Tuple (optimized_image_data, format)
+    """
+    try:
+        file_stream.seek(0)
+        img = Image.open(file_stream)
+        
+        # Convert RGBA to RGB if needed (for JPEG)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        
+        # Resize if too large
+        if img.size[0] > max_size[0] or img.size[1] > max_size[1]:
+            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Save to bytes
+        import io
+        output = io.BytesIO()
+        img_format = 'JPEG'  # Always save as JPEG for consistency and smaller size
+        img.save(output, format=img_format, quality=quality, optimize=True)
+        output.seek(0)
+        
+        return output, img_format
+    except Exception as e:
+        raise Exception(f"Lỗi tối ưu ảnh: {str(e)}")
+
+def validate_image_file(file, max_size_mb=5):
+    """
+    Validate file ảnh
+    Args:
+        file: FileStorage object
+        max_size_mb: Kích thước tối đa (MB)
+    Returns:
+        Tuple (is_valid, error_message)
+    """
+    if not file or not file.filename:
+        return False, "Không có file được chọn"
+    
+    # Check extension
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.jfif', '.webp'}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_extensions:
+        return False, f"Định dạng file không được hỗ trợ: {ext}"
+    
+    # Check file size
+    file.seek(0, 2)  # Seek to end
+    size = file.tell()
+    file.seek(0)  # Reset to beginning
+    
+    if size > max_size_mb * 1024 * 1024:
+        return False, f"File quá lớn: {size // (1024*1024)}MB > {max_size_mb}MB"
+    
+    # Try to open as image
+    try:
+        file.seek(0)
+        img = Image.open(file.stream)
+        img.verify()  # Verify it's a valid image
+        file.seek(0)  # Reset stream
+        return True, ""
+    except Exception as e:
+        return False, f"File không phải là ảnh hợp lệ: {str(e)}"
+
 # CRUD Class
 
 @main.route('/classes/new', methods=['GET', 'POST'])
@@ -429,52 +502,96 @@ def new_activity():
         activity_dir = os.path.join('app', 'static', 'images', 'activities', str(new_post.id))
         os.makedirs(activity_dir, exist_ok=True)
         
-        # Xử lý ảnh upload truyền thống (fallback nếu không có client-side compression)
+        # Xử lý ảnh upload với tối ưu hóa
         files = request.files.getlist('images')
         print(f"[DEBUG] Processing {len(files)} files from request.files")
         
-        if files and files[0].filename:  # Có ảnh upload truyền thống
-            print(f"[INFO] Xử lý upload truyền thống: {len(files)} ảnh")
+        if files and files[0].filename:  # Có ảnh upload
+            print(f"[INFO] Xử lý upload với tối ưu hóa: {len(files)} ảnh")
             total_files = len(files)
             success_count = 0
+            error_count = 0
+            error_messages = []
             
-            # Đơn giản hóa: Xử lý từng ảnh một cách đơn giản
-            for i, file in enumerate(files):
-                if file and getattr(file, 'filename', None):
-                    print(f"[DEBUG] Processing file {i+1}: {file.filename}")
-                    ext = os.path.splitext(file.filename)[1].lower()
-                    if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.jfif']:
-                        print(f"[DEBUG] Skipping file {file.filename} - invalid extension: {ext}")
-                        continue
+            # Validate tổng kích thước trước khi xử lý
+            total_size = 0
+            valid_files = []
+            
+            for file in files:
+                if not file or not file.filename:
+                    continue
+                    
+                # Validate từng file
+                is_valid, error_msg = validate_image_file(file, max_size_mb=10)  # Tăng limit lên 10MB/file
+                
+                if is_valid:
+                    file.seek(0, 2)
+                    size = file.tell()
+                    file.seek(0)
+                    total_size += size
+                    valid_files.append(file)
+                else:
+                    error_messages.append(f"{file.filename}: {error_msg}")
+                    error_count += 1
+            
+            # Check tổng kích thước (50MB limit cho tất cả ảnh)
+            max_total_size = 50 * 1024 * 1024  # 50MB
+            if total_size > max_total_size:
+                flash(f'Tổng kích thước ảnh quá lớn: {total_size//1024//1024}MB > 50MB. Hãy chọn ít ảnh hơn hoặc giảm chất lượng.', 'danger')
+                return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile(), classes=classes)
+            
+            # Xử lý từng ảnh hợp lệ
+            for i, file in enumerate(valid_files):
+                try:
+                    print(f"[DEBUG] Processing file {i+1}/{len(valid_files)}: {file.filename}")
+                    
+                    # Tối ưu ảnh
+                    optimized_data, img_format = optimize_image(file.stream, max_size=(1200, 900), quality=80)
+                    
+                    # Tạo tên file
                     safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                    img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
+                    base_name = os.path.splitext(safe_filename)[0]
+                    img_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{base_name}.jpg"
                     img_path = os.path.join(activity_dir, img_filename)
-                    try:
-                        file.stream.seek(0)
-                        img = Image.open(file.stream)
-                        # Tối ưu kích thước: resize nhỏ hơn cho web
-                        img.thumbnail((800, 600), Image.Resampling.LANCZOS)
-                        if ext.lower() in ['.jpg', '.jpeg']:
-                            img.save(img_path, 'JPEG', quality=75, optimize=True)  # Giảm quality để tiết kiệm bộ nhớ
-                        else:
-                            img.save(img_path, optimize=True)
-                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
-                        db.session.add(ActivityImage(filename=img_filename, filepath=rel_path, upload_date=datetime.now(), activity_id=new_post.id))
-                        success_count += 1
-                        print(f"[DEBUG] Successfully processed file {i+1}: {img_filename}")
-                    except Exception as e:
-                        print(f"[ERROR] Lỗi upload ảnh: {file.filename} - {e}")
-                        continue
+                    
+                    # Lưu ảnh đã tối ưu
+                    with open(img_path, 'wb') as f:
+                        f.write(optimized_data.getvalue())
+                    
+                    # Lưu vào database
+                    rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                    db.session.add(ActivityImage(
+                        filename=img_filename, 
+                        filepath=rel_path, 
+                        upload_date=datetime.now(), 
+                        activity_id=new_post.id
+                    ))
+                    
+                    success_count += 1
+                    print(f"[DEBUG] Successfully processed file {i+1}: {img_filename}")
+                    
+                except Exception as e:
+                    print(f"[ERROR] Lỗi xử lý ảnh {file.filename}: {e}")
+                    error_messages.append(f"{file.filename}: Lỗi xử lý - {str(e)}")
+                    error_count += 1
+                    continue
             
+            # Commit database
             try:
                 db.session.commit()
                 print(f"[DEBUG] Database commit successful: {success_count} images saved")
             except Exception as e:
                 print(f"[ERROR] Lỗi commit database: {e}")
                 db.session.rollback()
+                flash('Lỗi lưu vào database!', 'danger')
+                return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile(), classes=classes)
             
+            # Thông báo kết quả
             if success_count > 0:
                 flash(f'Đã đăng bài viết mới với {success_count}/{total_files} ảnh thành công!', 'success')
+            
+            if error_count > 0:
+                flash(f'Có {error_count} ảnh không thể xử lý: {"; ".join(error_messages[:3])}{"..." if len(error_messages) > 3 else ""}', 'warning')
             else:
                 flash('Đã đăng bài viết mới!', 'success')
         else:

@@ -45,8 +45,14 @@
         <div class="mb-3">
             <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
             <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple onchange="debugFiles()">
-            <div class="form-text text-info">
-                <small>💡 <strong>Tối ưu cho 50-100 ảnh:</strong> Ảnh sẽ được tự động nén xuống ~200KB/ảnh trước khi upload.</small>
+            <div class="form-text text-success">
+                <strong>� Đã tối ưu hóa upload:</strong>
+                <ul class="mb-1 mt-1">
+                    <li>Tối đa 50MB cho tất cả ảnh (khoảng 50-100 ảnh)</li>
+                    <li>Mỗi ảnh tối đa 10MB, sẽ được tự động nén về 1200x900px</li>
+                    <li>Định dạng hỗ trợ: JPG, PNG, GIF, JFIF</li>
+                    <li>Xử lý từng ảnh một để tránh lỗi 413</li>
+                </ul>
             </div>
             <!-- Debug info để test -->
             <div id="debug-info" class="mt-2" style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: none;">
