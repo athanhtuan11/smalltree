@@ -66,13 +66,13 @@
                         <td>{{ absent_excused_days[student.id] }}</td>
                         <td>
                             <input type="checkbox" name="english_{{ student.id }}" value="1" 
-                                   {% if services_dict[student.id].has_english %}checked{% endif %}
+                                   {% if services_dict.get(student.id) and services_dict[student.id].has_english %}checked{% endif %}
                                    class="form-check-input english-checkbox" 
                                    data-student-id="{{ student.id }}">
                         </td>
                         <td>
                             <input type="checkbox" name="steamax_{{ student.id }}" value="1" 
-                                   {% if services_dict[student.id].has_steamax %}checked{% endif %}
+                                   {% if services_dict.get(student.id) and services_dict[student.id].has_steamax %}checked{% endif %}
                                    class="form-check-input steamax-checkbox" 
                                    data-student-id="{{ student.id }}">
                         </td>
@@ -150,6 +150,8 @@ document.addEventListener('DOMContentLoaded', function() {
             has_steamax: serviceType === 'steamax' ? checked : document.querySelector(`input[name="steamax_${studentId}"]`).checked
         };
         
+        console.log('💾 Saving service data:', data);
+        
         fetch('/api/save_monthly_service', {
             method: 'POST',
             headers: {
@@ -160,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(result => {
             if (result.success) {
-                console.log('✅ Đã lưu dịch vụ cho học sinh ' + studentId);
+                console.log('✅ Đã lưu dịch vụ cho học sinh ' + studentId + ', tháng ' + currentMonth);
             } else {
                 console.error('❌ Lỗi lưu dịch vụ:', result.error);
             }
@@ -197,6 +199,7 @@ function toggleAllEnglish() {
         checkbox.checked = !firstChecked;
         const studentId = checkbox.dataset.studentId;
         updateTotal(studentId);
+        saveServiceData(studentId, 'english', checkbox.checked);
     });
 }
 
@@ -208,6 +211,7 @@ function toggleAllSteamax() {
         checkbox.checked = !firstChecked;
         const studentId = checkbox.dataset.studentId;
         updateTotal(studentId);
+        saveServiceData(studentId, 'steamax', checkbox.checked);
     });
 }
 

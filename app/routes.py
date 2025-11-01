@@ -1096,6 +1096,8 @@ def save_monthly_service():
         has_english = data.get('has_english', True)
         has_steamax = data.get('has_steamax', True)
         
+        print(f"[DEBUG] Nhận request save service: child_id={child_id}, month={month}, english={has_english}, steamax={has_steamax}")
+        
         if not child_id or not month:
             return jsonify({'error': 'Missing child_id or month'}), 400
         
@@ -1104,16 +1106,21 @@ def save_monthly_service():
         if not service:
             service = MonthlyService(child_id=child_id, month=month)
             db.session.add(service)
+            print(f"[DEBUG] Tạo mới MonthlyService cho child_id={child_id}, month={month}")
+        else:
+            print(f"[DEBUG] Cập nhật MonthlyService existing cho child_id={child_id}, month={month}")
         
         # Cập nhật thông tin
         service.has_english = has_english
         service.has_steamax = has_steamax
         
         db.session.commit()
+        print(f"[DEBUG] Đã commit thành công!")
         return jsonify({'success': True, 'message': 'Đã lưu thông tin dịch vụ'})
         
     except Exception as e:
         db.session.rollback()
+        print(f"[ERROR] Lỗi save service: {e}")
         return jsonify({'error': str(e)}), 500
 
 @main.route('/invoice', methods=['GET', 'POST'])
@@ -1200,7 +1207,7 @@ def invoice():
                         for para in right_cell.paragraphs:
                             para.alignment = 1
                         doc.add_paragraph('')
-                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ: HỌC PHÍ THÁNG {month}', 0)
+                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
                         run.font.size = Pt(18)  # Reduce font size
