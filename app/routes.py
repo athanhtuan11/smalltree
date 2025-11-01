@@ -1200,7 +1200,7 @@ def invoice():
                         for para in right_cell.paragraphs:
                             para.alignment = 1
                         doc.add_paragraph('')
-                        title = doc.add_heading(f'HÓA ĐƠN THANH TOÁN THÁNG {month}', 0)
+                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ: HỌC PHÍ THÁNG {month}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
                         run.font.size = Pt(18)  # Reduce font size

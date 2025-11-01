@@ -66,42 +66,85 @@
     <h3 style="margin-top:18px;">THÔNG BÁO HỌC PHÍ: HỌC PHÍ THÁNG {{ month }}</h3>
   </div>
   <div class="info">
-    <strong>Họ và tên học sinh:</strong> {{ student_name }}<br>
-    <strong>Ngày sinh:</strong> {{ birth_date }}<br>
-  <strong>Ngày sinh:</strong> {% if birth_date %}{{ birth_date | datetimeformat('d/m/Y') }}{% else %}-{% endif %}<br>
-    <strong>Lớp:</strong> {{ class_name }}<br>
-    <strong>Thời hạn đóng học phí:</strong> 02/{{ month }} - 10/{{ month }}/{{ year }}
+    <strong>Họ và tên học sinh:</strong> {{ student.name }}<br>
+    <strong>Ngày sinh:</strong> {% if student.birth_date %}{{ student.birth_date }}{% else %}-{% endif %}<br>
+    <strong>Lớp:</strong> {{ student.class_name or '-' }}<br>
+    <strong>Thời hạn đóng học phí:</strong> 02/{{ month_num }} - 10/{{ month_num }}/{{ year }}
   </div>
   <table>
     <thead>
       <tr>
         <th>STT</th>
         <th>Tên khoản thu</th>
+        <th>Số lượng/Đơn vị</th>
         <th>Đơn giá</th>
-        <th>Giảm trừ</th>
         <th>Thành tiền</th>
       </tr>
     </thead>
     <tbody>
-      {% for item in fee_items %}
       <tr>
-        <td>{{ loop.index }}</td>
-        <td>{{ item.name }}</td>
-        <td>{{ item.unit_price }}</td>
-        <td>{{ item.discount }}</td>
-        <td>{{ item.total }}</td>
+        <td>1</td>
+        <td>Số ngày đi học</td>
+        <td>{{ attendance_days }} ngày</td>
+        <td>-</td>
+        <td>-</td>
       </tr>
-      {% endfor %}
+      <tr>
+        <td>2</td>
+        <td>Số ngày vắng không phép</td>
+        <td>{{ absent_unexcused_days }} ngày</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Số ngày vắng có phép</td>
+        <td>{{ absent_excused_days }} ngày</td>
+        <td>-</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Tiền ăn (có mặt + vắng không phép)</td>
+        <td>{{ attendance_days + absent_unexcused_days }} ngày</td>
+        <td>38,000 đ</td>
+        <td>{{ "{:,}".format(meal_cost) }} đ</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Tiền học phí</td>
+        <td>1 tháng</td>
+        <td>{{ "{:,}".format(tuition) }} đ</td>
+        <td>{{ "{:,}".format(tuition) }} đ</td>
+      </tr>
+      {% if has_english %}
+      <tr>
+        <td>6</td>
+        <td>Tiền học anh văn</td>
+        <td>1 tháng</td>
+        <td>250,000 đ</td>
+        <td>250,000 đ</td>
+      </tr>
+      {% endif %}
+      {% if has_steamax %}
+      <tr>
+        <td>{{ 7 if has_english else 6 }}</td>
+        <td>Tiền học STEAMAX</td>
+        <td>1 tháng</td>
+        <td>200,000 đ</td>
+        <td>200,000 đ</td>
+      </tr>
+      {% endif %}
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="4" class="right"><strong>Tổng</strong></td>
-        <td><strong>{{ total }}</strong></td>
+        <td colspan="4" class="right"><strong>Tổng cộng</strong></td>
+        <td><strong>{{ "{:,}".format(total) }} đ</strong></td>
       </tr>
     </tfoot>
   </table>
-  <div class="info"><strong>Viết bằng chữ:</strong> {{ total_text }}</div>
-  <p class="right">Ngày {{ day }} tháng {{ month }} năm {{ year }}</p>
+  <div class="info"><strong>Viết bằng chữ:</strong> {{ total_in_words }}</div>
+  <p class="right">Ngày {{ current_day }} tháng {{ month_num }} năm {{ year }}</p>
   <div class="signature">
     <div>
       <strong>Người nộp tiền</strong><br>
