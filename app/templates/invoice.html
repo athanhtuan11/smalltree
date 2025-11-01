@@ -27,6 +27,7 @@
                         <th>Ngày sinh</th>
                         <th>Số ngày có mặt</th>
                         <th>Số ngày vắng không phép</th>
+                        <th>Số ngày vắng có phép</th>
                         <th>Tiền học phí</th>
                         <th>Tổng tiền</th>
                     </tr>
@@ -36,10 +37,10 @@
                     <tr>
                         <td><input type="checkbox" name="student_ids" value="{{ student.id }}" checked></td>
                         <td>{{ student.name }}</td>
-                        <td>{{ student.birth_date or '-' }}</td>
                         <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}-{% endif %}</td>
                         <td>{{ attendance_days[student.id] }}</td>
                         <td>{{ absent_unexcused_days[student.id] }}</td>
+                        <td>{{ absent_excused_days[student.id] }}</td>
                         <td>
                             {% set age = student_ages[student.id] %}
                             {% if age == 0 %}1,850,000đ
@@ -51,8 +52,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {{ ((attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 +
-                                (1850000 if age == 1 else 1750000 if age == 2 else 1650000 if age == 3 else 1550000 if age == 4 else 1500000)) | int | string | replace(',', '.') }}đ
+                            {% set tuition = 1850000 if age == 1 else 1750000 if age == 2 else 1650000 if age == 3 else 1550000 if age == 4 else 1500000 %}
+                            {% set total = (attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 + tuition %}
+                            {{ "{:,}".format(total) }}đ
                         </td>
                     </tr>
                     {% endfor %}
