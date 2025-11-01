@@ -234,3 +234,20 @@ class Menu(db.Model):
     
     # Unique constraint để tránh trùng lặp tuần
     __table_args__ = (db.UniqueConstraint('week_number', 'year', name='unique_week_year'),)
+
+# ================== DỊCH VỤ THEO THÁNG ==================
+class MonthlyService(db.Model):
+    """Lưu trữ thông tin dịch vụ (tiếng anh, steamax) của học sinh theo tháng"""
+    id = db.Column(db.Integer, primary_key=True)
+    child_id = db.Column(db.Integer, db.ForeignKey('child.id'), nullable=False)
+    month = db.Column(db.String(7), nullable=False)  # Format: "2025-11"
+    has_english = db.Column(db.Boolean, default=True, nullable=False)  # Học tiếng anh
+    has_steamax = db.Column(db.Boolean, default=True, nullable=False)   # STEAMAX
+    created_date = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    updated_date = db.Column(db.DateTime, onupdate=db.func.current_timestamp())
+    
+    # Relationship
+    child = db.relationship('Child', backref=db.backref('monthly_services', lazy=True))
+    
+    # Unique constraint: một học sinh chỉ có một record cho mỗi tháng
+    __table_args__ = (db.UniqueConstraint('child_id', 'month', name='unique_child_month'),)

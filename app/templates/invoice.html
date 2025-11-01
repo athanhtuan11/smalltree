@@ -1,14 +1,26 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-    .invoice-table-mobile { font-size:0.85em; }
+    .invoice-table-mobile { font-size:0.75em; }
     .invoice-table-desktop { font-size:1em; }
     .invoice-btn-mobile { width:100%; margin-bottom:8px; font-size:0.95em; }
     .invoice-btn-group-mobile { display:flex; flex-direction:column; gap:8px; }
-    .invoice-table-mobile td, .invoice-table-mobile th { padding:0.18em 0.08em; }
+    .invoice-table-mobile td, .invoice-table-mobile th { padding:0.15em 0.06em; }
     .invoice-table-wrapper { border:1.5px solid #c8e6c9; border-radius:0; box-shadow:none; background:#fff; margin-left:-12px; margin-right:-12px; }
-    @media (max-width: 576px) {
+    
+    /* Checkbox styling */
+    .form-check-input { margin: 0 auto; display: block; }
+    
+    /* Mobile specific adjustments for more columns */
+    @media (max-width: 768px) {
+        .invoice-table-mobile { font-size:0.7em; }
+        .invoice-table-mobile td, .invoice-table-mobile th { padding:0.1em 0.04em; }
         .invoice-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
+    }
+    
+    @media (max-width: 576px) {
+        .invoice-table-mobile { font-size:0.65em; }
+        .invoice-table-wrapper { margin-left:-20px; margin-right:-20px; }
     }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
@@ -16,6 +28,15 @@
         <a href="{{ url_for('main.attendance_history', month=selected_month) }}" class="btn btn-secondary fw-bold {% if mobile %}invoice-btn-mobile{% endif %}">Quay lại lịch sử điểm danh</a>
     </div>
     <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Hóa đơn thanh toán tháng {{ selected_month }}</h2>
+    
+    <!-- Quick control buttons -->
+    <div class="row mb-2">
+        <div class="col-md-6">
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="toggleAllEnglish()">Toggle Anh văn tất cả</button>
+            <button type="button" class="btn btn-sm btn-outline-info ms-2" onclick="toggleAllSteamax()">Toggle STEAMAX tất cả</button>
+        </div>
+    </div>
+    
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="table-responsive invoice-table-wrapper">
@@ -28,6 +49,8 @@
                         <th>Số ngày có mặt</th>
                         <th>Số ngày vắng không phép</th>
                         <th>Số ngày vắng có phép</th>
+                        <th>Học tiếng anh</th>
+                        <th>STEAMAX</th>
                         <th>Tiền học phí</th>
                         <th>Tổng tiền</th>
                     </tr>
@@ -42,6 +65,18 @@
                         <td>{{ absent_unexcused_days[student.id] }}</td>
                         <td>{{ absent_excused_days[student.id] }}</td>
                         <td>
+                            <input type="checkbox" name="english_{{ student.id }}" value="1" 
+                                   {% if services_dict[student.id].has_english %}checked{% endif %}
+                                   class="form-check-input english-checkbox" 
+                                   data-student-id="{{ student.id }}">
+                        </td>
+                        <td>
+                            <input type="checkbox" name="steamax_{{ student.id }}" value="1" 
+                                   {% if services_dict[student.id].has_steamax %}checked{% endif %}
+                                   class="form-check-input steamax-checkbox" 
+                                   data-student-id="{{ student.id }}">
+                        </td>
+                        <td>
                             {% set age = student_ages[student.id] %}
                             {% if age == 0 %}1,850,000đ
                             {% elif age == 1 %}1,850,000đ
@@ -53,8 +88,17 @@
                         </td>
                         <td>
                             {% set tuition = 1850000 if age == 1 else 1750000 if age == 2 else 1650000 if age == 3 else 1550000 if age == 4 else 1500000 %}
-                            {% set total = (attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 + tuition %}
-                            {{ "{:,}".format(total) }}đ
+                            {% set meal_cost = (attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 %}
+                            {% set base_total = meal_cost + tuition %}
+                            {% set english_cost = 250000 if services_dict[student.id].has_english else 0 %}
+                            {% set steamax_cost = 200000 if services_dict[student.id].has_steamax else 0 %}
+                            {% set total = base_total + english_cost + steamax_cost %}
+                            <span class="total-amount" data-student-id="{{ student.id }}" 
+                                  data-base-total="{{ base_total }}" 
+                                  data-english="250000" 
+                                  data-steamax="200000">
+                                {{ "{:,}".format(total) }}đ
+                            </span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -72,4 +116,116 @@
     </ul>
     {% endif %}
 </div>
+
+<script>
+// Tự động tính lại tổng tiền khi checkbox thay đổi
+document.addEventListener('DOMContentLoaded', function() {
+    const englishCheckboxes = document.querySelectorAll('.english-checkbox');
+    const steamaxCheckboxes = document.querySelectorAll('.steamax-checkbox');
+    
+    // Lấy tháng hiện tại từ URL hoặc page
+    const currentMonth = '{{ selected_month }}';
+    
+    function updateTotal(studentId) {
+        const totalSpan = document.querySelector(`[data-student-id="${studentId}"].total-amount`);
+        const englishCheckbox = document.querySelector(`input[name="english_${studentId}"]`);
+        const steamaxCheckbox = document.querySelector(`input[name="steamax_${studentId}"]`);
+        
+        if (totalSpan && englishCheckbox && steamaxCheckbox) {
+            const baseTotal = parseInt(totalSpan.dataset.baseTotal);
+            const englishCost = englishCheckbox.checked ? 250000 : 0;
+            const steamaxCost = steamaxCheckbox.checked ? 200000 : 0;
+            const newTotal = baseTotal + englishCost + steamaxCost;
+            
+            // Format số với dấu phẩy
+            totalSpan.textContent = newTotal.toLocaleString('vi-VN') + 'đ';
+        }
+    }
+    
+    function saveServiceData(studentId, serviceType, checked) {
+        const data = {
+            child_id: parseInt(studentId),
+            month: currentMonth,
+            has_english: serviceType === 'english' ? checked : document.querySelector(`input[name="english_${studentId}"]`).checked,
+            has_steamax: serviceType === 'steamax' ? checked : document.querySelector(`input[name="steamax_${studentId}"]`).checked
+        };
+        
+        fetch('/api/save_monthly_service', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                console.log('✅ Đã lưu dịch vụ cho học sinh ' + studentId);
+            } else {
+                console.error('❌ Lỗi lưu dịch vụ:', result.error);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Lỗi network:', error);
+        });
+    }
+    
+    // Gắn event listener cho tất cả checkbox
+    englishCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const studentId = this.dataset.studentId;
+            updateTotal(studentId);
+            saveServiceData(studentId, 'english', this.checked);
+        });
+    });
+    
+    steamaxCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const studentId = this.dataset.studentId;
+            updateTotal(studentId);
+            saveServiceData(studentId, 'steamax', this.checked);
+        });
+    });
+});
+
+// Toggle functions cho quick controls
+function toggleAllEnglish() {
+    const checkboxes = document.querySelectorAll('.english-checkbox');
+    const firstChecked = checkboxes[0] ? checkboxes[0].checked : false;
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !firstChecked;
+        const studentId = checkbox.dataset.studentId;
+        updateTotal(studentId);
+    });
+}
+
+function toggleAllSteamax() {
+    const checkboxes = document.querySelectorAll('.steamax-checkbox');
+    const firstChecked = checkboxes[0] ? checkboxes[0].checked : false;
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !firstChecked;
+        const studentId = checkbox.dataset.studentId;
+        updateTotal(studentId);
+    });
+}
+
+function updateTotal(studentId) {
+    const totalSpan = document.querySelector(`[data-student-id="${studentId}"].total-amount`);
+    const englishCheckbox = document.querySelector(`input[name="english_${studentId}"]`);
+    const steamaxCheckbox = document.querySelector(`input[name="steamax_${studentId}"]`);
+    
+    if (totalSpan && englishCheckbox && steamaxCheckbox) {
+        const baseTotal = parseInt(totalSpan.dataset.baseTotal);
+        const englishCost = englishCheckbox.checked ? 250000 : 0;
+        const steamaxCost = steamaxCheckbox.checked ? 200000 : 0;
+        const newTotal = baseTotal + englishCost + steamaxCost;
+        
+        // Format số với dấu phẩy
+        totalSpan.textContent = newTotal.toLocaleString('vi-VN') + 'đ';
+    }
+}
+</script>
+
 {% endblock %}

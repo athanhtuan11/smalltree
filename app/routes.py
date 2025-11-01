@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from PIL import Image
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class, MonthlyService
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -1086,6 +1086,36 @@ def attendance_history():
     mobile = is_mobile()
     return render_template('attendance_history.html', records=records, students=students, days_in_month=days_in_month, selected_month=month, title='Lịch sử điểm danh', mobile=mobile)
 
+@main.route('/api/save_monthly_service', methods=['POST'])
+def save_monthly_service():
+    """API để lưu thông tin dịch vụ hàng tháng khi checkbox thay đổi"""
+    try:
+        data = request.get_json()
+        child_id = data.get('child_id')
+        month = data.get('month')
+        has_english = data.get('has_english', True)
+        has_steamax = data.get('has_steamax', True)
+        
+        if not child_id or not month:
+            return jsonify({'error': 'Missing child_id or month'}), 400
+        
+        # Tìm hoặc tạo record
+        service = MonthlyService.query.filter_by(child_id=child_id, month=month).first()
+        if not service:
+            service = MonthlyService(child_id=child_id, month=month)
+            db.session.add(service)
+        
+        # Cập nhật thông tin
+        service.has_english = has_english
+        service.has_steamax = has_steamax
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Đã lưu thông tin dịch vụ'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @main.route('/invoice', methods=['GET', 'POST'])
 def invoice():
     month = request.args.get('month')
@@ -1113,6 +1143,25 @@ def invoice():
             absent_unexcused_days[r.child_id] += 1
         elif r.status == 'Vắng mặt có phép':  # Thêm logic này
             absent_excused_days[r.child_id] += 1
+    
+    # Load thông tin dịch vụ từ database
+    monthly_services = MonthlyService.query.filter_by(month=month).all()
+    services_dict = {service.child_id: service for service in monthly_services}
+    
+    # Tạo default service cho học sinh chưa có record
+    for student in students:
+        if student.id not in services_dict:
+            # Tạo record mặc định (mặc định tick cả 2 dịch vụ)
+            new_service = MonthlyService(child_id=student.id, month=month, has_english=True, has_steamax=True)
+            db.session.add(new_service)
+            services_dict[student.id] = new_service
+    
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Lỗi tạo default services: {e}")
+    
     invoices = []
     if request.method == 'POST':
         selected_ids = request.form.getlist('student_ids')
@@ -1188,7 +1237,20 @@ def invoice():
                         else:
                             tuition = 1500000
                         excused_absents = sum(1 for r in records_raw if r.child_id == student.id and r.status == 'Vắng mặt có phép')
-                        summary_table = doc.add_table(rows=7, cols=2)
+                        
+                        # Lấy thông tin dịch vụ từ database thay vì form
+                        service = services_dict.get(student.id)
+                        has_english = service.has_english if service else True
+                        has_steamax = service.has_steamax if service else True
+                        
+                        # Tính số dòng cần thiết cho bảng tóm tắt
+                        base_rows = 5  # Ngày học, vắng không phép, vắng có phép, tiền ăn, học phí
+                        extra_rows = 0
+                        if has_english: extra_rows += 1
+                        if has_steamax: extra_rows += 1
+                        total_rows = base_rows + extra_rows
+                        
+                        summary_table = doc.add_table(rows=total_rows, cols=2)
                         summary_table.style = 'Table Grid'
                         for row in summary_table.rows:
                             for cell in row.cells:
@@ -1197,22 +1259,47 @@ def invoice():
                                 shd = OxmlElement('w:shd')
                                 shd.set(qn('w:fill'), 'e8f5e9')
                                 tcPr.append(shd)
-                        summary_table.cell(0,0).text = 'Số ngày đi học:'
-                        summary_table.cell(0,1).text = str(days)
-                        summary_table.cell(1,0).text = 'Số ngày vắng không phép:'
-                        summary_table.cell(1,1).text = str(absents)
-                        summary_table.cell(2,0).text = 'Số ngày vắng có phép:'
-                        summary_table.cell(2,1).text = str(excused_absents)
-                        summary_table.cell(3,0).text = 'Tiền ăn (có mặt + vắng không phép):'
+                        
+                        # Điền thông tin cơ bản
+                        row_index = 0
+                        summary_table.cell(row_index,0).text = 'Số ngày đi học:'
+                        summary_table.cell(row_index,1).text = str(days)
+                        row_index += 1
+                        
+                        summary_table.cell(row_index,0).text = 'Số ngày vắng không phép:'
+                        summary_table.cell(row_index,1).text = str(absents)
+                        row_index += 1
+                        
+                        summary_table.cell(row_index,0).text = 'Số ngày vắng có phép:'
+                        summary_table.cell(row_index,1).text = str(excused_absents)
+                        row_index += 1
+                        
+                        summary_table.cell(row_index,0).text = 'Tiền ăn (có mặt + vắng không phép):'
                         meal_cost = (days + absents) * 38000
-                        summary_table.cell(3,1).text = f'{meal_cost:,} đ'
-                        summary_table.cell(4,0).text = 'Tiền học phí:'
-                        summary_table.cell(4,1).text = f'{tuition:,} đ'
-                        summary_table.cell(5,0).text = 'Tiền học anh văn:'
-                        summary_table.cell(5,1).text = '500,000 đ'
-                        summary_table.cell(6,0).text = 'Tiền học STEMax:'
-                        summary_table.cell(6,1).text = '200,000 đ'
-                        total = tuition + meal_cost + 500000 + 200000
+                        summary_table.cell(row_index,1).text = f'{meal_cost:,} đ'
+                        row_index += 1
+                        
+                        summary_table.cell(row_index,0).text = 'Tiền học phí:'
+                        summary_table.cell(row_index,1).text = f'{tuition:,} đ'
+                        row_index += 1
+                        
+                        # Thêm các dịch vụ theo checkbox
+                        english_cost = 0
+                        steamax_cost = 0
+                        
+                        if has_english:
+                            summary_table.cell(row_index,0).text = 'Tiền học anh văn:'
+                            english_cost = 250000
+                            summary_table.cell(row_index,1).text = f'{english_cost:,} đ'
+                            row_index += 1
+                            
+                        if has_steamax:
+                            summary_table.cell(row_index,0).text = 'Tiền học STEAMAX:'
+                            steamax_cost = 200000
+                            summary_table.cell(row_index,1).text = f'{steamax_cost:,} đ'
+                            row_index += 1
+                        
+                        total = tuition + meal_cost + english_cost + steamax_cost
                         total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {total:,} đ')
                         total_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                         total_run = total_paragraph.runs[0]
@@ -1253,6 +1340,11 @@ def invoice():
                     days_absent_unexcused = absent_unexcused_days.get(student.id, 0)
                     days_absent_excused = absent_excused_days.get(student.id, 0)
                     
+                    # Lấy thông tin dịch vụ từ database
+                    service = services_dict.get(student.id)
+                    has_english = service.has_english if service else True
+                    has_steamax = service.has_steamax if service else True
+                    
                     # Học phí theo độ tuổi - sử dụng student_ages đã tính
                     age = student_ages[student.id]
                     if age == 1:
@@ -1266,14 +1358,22 @@ def invoice():
                     else:
                         tuition = 1500000
                     
-                    # Chỉ tính tiền ăn cho ngày có mặt + ngày vắng không phép (vì vắng không phép vẫn phải trả tiền ăn)
+                    # Tính các khoản phí
                     meal_cost = (days_present + days_absent_unexcused) * 38000
-                    total = meal_cost + tuition
+                    english_cost = 250000 if has_english else 0
+                    steamax_cost = 200000 if has_steamax else 0
+                    total = meal_cost + tuition + english_cost + steamax_cost
                     
-                    invoices.append(f"Học sinh {student.name}: Có mặt {days_present} ngày, vắng không phép {days_absent_unexcused} ngày, vắng có phép {days_absent_excused} ngày. Tiền ăn: {meal_cost:,}đ + Học phí: {tuition:,}đ = Tổng: {total:,}đ")
+                    # Tạo chuỗi mô tả chi tiết
+                    extras = []
+                    if has_english: extras.append(f"Anh văn: {english_cost:,}đ")
+                    if has_steamax: extras.append(f"STEAMAX: {steamax_cost:,}đ")
+                    extra_text = " + " + " + ".join(extras) if extras else ""
+                    
+                    invoices.append(f"Học sinh {student.name}: Có mặt {days_present} ngày, vắng không phép {days_absent_unexcused} ngày, vắng có phép {days_absent_excused} ngày. Tiền ăn: {meal_cost:,}đ + Học phí: {tuition:,}đ{extra_text} = Tổng: {total:,}đ")
     mobile = is_mobile()
     student_ages = {student.id: calculate_age(student.birth_date) if student.birth_date else 0 for student in students}
-    return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, absent_excused_days=absent_excused_days, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
+    return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, absent_excused_days=absent_excused_days, services_dict=services_dict, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
 
 
 @main.route('/login', methods=['GET', 'POST'])
