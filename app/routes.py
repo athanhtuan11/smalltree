@@ -1172,12 +1172,55 @@ def invoice():
     invoices = []
     if request.method == 'POST':
         selected_ids = request.form.getlist('student_ids')
+        
+        # Xử lý checkbox data từ form khi submit và cập nhật database ngay
+        for student in students:
+            english_checked = request.form.get(f'english_{student.id}') == '1'
+            steamax_checked = request.form.get(f'steamax_{student.id}') == '1'
+            
+            # Cập nhật database ngay lập tức với giá trị từ form
+            service = services_dict.get(student.id)
+            if service:
+                service.has_english = english_checked
+                service.has_steamax = steamax_checked
+            else:
+                # Tạo mới nếu chưa có
+                new_service = MonthlyService(child_id=student.id, month=month, has_english=english_checked, has_steamax=steamax_checked)
+                db.session.add(new_service)
+                services_dict[student.id] = new_service
+        
+        # Commit changes to database
+        try:
+            db.session.commit()
+            print(f"[DEBUG] Đã cập nhật tất cả dịch vụ từ form cho tháng {month}")
+        except Exception as e:
+            db.session.rollback()
+            print(f"[ERROR] Lỗi cập nhật dịch vụ từ form: {e}")
+        
         if request.form.get('export_word'):
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, 'w') as zipf:
                 for student in students:
                     if str(student.id) in selected_ids:
                         doc = Document()
+                        
+                        # Cài đặt page size A5 nằm ngang
+                        if DOCX_AVAILABLE:
+                            try:
+                                from docx.shared import Inches
+                                from docx.enum.section import WD_SECTION_START
+                                
+                                section = doc.sections[0]
+                                # A5 size: 148mm x 210mm, nhưng nằm ngang nên đảo ngược
+                                section.page_width = Inches(8.27)  # 210mm = 8.27 inches
+                                section.page_height = Inches(5.83)  # 148mm = 5.83 inches
+                                section.left_margin = Inches(0.5)
+                                section.right_margin = Inches(0.5)
+                                section.top_margin = Inches(0.4)
+                                section.bottom_margin = Inches(0.4)
+                            except ImportError:
+                                pass
+                        
                         # Bảng header: thông tin trường bên trái, logo bên phải
                         header_table = doc.add_table(rows=1, cols=2)
                         header_table.style = None  # Remove borders for a cleaner look
@@ -1192,7 +1235,7 @@ def invoice():
                             if DOCX_AVAILABLE:
                                 try:
                                     from docx.shared import Inches
-                                    run_logo.add_picture(logo_path, width=Inches(1.2))
+                                    run_logo.add_picture(logo_path, width=Inches(0.8))  # Giảm kích thước logo cho A5
                                 except ImportError:
                                     pass
                             left_cell.paragraphs[0].alignment = 0  # Left
@@ -1210,12 +1253,12 @@ def invoice():
                         title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
-                        run.font.size = Pt(18)  # Reduce font size
+                        run.font.size = Pt(14)  # Giảm từ 18 xuống 14 cho A5
                         run.font.color.rgb = RGBColor(76, 175, 80)
                         run.font.name = 'Comic Sans MS'
                         
-                        # Bảng thông tin học sinh
-                        info_table = doc.add_table(rows=2, cols=2)
+                        # Bảng thông tin học sinh - Layout ngang cho A5
+                        info_table = doc.add_table(rows=1, cols=4)  # Đổi từ 2x2 thành 1x4
                         info_table.style = 'Table Grid'
                         for row in info_table.rows:
                             for cell in row.cells:
@@ -1226,8 +1269,8 @@ def invoice():
                                 tcPr.append(shd)
                         info_table.cell(0,0).text = 'Họ và tên:'
                         info_table.cell(0,1).text = student.name
-                        info_table.cell(1,0).text = 'Ngày sinh:'
-                        info_table.cell(1,1).text = student.birth_date or "-"
+                        info_table.cell(0,2).text = 'Ngày sinh:'
+                        info_table.cell(0,3).text = student.birth_date or "-"
                         doc.add_paragraph('')
                         # Bảng tổng kết
                         days = attendance_days.get(student.id, 0)
@@ -1245,19 +1288,18 @@ def invoice():
                             tuition = 1500000
                         excused_absents = sum(1 for r in records_raw if r.child_id == student.id and r.status == 'Vắng mặt có phép')
                         
-                        # Lấy thông tin dịch vụ từ database thay vì form
+                        # Tính meal_cost - quan trọng!
+                        meal_cost = (days + absents) * 38000
+                        
+                        # Lấy thông tin dịch vụ từ database sau khi đã cập nhật
                         service = services_dict.get(student.id)
                         has_english = service.has_english if service else True
                         has_steamax = service.has_steamax if service else True
                         
-                        # Tính số dòng cần thiết cho bảng tóm tắt
-                        base_rows = 5  # Ngày học, vắng không phép, vắng có phép, tiền ăn, học phí
-                        extra_rows = 0
-                        if has_english: extra_rows += 1
-                        if has_steamax: extra_rows += 1
-                        total_rows = base_rows + extra_rows
+                        print(f"[DEBUG] Export Word - Student {student.name} (ID: {student.id}): english={has_english}, steamax={has_steamax}, month={month}")
                         
-                        summary_table = doc.add_table(rows=total_rows, cols=2)
+                        # Bảng tóm tắt compact cho A5 - chia làm 2 cột
+                        summary_table = doc.add_table(rows=4, cols=4)  # 4x4 grid cho compact
                         summary_table.style = 'Table Grid'
                         for row in summary_table.rows:
                             for cell in row.cells:
@@ -1266,55 +1308,89 @@ def invoice():
                                 shd = OxmlElement('w:shd')
                                 shd.set(qn('w:fill'), 'e8f5e9')
                                 tcPr.append(shd)
+                                # Set font size cho tất cả text trong cell
+                                for paragraph in cell.paragraphs:
+                                    for run in paragraph.runs:
+                                        run.font.size = Pt(9)
                         
-                        # Điền thông tin cơ bản
-                        row_index = 0
-                        summary_table.cell(row_index,0).text = 'Số ngày đi học:'
-                        summary_table.cell(row_index,1).text = str(days)
-                        row_index += 1
+                        # Điền thông tin cơ bản - cột trái
+                        cell = summary_table.cell(0,0)
+                        cell.text = 'Số ngày đi học:'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
-                        summary_table.cell(row_index,0).text = 'Số ngày vắng không phép:'
-                        summary_table.cell(row_index,1).text = str(absents)
-                        row_index += 1
+                        cell = summary_table.cell(0,1)
+                        cell.text = str(days)
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
-                        summary_table.cell(row_index,0).text = 'Số ngày vắng có phép:'
-                        summary_table.cell(row_index,1).text = str(excused_absents)
-                        row_index += 1
+                        cell = summary_table.cell(1,0)
+                        cell.text = 'Số ngày vắng không phép:'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
-                        summary_table.cell(row_index,0).text = 'Tiền ăn (có mặt + vắng không phép):'
-                        meal_cost = (days + absents) * 38000
-                        summary_table.cell(row_index,1).text = f'{meal_cost:,} đ'
-                        row_index += 1
+                        cell = summary_table.cell(1,1)
+                        cell.text = str(absents)
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
-                        summary_table.cell(row_index,0).text = 'Tiền học phí:'
-                        summary_table.cell(row_index,1).text = f'{tuition:,} đ'
-                        row_index += 1
+                        cell = summary_table.cell(2,0)
+                        cell.text = 'Số ngày vắng có phép:'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
-                        # Thêm các dịch vụ theo checkbox
-                        english_cost = 0
-                        steamax_cost = 0
+                        cell = summary_table.cell(2,1)
+                        cell.text = str(excused_absents)
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
                         
+                        cell = summary_table.cell(3,0)
+                        cell.text = 'Tiền ăn:'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        
+                        cell = summary_table.cell(3,1)
+                        cell.text = f'{meal_cost:,} đ'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        
+                        # Điền thông tin học phí và dịch vụ - cột phải
+                        cell = summary_table.cell(0,2)
+                        cell.text = 'Tiền học phí:'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        
+                        cell = summary_table.cell(0,3)
+                        cell.text = f'{tuition:,} đ'
+                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        
+                        row_index = 1
                         if has_english:
-                            summary_table.cell(row_index,0).text = 'Tiền học anh văn:'
-                            english_cost = 250000
-                            summary_table.cell(row_index,1).text = f'{english_cost:,} đ'
+                            cell = summary_table.cell(row_index,2)
+                            cell.text = 'Tiền học anh văn:'
+                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            
+                            cell = summary_table.cell(row_index,3)
+                            cell.text = '250,000 đ'
+                            cell.paragraphs[0].runs[0].font.size = Pt(9)
                             row_index += 1
                             
                         if has_steamax:
-                            summary_table.cell(row_index,0).text = 'Tiền học STEAMAX:'
-                            steamax_cost = 200000
-                            summary_table.cell(row_index,1).text = f'{steamax_cost:,} đ'
+                            cell = summary_table.cell(row_index,2)
+                            cell.text = 'Tiền học STEAMAX:'
+                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            
+                            cell = summary_table.cell(row_index,3)
+                            cell.text = '200,000 đ'
+                            cell.paragraphs[0].runs[0].font.size = Pt(9)
                             row_index += 1
                         
+                        
+                        # Tính tổng
+                        english_cost = 250000 if has_english else 0
+                        steamax_cost = 200000 if has_steamax else 0
                         total = tuition + meal_cost + english_cost + steamax_cost
+                        
                         total_paragraph = doc.add_paragraph(f'Tổng tiền cần thanh toán: {total:,} đ')
                         total_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                         total_run = total_paragraph.runs[0]
                         total_run.font.color.rgb = RGBColor(76, 175, 80)
                         total_run.font.bold = True
                         total_run.font.name = 'Comic Sans MS'
+                        total_run.font.size = Pt(12)  # Font size cho A5
 
-                        # Add payment info table
+                        # Add payment info table - Compact cho A5
                         from datetime import datetime
                         payment_table = doc.add_table(rows=1, cols=2)
                         payment_table.style = None  # No border for clean look
@@ -1322,16 +1398,37 @@ def invoice():
                         right_payment_cell = payment_table.cell(0,1)
                         left_payment_cell.vertical_alignment = 1  # Top
                         right_payment_cell.vertical_alignment = 1  # Top
-                        left_payment_cell.text = 'Người nộp tiền:'
-                        left_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')                        
+                        
+                        # Left cell với font size nhỏ
+                        left_para = left_payment_cell.paragraphs[0]
+                        left_run1 = left_para.add_run('Người nộp tiền:')
+                        left_run1.font.size = Pt(9)
+                        left_run1.bold = True
+                        left_para2 = left_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')
+                        left_para2.runs[0].font.size = Pt(8)
+                        
+                        # Right cell với font size nhỏ                      
                         now = datetime.now()
-                        right_payment_cell.text = ''  # Xóa nội dung mặc định
-                        right_payment_cell.add_paragraph(f'Ngày ...... tháng ...... năm {now.year}').alignment = 1
-                        right_payment_cell.add_paragraph('Chủ Trường').alignment = 1
-                        right_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)').alignment = 1
+                        right_para1 = right_payment_cell.paragraphs[0]
+                        right_para1.alignment = 1
+                        right_run1 = right_para1.add_run(f'Ngày ...... tháng ...... năm {now.year}')
+                        right_run1.font.size = Pt(8)
+                        
+                        right_para2 = right_payment_cell.add_paragraph('Chủ Trường')
+                        right_para2.alignment = 1
+                        right_para2.runs[0].font.size = Pt(9)
+                        right_para2.runs[0].bold = True
+                        
+                        right_para3 = right_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')
+                        right_para3.alignment = 1
+                        right_para3.runs[0].font.size = Pt(8)
+                        
                         right_payment_cell.add_paragraph().alignment = 1
-                        right_payment_cell.add_paragraph().alignment = 1
-                        right_payment_cell.add_paragraph('Nguyễn Thị Vân').alignment = 1
+                        
+                        right_para_name = right_payment_cell.add_paragraph('Nguyễn Thị Vân')
+                        right_para_name.alignment = 1
+                        right_para_name.runs[0].font.size = Pt(9)
+                        right_para_name.runs[0].bold = True
                         
                         file_stream = io.BytesIO()
                         doc.save(file_stream)

@@ -188,6 +188,15 @@ document.addEventListener('DOMContentLoaded', function() {
             saveServiceData(studentId, 'steamax', this.checked);
         });
     });
+    
+    // Tính tổng ban đầu cho tất cả học sinh khi trang load
+    const allStudentIds = new Set();
+    englishCheckboxes.forEach(cb => allStudentIds.add(cb.dataset.studentId));
+    steamaxCheckboxes.forEach(cb => allStudentIds.add(cb.dataset.studentId));
+    
+    allStudentIds.forEach(studentId => {
+        updateTotal(studentId);
+    });
 });
 
 // Toggle functions cho quick controls
