@@ -1214,10 +1214,10 @@ def invoice():
                                 # A5 size: 148mm x 210mm, nhưng nằm ngang nên đảo ngược
                                 section.page_width = Inches(8.27)  # 210mm = 8.27 inches
                                 section.page_height = Inches(5.83)  # 148mm = 5.83 inches
-                                section.left_margin = Inches(0.5)
-                                section.right_margin = Inches(0.5)
-                                section.top_margin = Inches(0.4)
-                                section.bottom_margin = Inches(0.4)
+                                section.left_margin = Inches(0.3)
+                                section.right_margin = Inches(0.3)
+                                section.top_margin = Inches(0.2)
+                                section.bottom_margin = Inches(0.2)
                             except ImportError:
                                 pass
                         
@@ -1235,7 +1235,7 @@ def invoice():
                             if DOCX_AVAILABLE:
                                 try:
                                     from docx.shared import Inches
-                                    run_logo.add_picture(logo_path, width=Inches(0.8))  # Giảm kích thước logo cho A5
+                                    run_logo.add_picture(logo_path, width=Inches(0.6))  # Giảm kích thước logo cho A5
                                 except ImportError:
                                     pass
                             left_cell.paragraphs[0].alignment = 0  # Left
@@ -1249,13 +1249,18 @@ def invoice():
                         # Đảm bảo mọi paragraph trong cell đều căn giữa
                         for para in right_cell.paragraphs:
                             para.alignment = 1
-                        doc.add_paragraph('')
+                        # Loại bỏ paragraph trống để tiết kiệm không gian
                         title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
-                        run.font.size = Pt(14)  # Giảm từ 18 xuống 14 cho A5
+                        run.font.size = Pt(12)  # Giảm từ 14 xuống 12 cho A5
                         run.font.color.rgb = RGBColor(76, 175, 80)
                         run.font.name = 'Comic Sans MS'
+                        
+                        # Thiết lập line spacing compact
+                        from docx.shared import Pt as PtUnit
+                        title.paragraph_format.space_before = PtUnit(0)
+                        title.paragraph_format.space_after = PtUnit(6)
                         
                         # Bảng thông tin học sinh - Layout ngang cho A5
                         info_table = doc.add_table(rows=1, cols=4)  # Đổi từ 2x2 thành 1x4
@@ -1271,7 +1276,7 @@ def invoice():
                         info_table.cell(0,1).text = student.name
                         info_table.cell(0,2).text = 'Ngày sinh:'
                         info_table.cell(0,3).text = student.birth_date or "-"
-                        doc.add_paragraph('')
+                        # Loại bỏ paragraph trống để tiết kiệm không gian
                         # Bảng tổng kết
                         days = attendance_days.get(student.id, 0)
                         absents = absent_unexcused_days.get(student.id, 0)
@@ -1311,69 +1316,69 @@ def invoice():
                                 # Set font size cho tất cả text trong cell
                                 for paragraph in cell.paragraphs:
                                     for run in paragraph.runs:
-                                        run.font.size = Pt(9)
+                                        run.font.size = Pt(8)  # Giảm từ 9 xuống 8
                         
                         # Điền thông tin cơ bản - cột trái
                         cell = summary_table.cell(0,0)
                         cell.text = 'Số ngày đi học:'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(0,1)
                         cell.text = str(days)
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(1,0)
                         cell.text = 'Số ngày vắng không phép:'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(1,1)
                         cell.text = str(absents)
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(2,0)
                         cell.text = 'Số ngày vắng có phép:'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(2,1)
                         cell.text = str(excused_absents)
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(3,0)
                         cell.text = 'Tiền ăn:'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(3,1)
                         cell.text = f'{meal_cost:,} đ'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         # Điền thông tin học phí và dịch vụ - cột phải
                         cell = summary_table.cell(0,2)
                         cell.text = 'Tiền học phí:'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         cell = summary_table.cell(0,3)
                         cell.text = f'{tuition:,} đ'
-                        cell.paragraphs[0].runs[0].font.size = Pt(9)
+                        cell.paragraphs[0].runs[0].font.size = Pt(8)
                         
                         row_index = 1
                         if has_english:
                             cell = summary_table.cell(row_index,2)
                             cell.text = 'Tiền học anh văn:'
-                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            cell.paragraphs[0].runs[0].font.size = Pt(8)
                             
                             cell = summary_table.cell(row_index,3)
                             cell.text = '250,000 đ'
-                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            cell.paragraphs[0].runs[0].font.size = Pt(8)
                             row_index += 1
                             
                         if has_steamax:
                             cell = summary_table.cell(row_index,2)
                             cell.text = 'Tiền học STEAMAX:'
-                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            cell.paragraphs[0].runs[0].font.size = Pt(8)
                             
                             cell = summary_table.cell(row_index,3)
                             cell.text = '200,000 đ'
-                            cell.paragraphs[0].runs[0].font.size = Pt(9)
+                            cell.paragraphs[0].runs[0].font.size = Pt(8)
                             row_index += 1
                         
                         
@@ -1388,10 +1393,14 @@ def invoice():
                         total_run.font.color.rgb = RGBColor(76, 175, 80)
                         total_run.font.bold = True
                         total_run.font.name = 'Comic Sans MS'
-                        total_run.font.size = Pt(12)  # Font size cho A5
+                        total_run.font.size = Pt(10)  # Giảm font size cho A5
+                        
+                        # Thiết lập compact spacing cho total
+                        total_paragraph.paragraph_format.space_before = PtUnit(3)
+                        total_paragraph.paragraph_format.space_after = PtUnit(6)
 
                         # Add payment info table - Compact cho A5
-                        from datetime import datetime
+                        # Loại bỏ khoảng cách để tiết kiệm không gian
                         payment_table = doc.add_table(rows=1, cols=2)
                         payment_table.style = None  # No border for clean look
                         left_payment_cell = payment_table.cell(0,0)
@@ -1402,32 +1411,33 @@ def invoice():
                         # Left cell với font size nhỏ
                         left_para = left_payment_cell.paragraphs[0]
                         left_run1 = left_para.add_run('Người nộp tiền:')
-                        left_run1.font.size = Pt(9)
+                        left_run1.font.size = Pt(8)
                         left_run1.bold = True
                         left_para2 = left_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')
-                        left_para2.runs[0].font.size = Pt(8)
+                        left_para2.runs[0].font.size = Pt(7)
                         
                         # Right cell với font size nhỏ                      
                         now = datetime.now()
                         right_para1 = right_payment_cell.paragraphs[0]
                         right_para1.alignment = 1
                         right_run1 = right_para1.add_run(f'Ngày ...... tháng ...... năm {now.year}')
-                        right_run1.font.size = Pt(8)
+                        right_run1.font.size = Pt(7)
                         
                         right_para2 = right_payment_cell.add_paragraph('Chủ Trường')
                         right_para2.alignment = 1
-                        right_para2.runs[0].font.size = Pt(9)
+                        right_para2.runs[0].font.size = Pt(8)
                         right_para2.runs[0].bold = True
                         
                         right_para3 = right_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')
                         right_para3.alignment = 1
-                        right_para3.runs[0].font.size = Pt(8)
+                        right_para3.runs[0].font.size = Pt(7)
                         
-                        right_payment_cell.add_paragraph().alignment = 1
+                        # Bỏ paragraph trống để tiết kiệm không gian
+                        # right_payment_cell.add_paragraph().alignment = 1
                         
                         right_para_name = right_payment_cell.add_paragraph('Nguyễn Thị Vân')
                         right_para_name.alignment = 1
-                        right_para_name.runs[0].font.size = Pt(9)
+                        right_para_name.runs[0].font.size = Pt(8)
                         right_para_name.runs[0].bold = True
                         
                         file_stream = io.BytesIO()
