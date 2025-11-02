@@ -1264,7 +1264,9 @@ def invoice():
                         for para in center_cell.paragraphs:
                             para.alignment = 1
                         # Loại bỏ paragraph trống để tiết kiệm không gian
-                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month}', 0)
+                        # Format title with proper month and year display
+                        month_year, month_num = month.split('-')
+                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month_num} NĂM {month_year}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
                         run.font.size = Pt(12)  # Giảm từ 14 xuống 12 cho A5
@@ -1314,8 +1316,6 @@ def invoice():
                         service = services_dict.get(student.id)
                         has_english = service.has_english if service else True
                         has_steamax = service.has_steamax if service else True
-                        
-                        print(f"[DEBUG] Export Word - Student {student.name} (ID: {student.id}): english={has_english}, steamax={has_steamax}, month={month}")
                         
                         # Bảng tóm tắt compact cho A5 - chia làm 2 cột
                         summary_table = doc.add_table(rows=4, cols=4)  # 4x4 grid cho compact
@@ -1434,9 +1434,11 @@ def invoice():
                         
                         # Right cell với font size nhỏ                      
                         now = datetime.now()
+                        # Extract month number and year from month string (format: "YYYY-MM")
+                        month_year, month_num = month.split('-')
                         right_para1 = right_payment_cell.paragraphs[0]
                         right_para1.alignment = 1
-                        right_run1 = right_para1.add_run(f'Ngày ...... tháng ...... năm {now.year}')
+                        right_run1 = right_para1.add_run(f'Ngày 1 tháng {month_num} năm {month_year}')
                         right_run1.font.size = Pt(7)
 
                         right_para2 = right_payment_cell.add_paragraph('Chủ Trường')
