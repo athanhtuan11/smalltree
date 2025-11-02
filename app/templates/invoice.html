@@ -49,6 +49,7 @@
                         <th>Số ngày có mặt</th>
                         <th>Số ngày vắng không phép</th>
                         <th>Số ngày vắng có phép</th>
+                        <th>Tiền ăn</th>
                         <th>Học tiếng anh</th>
                         <th>STEAMAX</th>
                         <th>Tiền học phí</th>
@@ -64,6 +65,10 @@
                         <td>{{ attendance_days[student.id] }}</td>
                         <td>{{ absent_unexcused_days[student.id] }}</td>
                         <td>{{ absent_excused_days[student.id] }}</td>
+                        <td>
+                            {% set meal_cost = (26 - absent_excused_days[student.id]) * 38000 %}
+                            {{ "{:,}".format(meal_cost) }}đ
+                        </td>
                         <td>
                             <input type="checkbox" name="english_{{ student.id }}" value="1" 
                                    {% if services_dict.get(student.id) and services_dict[student.id].has_english %}checked{% endif %}
@@ -88,15 +93,17 @@
                         </td>
                         <td>
                             {% set tuition = 1850000 if age == 1 else 1750000 if age == 2 else 1650000 if age == 3 else 1550000 if age == 4 else 1500000 %}
-                            {% set meal_cost = (attendance_days[student.id] + absent_unexcused_days[student.id]) * 38000 %}
-                            {% set base_total = meal_cost + tuition %}
+                            {% set meal_cost_new = (26 - absent_excused_days[student.id]) * 38000 %}
+                            {% set base_total = meal_cost_new + tuition %}
                             {% set english_cost = 250000 if services_dict[student.id].has_english else 0 %}
                             {% set steamax_cost = 200000 if services_dict[student.id].has_steamax else 0 %}
                             {% set total = base_total + english_cost + steamax_cost %}
                             <span class="total-amount" data-student-id="{{ student.id }}" 
                                   data-base-total="{{ base_total }}" 
                                   data-english="250000" 
-                                  data-steamax="200000">
+                                  data-steamax="200000"
+                                  data-meal-base="26"
+                                  data-excused-absents="{{ absent_excused_days[student.id] }}">
                                 {{ "{:,}".format(total) }}đ
                             </span>
                         </td>

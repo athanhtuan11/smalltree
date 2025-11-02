@@ -1221,33 +1221,47 @@ def invoice():
                             except ImportError:
                                 pass
                         
-                        # Bảng header: thông tin trường bên trái, logo bên phải
-                        header_table = doc.add_table(rows=1, cols=2)
+                        # Bảng header: logo bên trái, thông tin trường ở giữa
+                        header_table = doc.add_table(rows=1, cols=3)  # Thay đổi từ 2 cột thành 3 cột
                         header_table.style = None  # Remove borders for a cleaner look
-                        left_cell = header_table.cell(0,0)
-                        right_cell = header_table.cell(0,1)
+                        left_cell = header_table.cell(0,0)    # Logo
+                        center_cell = header_table.cell(0,1)  # Thông tin trường
+                        right_cell = header_table.cell(0,2)   # Trống
+                        
                         left_cell.vertical_alignment = 1  # Top
+                        center_cell.vertical_alignment = 1  # Top
                         right_cell.vertical_alignment = 1  # Top
-                        # Logo on the left
+                        # Logo on the left - to hơn
                         logo_path = os.path.join(os.path.dirname(__file__), 'static', 'images', 'logo.jpg')
                         if os.path.exists(logo_path):
                             run_logo = left_cell.paragraphs[0].add_run()
                             if DOCX_AVAILABLE:
                                 try:
                                     from docx.shared import Inches
-                                    run_logo.add_picture(logo_path, width=Inches(0.6))  # Giảm kích thước logo cho A5
+                                    run_logo.add_picture(logo_path, width=Inches(1.0))  # Tăng từ 0.6 lên 1.0
                                 except ImportError:
                                     pass
                             left_cell.paragraphs[0].alignment = 0  # Left
-                        # School info on the right
-                        right_paragraph = right_cell.paragraphs[0]
-                        right_paragraph.alignment = 1  # Center
-                        right_paragraph.add_run('SMALL TREE\n').bold = True
-                        right_paragraph.add_run('MẦM NON CÂY NHỎ\n').bold = True
-                        right_paragraph.add_run('Số 1, Rchai’ 2, Đức Trọng, Lâm Đồng\n')
-                        right_paragraph.add_run('SDT: 0917618868 / STK: Nguyễn Thị Vân 108875858567 NH VietinBank')
-                        # Đảm bảo mọi paragraph trong cell đều căn giữa
-                        for para in right_cell.paragraphs:
+                        # School info ở giữa
+                        center_paragraph = center_cell.paragraphs[0]
+                        center_paragraph.alignment = 1  # Center
+                        
+                        school_run1 = center_paragraph.add_run('SMALL TREE\n')
+                        school_run1.bold = True
+                        school_run1.font.size = Pt(10)  # Tăng size vì ở giữa
+                        
+                        school_run2 = center_paragraph.add_run('MẦM NON CÂY NHỎ\n')
+                        school_run2.bold = True
+                        school_run2.font.size = Pt(10)
+    
+                        school_run3 = center_paragraph.add_run('Số 1, Rchai 2, Đức Trọng, Lâm Đồng\n')
+                        school_run3.font.size = Pt(8)
+                        
+                        school_run4 = center_paragraph.add_run('SDT: 0917618868 / STK: Nguyễn Thị Vân 108875858567 NH VietinBank')
+                        school_run4.font.size = Pt(7)
+                        
+                        # Đảm bảo mọi paragraph trong center cell đều căn giữa
+                        for para in center_cell.paragraphs:
                             para.alignment = 1
                         # Loại bỏ paragraph trống để tiết kiệm không gian
                         title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month}', 0)
@@ -1293,8 +1307,8 @@ def invoice():
                             tuition = 1500000
                         excused_absents = sum(1 for r in records_raw if r.child_id == student.id and r.status == 'Vắng mặt có phép')
                         
-                        # Tính meal_cost - quan trọng!
-                        meal_cost = (days + absents) * 38000
+                        # Tính meal_cost theo công thức mới: (26 - số ngày vắng có phép) * 38000
+                        meal_cost = (26 - excused_absents) * 38000
                         
                         # Lấy thông tin dịch vụ từ database sau khi đã cập nhật
                         service = services_dict.get(student.id)
@@ -1408,12 +1422,14 @@ def invoice():
                         left_payment_cell.vertical_alignment = 1  # Top
                         right_payment_cell.vertical_alignment = 1  # Top
                         
-                        # Left cell với font size nhỏ
+                        # Left cell với font size nhỏ - căn giữa
                         left_para = left_payment_cell.paragraphs[0]
+                        left_para.alignment = 1  # Center
                         left_run1 = left_para.add_run('Người nộp tiền:')
                         left_run1.font.size = Pt(8)
                         left_run1.bold = True
                         left_para2 = left_payment_cell.add_paragraph('(Kí và ghi rõ họ tên)')
+                        left_para2.alignment = 1  # Center
                         left_para2.runs[0].font.size = Pt(7)
                         
                         # Right cell với font size nhỏ                      
@@ -1422,7 +1438,7 @@ def invoice():
                         right_para1.alignment = 1
                         right_run1 = right_para1.add_run(f'Ngày ...... tháng ...... năm {now.year}')
                         right_run1.font.size = Pt(7)
-                        
+
                         right_para2 = right_payment_cell.add_paragraph('Chủ Trường')
                         right_para2.alignment = 1
                         right_para2.runs[0].font.size = Pt(8)
@@ -1432,8 +1448,8 @@ def invoice():
                         right_para3.alignment = 1
                         right_para3.runs[0].font.size = Pt(7)
                         
-                        # Bỏ paragraph trống để tiết kiệm không gian
-                        # right_payment_cell.add_paragraph().alignment = 1
+                        # paragraph trống để tiết kiệm không gian
+                        right_payment_cell.add_paragraph().alignment = 1
                         
                         right_para_name = right_payment_cell.add_paragraph('Nguyễn Thị Vân')
                         right_para_name.alignment = 1
@@ -1472,8 +1488,8 @@ def invoice():
                     else:
                         tuition = 1500000
                     
-                    # Tính các khoản phí
-                    meal_cost = (days_present + days_absent_unexcused) * 38000
+                    # Tính các khoản phí theo công thức mới
+                    meal_cost = (26 - days_absent_excused) * 38000  # 26 ngày mặc định trừ ngày vắng có phép
                     english_cost = 250000 if has_english else 0
                     steamax_cost = 200000 if has_steamax else 0
                     total = meal_cost + tuition + english_cost + steamax_cost
