@@ -3,24 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}SmallTree Academy{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Optimized viewport for mobile devices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Mobile optimization meta tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#4CAF50">
+    <!-- Prevent auto-zoom on form inputs in iOS -->
+    <meta name="format-detection" content="telephone=no">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    
+    <!-- Preload key resources for better performance -->
+    <link rel="preload" href="{{ url_for('static', filename='images/logo.jpg') }}" as="image">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-4 rounded" style="border-radius:18px;">
-        <div class="container-fluid px-3">
+    <!-- Mobile-optimized navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-3 rounded" style="border-radius:15px;">
+        <div class="container-fluid px-2 px-md-3">
             <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
-                <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo" style="width:38px; margin-right:8px; border-radius:50%;">
-                <span style="color:#43a047; font-family:'Comic Sans MS', 'Arial', sans-serif; font-size:1.3em;" class="d-none d-sm-inline">SmallTree Academy</span>
+                <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo" style="width:32px; margin-right:6px; border-radius:50%;" class="d-inline d-md-none">
+                <img src="{{ url_for('static', filename='images/logo.jpg') }}" alt="Logo" style="width:38px; margin-right:8px; border-radius:50%;" class="d-none d-md-inline">
                 <span style="color:#43a047; font-family:'Comic Sans MS', 'Arial', sans-serif; font-size:1.1em;" class="d-inline d-sm-none">SmallTree</span>
+                <span style="color:#43a047; font-family:'Comic Sans MS', 'Arial', sans-serif; font-size:1.2em;" class="d-none d-sm-inline d-md-none">SmallTree</span>
+                <span style="color:#43a047; font-family:'Comic Sans MS', 'Arial', sans-serif; font-size:1.3em;" class="d-none d-md-inline">SmallTree Academy</span>
             </a>
-            <button class="navbar-toggler border-0 p-1" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" style="font-size: 1.2em;">
+            <button class="navbar-toggler border-0 p-1" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" style="font-size: 1.1em;">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto mb-2 mb-lg-0" style="font-size:1.08em;">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0" style="font-size:1.05em;">
                     <li class="nav-item">
                         <a class="nav-link d-flex align-items-center py-2" href="/" style="min-height: 44px;">
                             <i class="bi bi-house-door-fill me-2" style="color:#43a047; font-size:1.1em;"></i> 
@@ -90,8 +105,16 @@
             </div>
         </div>
     </nav>
-    <main class="container">
-        {% block content %}{% endblock %}
+    
+    <!-- Mobile-optimized main container -->
+    <main class="container-fluid px-2 px-md-3">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-11 col-xl-10">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+        
+        <!-- Flash messages with mobile optimization -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="modal fade" id="flashModal" tabindex="-1" aria-labelledby="flashModalLabel" aria-hidden="true">
@@ -122,12 +145,94 @@
             {% endif %}
         {% endwith %}
     </main>
-    <footer class="bg-light text-center py-3 mt-5">
+    
+    <!-- Mobile-optimized footer -->
+    <footer class="bg-light text-center py-3 mt-4 mt-md-5">
         <div class="container">
-            <span class="fw-bold" style="color:#43a047; font-size:1.2em;">SmallTree Academy</span><br>
-            <span style="color:#388e3c;">Ngôi nhà thứ hai của bé - Mầm non xanh, an toàn và sáng tạo!</span>
+            <span class="fw-bold" style="color:#43a047; font-size:1.1em;">SmallTree Academy</span><br>
+            <span style="color:#388e3c; font-size:0.9em;">Ngôi nhà thứ hai của bé - Mầm non xanh, an toàn và sáng tạo!</span>
         </div>
     </footer>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Mobile optimization JavaScript -->
+    <script>
+        // Prevent zoom on iOS when focusing inputs
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add viewport meta tag for iOS zoom prevention
+            var viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            }
+            
+            // Auto-collapse navbar on link click (mobile)
+            var navbarCollapse = document.getElementById('navbarNav');
+            var navLinks = document.querySelectorAll('.navbar-nav .nav-link');
+            
+            navLinks.forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth < 992) { // Only on mobile/tablet
+                        var bsCollapse = new bootstrap.Collapse(navbarCollapse, {
+                            toggle: false
+                        });
+                        bsCollapse.hide();
+                    }
+                });
+            });
+            
+            // Optimize table scrolling on mobile
+            var tables = document.querySelectorAll('.table-responsive');
+            tables.forEach(function(table) {
+                if (window.innerWidth < 768) {
+                    table.style.overflowX = 'auto';
+                    table.style.webkitOverflowScrolling = 'touch';
+                }
+            });
+            
+            // Add touch-friendly classes to forms
+            var formControls = document.querySelectorAll('.form-control, .form-select');
+            formControls.forEach(function(control) {
+                if (window.innerWidth < 768) {
+                    control.classList.add('mobile-form-control');
+                }
+            });
+            
+            // Optimize button groups for mobile
+            var buttonGroups = document.querySelectorAll('.btn-group');
+            buttonGroups.forEach(function(group) {
+                if (window.innerWidth < 768) {
+                    group.classList.add('mobile-btn-group');
+                    group.classList.remove('btn-group');
+                }
+            });
+        });
+        
+        // Handle window resize for responsive adjustments
+        window.addEventListener('resize', function() {
+            var formControls = document.querySelectorAll('.form-control, .form-select');
+            formControls.forEach(function(control) {
+                if (window.innerWidth < 768) {
+                    control.classList.add('mobile-form-control');
+                } else {
+                    control.classList.remove('mobile-form-control');
+                }
+            });
+        });
+        
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
 </body>
 </html>
