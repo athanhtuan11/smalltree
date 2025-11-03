@@ -234,6 +234,66 @@ class Menu(db.Model):
     
     # Unique constraint để tránh trùng lặp tuần
     __table_args__ = (db.UniqueConstraint('week_number', 'year', name='unique_week_year'),)
+    
+    def to_dict(self):
+        """Convert Menu object to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'week_number': self.week_number,
+            'year': self.year,
+            'data': {
+                'mon': {
+                    'morning': self.monday_morning or '',
+                    'snack': self.monday_snack or '',
+                    'dessert': self.monday_dessert or '',
+                    'lunch': self.monday_lunch or '',
+                    'afternoon': self.monday_afternoon or '',
+                    'lateafternoon': self.monday_lateafternoon or ''
+                },
+                'tue': {
+                    'morning': self.tuesday_morning or '',
+                    'snack': self.tuesday_snack or '',
+                    'dessert': self.tuesday_dessert or '',
+                    'lunch': self.tuesday_lunch or '',
+                    'afternoon': self.tuesday_afternoon or '',
+                    'lateafternoon': self.tuesday_lateafternoon or ''
+                },
+                'wed': {
+                    'morning': self.wednesday_morning or '',
+                    'snack': self.wednesday_snack or '',
+                    'dessert': self.wednesday_dessert or '',
+                    'lunch': self.wednesday_lunch or '',
+                    'afternoon': self.wednesday_afternoon or '',
+                    'lateafternoon': self.wednesday_lateafternoon or ''
+                },
+                'thu': {
+                    'morning': self.thursday_morning or '',
+                    'snack': self.thursday_snack or '',
+                    'dessert': self.thursday_dessert or '',
+                    'lunch': self.thursday_lunch or '',
+                    'afternoon': self.thursday_afternoon or '',
+                    'lateafternoon': self.thursday_lateafternoon or ''
+                },
+                'fri': {
+                    'morning': self.friday_morning or '',
+                    'snack': self.friday_snack or '',
+                    'dessert': self.friday_dessert or '',
+                    'lunch': self.friday_lunch or '',
+                    'afternoon': self.friday_afternoon or '',
+                    'lateafternoon': self.friday_lateafternoon or ''
+                },
+                'sat': {
+                    'morning': self.saturday_morning or '',
+                    'snack': self.saturday_snack or '',
+                    'dessert': self.saturday_dessert or '',
+                    'lunch': self.saturday_lunch or '',
+                    'afternoon': self.saturday_afternoon or '',
+                    'lateafternoon': self.saturday_lateafternoon or ''
+                }
+            },
+            'created_date': self.created_date.isoformat() if self.created_date else None,
+            'updated_date': self.updated_date.isoformat() if self.updated_date else None
+        }
 
 # ================== DỊCH VỤ THEO THÁNG ==================
 class MonthlyService(db.Model):

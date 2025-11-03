@@ -4,6 +4,22 @@ from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
 import os
 from dotenv import load_dotenv
+import json
+from datetime import datetime, date
+
+class CustomJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle SQLAlchemy objects"""
+    def default(self, obj):
+        # Handle Menu objects
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        # Handle datetime objects
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        # Handle other SQLAlchemy model objects by trying to convert to dict
+        if hasattr(obj, '__table__'):
+            return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+        return super().default(obj)
 
 def create_app():
     # Load environment variables from .env file
@@ -11,6 +27,9 @@ def create_app():
 
     app = Flask(__name__)
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+    
+    # Configure custom JSON encoder to handle SQLAlchemy objects
+    app.json_encoder = CustomJSONEncoder
 
     # Định nghĩa filter định dạng ngày tháng năm cho Jinja2 (đăng ký sau khi tạo app)
     @app.template_filter('datetimeformat')
