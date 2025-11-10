@@ -1925,32 +1925,51 @@ def edit_student(student_id):
 def delete_student(student_id):
     if session.get('role') != 'admin' and session.get('role') != 'teacher':
         return redirect_no_permission()
-    student = Child.query.get_or_404(student_id)
-    # Xoá toàn bộ album và ảnh liên quan trước khi xoá học sinh
-    for album in student.albums:
-        for photo in album.photos:
-            db.session.delete(photo)
-        db.session.delete(album)
+    
+    try:
+        student = Child.query.get_or_404(student_id)
+        
+        # Xoá toàn bộ album và ảnh liên quan trước khi xoá học sinh
+        for album in student.albums:
+            for photo in album.photos:
+                db.session.delete(photo)
+            db.session.delete(album)
 
-    # Xoá toàn bộ bản ghi điểm danh liên quan
-    for record in student.attendance_records:
-        db.session.delete(record)
+        # Xoá toàn bộ bản ghi điểm danh liên quan
+        attendance_records = AttendanceRecord.query.filter_by(child_id=student.id).all()
+        for record in attendance_records:
+            db.session.delete(record)
 
-    # Xoá toàn bộ bản ghi BMI liên quan
-    for record in student.bmi_records:
-        db.session.delete(record)
+        # Xoá toàn bộ bản ghi BMI liên quan
+        bmi_records = BmiRecord.query.filter_by(student_id=student.id).all()
+        for record in bmi_records:
+            db.session.delete(record)
 
-    # Xoá toàn bộ bản ghi tiến bộ học tập liên quan
-    for record in student.progress_records:
-        db.session.delete(record)
+        # Xoá toàn bộ bản ghi tiến bộ học tập liên quan
+        progress_records = StudentProgress.query.filter_by(student_id=student.id).all()
+        for record in progress_records:
+            db.session.delete(record)
 
-    # Xoá toàn bộ dịch vụ theo tháng liên quan
-    for record in student.monthly_services:
-        db.session.delete(record)
+        # Xoá toàn bộ dịch vụ theo tháng liên quan
+        monthly_services = MonthlyService.query.filter_by(child_id=student.id).all()
+        for record in monthly_services:
+            db.session.delete(record)
 
-    db.session.delete(student)
-    db.session.commit()
-    flash('Đã xoá học sinh!', 'success')
+        # Xóa học sinh
+        student_name = student.name
+        db.session.delete(student)
+        
+        db.session.commit()
+        flash(f'Đã xoá học sinh {student_name}!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        if "404" in str(e):
+            flash(f'Không tìm thấy học sinh với ID {student_id}!', 'danger')
+        else:
+            flash(f'Lỗi khi xoá học sinh: {str(e)}', 'danger')
+        print(f"[ERROR] Lỗi xoá học sinh {student_id}: {str(e)}")
+    
     return redirect(url_for('main.student_list'))
 
 @main.route('/students/<int:student_id>/toggle', methods=['POST'])
