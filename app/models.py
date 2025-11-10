@@ -22,6 +22,7 @@ class Child(db.Model):
     password = db.Column(db.String(100))
     student_code = db.Column(db.String(20), unique=True, nullable=True)
     avatar = db.Column(db.String(300))  # Đường dẫn ảnh đại diện học sinh
+    is_active = db.Column(db.Boolean, default=True)  # Ẩn học sinh khi nghỉ học
 
 class Staff(db.Model):
     id = db.Column(db.Integer, primary_key=True)

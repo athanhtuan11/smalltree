@@ -258,9 +258,9 @@ def save_attendance():
     selected_class = request.form.get('class_name')
     # Lưu hàng loạt (không có student_id riêng lẻ)
     if selected_class and selected_class != 'None':
-        students = Child.query.filter_by(class_name=selected_class).all()
+        students = Child.query.filter_by(class_name=selected_class, is_active=True).all()
     else:
-        students = Child.query.all()
+        students = Child.query.filter_by(is_active=True).all()
     for student in students:
         present_value = request.form.get(f'present_{student.id}')
         if present_value == 'yes':
@@ -980,9 +980,9 @@ def attendance():
     class_names = [c.name for c in Class.query.order_by(Class.name).all()]
     # Lọc học sinh theo lớp
     if selected_class:
-        students = Child.query.filter_by(class_name=selected_class).all()
+        students = Child.query.filter_by(class_name=selected_class, is_active=True).all()
     else:
-        students = Child.query.all()
+        students = Child.query.filter_by(is_active=True).all()
     # Lấy trạng thái điểm danh từ database cho ngày đã chọn
     for student in students:
         record = AttendanceRecord.query.filter_by(child_id=student.id, date=attendance_date).first()
@@ -1049,7 +1049,7 @@ def attendance():
 
 @main.route('/attendance/mark', methods=['GET', 'POST'])
 def mark_attendance():
-    students = Child.query.all()
+    students = Child.query.filter_by(is_active=True).all()
     if request.method == 'POST':
         for student in students:
             present = request.form.get(f'present_{student.id}') == 'on'
@@ -1069,7 +1069,7 @@ def attendance_history():
         child = Child.query.filter_by(id=user_id).first()
         students = [child] if child else []
     else:
-        students = Child.query.all()
+        students = Child.query.filter_by(is_active=True).all()
     month = request.args.get('month')
     if month:
         year, m = map(int, month.split('-'))
@@ -1134,7 +1134,7 @@ def invoice():
         month = f"{year:04d}-{m:02d}"
     num_days = monthrange(year, m)[1]
     days_in_month = [f"{year:04d}-{m:02d}-{day:02d}" for day in range(1, num_days+1)]
-    students = Child.query.all()
+    students = Child.query.filter_by(is_active=True).all()
     records_raw = AttendanceRecord.query.filter(AttendanceRecord.date.like(f"{year:04d}-{m:02d}-%")).all()
     # Tính số ngày có mặt, số ngày vắng mặt không phép và có phép cho từng học sinh
     attendance_days = {student.id: 0 for student in students}
@@ -1630,7 +1630,7 @@ def accounts():
     if session.get('role') != 'admin':
         flash('Bạn không có quyền truy cập trang này!', 'danger')
         return redirect(url_for('main.login'))
-    parents = Child.query.all()
+    parents = Child.query.filter_by(is_active=True).all()
     teachers = Staff.query.filter(Staff.position != 'admin').all()
     mobile = is_mobile()
     def mask_user(u):
@@ -1801,7 +1801,13 @@ def edit_profile():
 
 @main.route('/students')
 def student_list():
-    students = Child.query.all()
+    show_all = request.args.get('show_all', 'false').lower() == 'true'
+    
+    if show_all and session.get('role') in ['admin', 'teacher']:
+        students = Child.query.all()
+    else:
+        students = Child.query.filter_by(is_active=True).all()
+    
     mobile = is_mobile()
     role = session.get('role')
     user_id = session.get('user_id')
@@ -1831,12 +1837,13 @@ def student_list():
                     self.parent_contact = student.parent_contact if role in ['admin', 'teacher'] else 'Ẩn'
                     self.birth_date = student.birth_date
                     self.avatar = student.avatar
+                    self.is_active = student.is_active
             
             student_data = StudentDisplay(s)
         
         display_students.append(student_data)
     
-    return render_template('student_list.html', students=display_students, title='Danh sách học sinh', mobile=mobile)
+    return render_template('student_list.html', students=display_students, title='Danh sách học sinh', mobile=mobile, show_all=show_all)
 
 @main.route('/students/<int:student_id>/edit', methods=['GET', 'POST'])
 def edit_student(student_id):
@@ -1924,9 +1931,42 @@ def delete_student(student_id):
         for photo in album.photos:
             db.session.delete(photo)
         db.session.delete(album)
+
+    # Xoá toàn bộ bản ghi điểm danh liên quan
+    for record in student.attendance_records:
+        db.session.delete(record)
+
+    # Xoá toàn bộ bản ghi BMI liên quan
+    for record in student.bmi_records:
+        db.session.delete(record)
+
+    # Xoá toàn bộ bản ghi tiến bộ học tập liên quan
+    for record in student.progress_records:
+        db.session.delete(record)
+
+    # Xoá toàn bộ dịch vụ theo tháng liên quan
+    for record in student.monthly_services:
+        db.session.delete(record)
+
     db.session.delete(student)
     db.session.commit()
     flash('Đã xoá học sinh!', 'success')
+    return redirect(url_for('main.student_list'))
+
+@main.route('/students/<int:student_id>/toggle', methods=['POST'])
+def toggle_student_status(student_id):
+    if session.get('role') not in ['admin', 'teacher']:
+        return redirect_no_permission()
+    
+    student = Child.query.get_or_404(student_id)
+    student.is_active = not student.is_active
+    db.session.commit()
+    
+    if student.is_active:
+        flash(f'Đã hiện học sinh {student.name}!', 'success')
+    else:
+        flash(f'Đã ẩn học sinh {student.name}!', 'warning')
+    
     return redirect(url_for('main.student_list'))
 
 @main.route('/students/export')
@@ -1963,7 +2003,7 @@ def export_students():
             )
         
         # Lấy danh sách học sinh và sắp xếp theo thứ tự lớp, sau đó theo tên
-        students = Child.query.all()
+        students = Child.query.filter_by(is_active=True).all()
         students = sorted(students, key=lambda x: (get_class_order(x.class_name), x.name))
         
         # Thêm dữ liệu học sinh
@@ -2086,7 +2126,7 @@ def export_subsidized_students():
         doc.add_paragraph('')
         
         # Lấy danh sách học sinh và sắp xếp theo thứ tự lớp, sau đó theo tên
-        students = Child.query.all()
+        students = Child.query.filter_by(is_active=True).all()
         students = sorted(students, key=lambda x: (get_class_order(x.class_name), x.name))
         
         # Tạo table với 5 cột

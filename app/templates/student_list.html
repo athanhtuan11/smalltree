@@ -9,6 +9,7 @@
     @media (max-width: 576px) {
         .student-table-wrapper { margin-left:-16px; margin-right:-16px; border-radius:0; }
     }
+    .student-inactive { opacity: 0.6; background-color: #f8f9fa !important; }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
     <div class="d-flex justify-content-between mb-3">
@@ -17,9 +18,18 @@
             <a href="/students/export" class="btn btn-success fw-bold me-2">
                 <i class="bi bi-file-earmark-excel"></i> Xuất danh sách Excel
             </a>
-            <a href="/students/export-subsidized" class="btn btn-info fw-bold">
+            <a href="/students/export-subsidized" class="btn btn-info fw-bold me-2">
                 <i class="bi bi-file-earmark-text"></i> DS miễn giảm học phí
             </a>
+            {% if show_all %}
+                <a href="/students" class="btn btn-outline-secondary fw-bold">
+                    <i class="bi bi-eye"></i> Chỉ xem đang học
+                </a>
+            {% else %}
+                <a href="/students?show_all=true" class="btn btn-outline-primary fw-bold">
+                    <i class="bi bi-eye-slash"></i> Xem tất cả
+                </a>
+            {% endif %}
         </div>
         {% else %}
         <div></div>
@@ -45,14 +55,14 @@
         </thead>
         <tbody>
             {% for student in students %}
-            <tr>
+            <tr {% if not student.is_active %}class="student-inactive"{% endif %}>
                 <td>{{ loop.index }}</td>
                 <td class="text-center">
                     {% if student.avatar %}
                         <img src="{{ url_for('static', filename=student.avatar) }}?v={{ range(1000, 9999) | random }}" 
                              alt="{{ student.name }}" 
                              class="rounded-circle border border-success avatar-student-list" 
-                             onerror="this.src='{{ url_for('static', filename='images/default_avatar.png') }}'">
+                             onerror="this.src='{{ url_for('static', filename='images/default_avatar.png') }}';">
                     {% else %}
                         <img src="{{ url_for('static', filename='images/default_avatar.png') }}" 
                              alt="{{ student.name }}" 
@@ -60,17 +70,31 @@
                              style="opacity: 0.7;">
                     {% endif %}
                 </td>
-                <td>{{ student.name }}</td>
+                <td>
+                    {{ student.name }}
+                    {% if not student.is_active %}
+                        <span class="badge bg-warning ms-1">Đã nghỉ</span>
+                    {% endif %}
+                </td>
                 <td>{% if student.student_code == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.student_code }}{% endif %}</td>
                 <td>{% if student.class_name == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.class_name }}{% endif %}</td>
                 <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}</td>
                 <td>{% if student.parent_contact == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.parent_contact }}{% endif %}</td>
                 {% if session.get('role') in ['admin', 'teacher'] %}
                 <td>
-                    <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1"><i class="bi bi-pencil-square"></i> Sửa</a>
-                    <form action="/students/{{ student.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xoá học sinh này?');">
+                    <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1" title="Chỉnh sửa thông tin"><i class="bi bi-pencil-square"></i></a>
+                    
+                    <form action="/students/{{ student.id }}/toggle" method="post" style="display:inline;" onsubmit="return confirm('{% if student.is_active %}Bạn có chắc muốn ẩn học sinh này?{% else %}Bạn có chắc muốn hiện lại học sinh này?{% endif %}');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i> Xóa</button>
+                        <button type="submit" class="btn {% if student.is_active %}btn-secondary{% else %}btn-success{% endif %} btn-sm me-1" 
+                                title="{% if student.is_active %}Ẩn học sinh{% else %}Hiện lại học sinh{% endif %}">
+                            <i class="bi {% if student.is_active %}bi-eye-slash{% else %}bi-eye{% endif %}"></i>
+                        </button>
+                    </form>
+                    
+                    <form action="/students/{{ student.id }}/delete" method="post" style="display:inline;" onsubmit="return confirm('Bạn có chắc muốn xóa vĩnh viễn học sinh này? Hành động này không thể hoàn tác!');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger btn-sm" title="Xóa vĩnh viễn"><i class="bi bi-trash"></i></button>
                     </form>
                 </td>
                 {% endif %}
