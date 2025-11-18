@@ -47,11 +47,16 @@ def log_activity(action, resource_type=None, resource_id=None, description=None)
         db.session.add(activity)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()  # Rollback transaction để không ảnh hưởng DB
         print(f"[ERROR] Failed to log activity: {str(e)}")
         # Không raise exception để không ảnh hưởng luồng chính
+        # Nếu bảng UserActivity chưa tồn tại, app vẫn chạy bình thường
 
 def redirect_no_permission():
-    log_activity('access_denied', description=f'Attempted to access: {request.path}')
+    try:
+        log_activity('access_denied', description=f'Attempted to access: {request.path}')
+    except:
+        pass  # Bỏ qua nếu bảng chưa tồn tại
     flash('Bạn không có quyền truy cập chức năng này!', 'danger')
     return redirect(url_for('main.login'))
 
@@ -508,7 +513,11 @@ def index():
 
 @main.route('/about')
 def about():
-    log_activity('view', resource_type='homepage')
+    # Log activity nếu bảng đã tồn tại
+    try:
+        log_activity('view', resource_type='homepage')
+    except:
+        pass  # Bỏ qua nếu bảng chưa tồn tại
     mobile = is_mobile()
     return render_template('about.html', title='About Us', mobile=mobile)
 
