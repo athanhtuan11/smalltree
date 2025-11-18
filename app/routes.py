@@ -1704,110 +1704,117 @@ def analytics():
     
     mobile = is_mobile()
     
-    # Get filter parameters
-    filter_user_type = request.args.get('user_type', '')
-    filter_action = request.args.get('action', '')
-    filter_user_name = request.args.get('user_name', '')
-    filter_resource = request.args.get('resource', '')
-    filter_days = request.args.get('days', '7')
-    # Ensure filter_days is integer
     try:
-        filter_days = int(filter_days)
-    except (ValueError, TypeError):
-        filter_days = 7
-    page = request.args.get('page', 1, type=int)
-    per_page = 50
-    
-    # Thống kê theo role
-    from sqlalchemy import func, desc, or_
-    from datetime import datetime, timedelta
-    
-    # Tổng lượt truy cập theo user_type
-    stats_by_role = db.session.query(
-        UserActivity.user_type,
-        func.count(UserActivity.id).label('count')
-    ).group_by(UserActivity.user_type).all()
-    
-    # Build filtered query
-    cutoff_date = datetime.now() - timedelta(days=filter_days)
-    query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
-    
-    if filter_user_type:
-        query = query.filter(UserActivity.user_type == filter_user_type)
-    if filter_action:
-        query = query.filter(UserActivity.action == filter_action)
-    if filter_user_name:
-        query = query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
-    if filter_resource:
-        query = query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
-    
-    # Paginated results
-    pagination = query.order_by(desc(UserActivity.timestamp)).paginate(
-        page=page, per_page=per_page, error_out=False
-    )
-    recent_activities = pagination.items
-    
-    # User hoạt động nhiều nhất
-    week_ago = datetime.now() - timedelta(days=7)
-    top_users = db.session.query(
-        UserActivity.user_name,
-        UserActivity.user_type,
-        func.count(UserActivity.id).label('count')
-    ).filter(
-        UserActivity.timestamp >= week_ago,
-        UserActivity.user_id.isnot(None)
-    ).group_by(
-        UserActivity.user_name,
-        UserActivity.user_type
-    ).order_by(desc('count')).limit(10).all()
-    
-    # Số lượt truy cập khách vãng lai (30 ngày)
-    month_ago = datetime.now() - timedelta(days=30)
-    guest_visits = UserActivity.query.filter(
-        UserActivity.user_type == 'guest',
-        UserActivity.timestamp >= month_ago
-    ).count()
-    
-    # Số phụ huynh đăng nhập (30 ngày)
-    parent_logins = UserActivity.query.filter(
-        UserActivity.user_type == 'parent',
-        UserActivity.action == 'login',
-        UserActivity.timestamp >= month_ago
-    ).count()
-    
-    # Action phổ biến nhất
-    top_actions = db.session.query(
-        UserActivity.action,
-        func.count(UserActivity.id).label('count')
-    ).filter(
-        UserActivity.timestamp >= week_ago
-    ).group_by(UserActivity.action).order_by(desc('count')).limit(10).all()
-    
-    # Get distinct values for filters
-    all_user_types = db.session.query(UserActivity.user_type).distinct().all()
-    all_actions = db.session.query(UserActivity.action).distinct().all()
-    all_resources = db.session.query(UserActivity.resource_type).filter(
-        UserActivity.resource_type.isnot(None)
-    ).distinct().all()
-    
-    return render_template('analytics.html',
-                         stats_by_role=stats_by_role,
-                         recent_activities=recent_activities,
-                         activities=pagination,
-                         top_users=top_users,
-                         guest_visits=guest_visits,
-                         parent_logins=parent_logins,
-                         top_actions=top_actions,
-                         all_user_types=[t[0] for t in all_user_types if t[0]],
-                         all_actions=[a[0] for a in all_actions if a[0]],
-                         all_resources=[r[0] for r in all_resources if r[0]],
-                         filter_user_type=filter_user_type,
-                         filter_action=filter_action,
-                         filter_user_name=filter_user_name,
-                         filter_resource=filter_resource,
-                         filter_days=filter_days,
-                         title='Thống kê hoạt động',
-                         mobile=mobile)
+        # Get filter parameters
+        filter_user_type = request.args.get('user_type', '')
+        filter_action = request.args.get('action', '')
+        filter_user_name = request.args.get('user_name', '')
+        filter_resource = request.args.get('resource', '')
+        filter_days = request.args.get('days', '7')
+        # Ensure filter_days is integer
+        try:
+            filter_days = int(filter_days)
+        except (ValueError, TypeError):
+            filter_days = 7
+        page = request.args.get('page', 1, type=int)
+        per_page = 50
+        
+        # Thống kê theo role
+        from sqlalchemy import func, desc, or_
+        from datetime import datetime, timedelta
+        
+        # Tổng lượt truy cập theo user_type
+        stats_by_role = db.session.query(
+            UserActivity.user_type,
+            func.count(UserActivity.id).label('count')
+        ).group_by(UserActivity.user_type).all()
+        
+        # Build filtered query
+        cutoff_date = datetime.now() - timedelta(days=filter_days)
+        query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
+        
+        if filter_user_type:
+            query = query.filter(UserActivity.user_type == filter_user_type)
+        if filter_action:
+            query = query.filter(UserActivity.action == filter_action)
+        if filter_user_name:
+            query = query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+        if filter_resource:
+            query = query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+        
+        # Paginated results
+        pagination = query.order_by(desc(UserActivity.timestamp)).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        recent_activities = pagination.items
+        
+        # User hoạt động nhiều nhất
+        week_ago = datetime.now() - timedelta(days=7)
+        top_users = db.session.query(
+            UserActivity.user_name,
+            UserActivity.user_type,
+            func.count(UserActivity.id).label('count')
+        ).filter(
+            UserActivity.timestamp >= week_ago,
+            UserActivity.user_id.isnot(None)
+        ).group_by(
+            UserActivity.user_name,
+            UserActivity.user_type
+        ).order_by(desc('count')).limit(10).all()
+        
+        # Số lượt truy cập khách vãng lai (30 ngày)
+        month_ago = datetime.now() - timedelta(days=30)
+        guest_visits = UserActivity.query.filter(
+            UserActivity.user_type == 'guest',
+            UserActivity.timestamp >= month_ago
+        ).count()
+        
+        # Số phụ huynh đăng nhập (30 ngày)
+        parent_logins = UserActivity.query.filter(
+            UserActivity.user_type == 'parent',
+            UserActivity.action == 'login',
+            UserActivity.timestamp >= month_ago
+        ).count()
+        
+        # Action phổ biến nhất
+        top_actions = db.session.query(
+            UserActivity.action,
+            func.count(UserActivity.id).label('count')
+        ).filter(
+            UserActivity.timestamp >= week_ago
+        ).group_by(UserActivity.action).order_by(desc('count')).limit(10).all()
+        
+        # Get distinct values for filters
+        all_user_types = db.session.query(UserActivity.user_type).distinct().all()
+        all_actions = db.session.query(UserActivity.action).distinct().all()
+        all_resources = db.session.query(UserActivity.resource_type).filter(
+            UserActivity.resource_type.isnot(None)
+        ).distinct().all()
+        
+        return render_template('analytics.html',
+                             stats_by_role=stats_by_role,
+                             recent_activities=recent_activities,
+                             activities=pagination,
+                             top_users=top_users,
+                             guest_visits=guest_visits,
+                             parent_logins=parent_logins,
+                             top_actions=top_actions,
+                             all_user_types=[t[0] for t in all_user_types if t[0]],
+                             all_actions=[a[0] for a in all_actions if a[0]],
+                             all_resources=[r[0] for r in all_resources if r[0]],
+                             filter_user_type=filter_user_type,
+                             filter_action=filter_action,
+                             filter_user_name=filter_user_name,
+                             filter_resource=filter_resource,
+                             filter_days=filter_days,
+                             title='Thống kê hoạt động',
+                             mobile=mobile)
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Analytics error: {str(e)}")
+        print(traceback.format_exc())
+        flash(f'Lỗi khi tải thống kê: {str(e)}. Vui lòng chạy: flask db upgrade', 'danger')
+        return redirect(url_for('main.about'))
 
 @main.route('/analytics/clear', methods=['POST'])
 def clear_activities():
