@@ -312,3 +312,21 @@ class MonthlyService(db.Model):
     
     # Unique constraint: một học sinh chỉ có một record cho mỗi tháng
     __table_args__ = (db.UniqueConstraint('child_id', 'month', name='unique_child_month'),)
+
+# ================== USER ACTIVITY TRACKING ==================
+class UserActivity(db.Model):
+    """Ghi nhận hoạt động của người dùng để phân tích và theo dõi"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=True)  # NULL nếu là khách vãng lai
+    user_type = db.Column(db.String(20), nullable=False)  # 'guest', 'parent', 'teacher', 'admin'
+    user_name = db.Column(db.String(100))  # Tên hiển thị
+    action = db.Column(db.String(50), nullable=False)  # 'login', 'view', 'create', 'edit', 'delete', 'download'
+    resource_type = db.Column(db.String(50))  # 'student', 'activity', 'menu', 'product', 'attendance', etc.
+    resource_id = db.Column(db.Integer)  # ID của resource bị tác động
+    description = db.Column(db.String(500))  # Mô tả chi tiết hành động
+    ip_address = db.Column(db.String(50))  # Địa chỉ IP
+    user_agent = db.Column(db.String(500))  # Trình duyệt / thiết bị
+    timestamp = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    
+    def __repr__(self):
+        return f'<UserActivity {self.user_type} - {self.action} - {self.resource_type}>'

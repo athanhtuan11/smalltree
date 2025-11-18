@@ -81,6 +81,14 @@
                         </a>
                     </li>
                     {% if session.get('role') %}
+                    {% if session.get('role') == 'admin' %}
+                    <li class="nav-item">
+                        <a href="/analytics" class="nav-link d-flex align-items-center py-2" style="min-height: 44px;">
+                            <i class="bi bi-graph-up me-2" style="color:#43a047; font-size:1.1em;"></i> 
+                            <span>Thống kê</span>
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a href="/profile" class="nav-link d-flex align-items-center py-2" style="min-height: 44px;">
                             <i class="bi bi-person-circle me-2" style="color:#43a047; font-size:1.1em;"></i> 

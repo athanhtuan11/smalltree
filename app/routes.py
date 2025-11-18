@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from PIL import Image
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
-from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class, MonthlyService
+from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class, MonthlyService, UserActivity
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -25,7 +25,33 @@ except ImportError:
     DOCX_AVAILABLE = False
 
 main = Blueprint('main', __name__)
+
+def log_activity(action, resource_type=None, resource_id=None, description=None):
+    """Helper function để ghi nhận hoạt động người dùng"""
+    try:
+        user_type = session.get('role', 'guest')
+        user_id = session.get('user_id')
+        user_name = session.get('name', 'Khách vãng lai')
+        
+        activity = UserActivity(
+            user_id=user_id,
+            user_type=user_type,
+            user_name=user_name,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            description=description,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent', '')[:500]
+        )
+        db.session.add(activity)
+        db.session.commit()
+    except Exception as e:
+        print(f"[ERROR] Failed to log activity: {str(e)}")
+        # Không raise exception để không ảnh hưởng luồng chính
+
 def redirect_no_permission():
+    log_activity('access_denied', description=f'Attempted to access: {request.path}')
     flash('Bạn không có quyền truy cập chức năng này!', 'danger')
     return redirect(url_for('main.login'))
 
@@ -213,6 +239,7 @@ def new_class():
         new_class = Class(name=class_name, description=description)
         db.session.add(new_class)
         db.session.commit()
+        log_activity('create', 'class', new_class.id, f'Tạo lớp: {class_name}')
         flash(f'Đã tạo lớp mới: {class_name}', 'success')
         return redirect(url_for('main.new_class'))
     # Hiển thị danh sách lớp
@@ -230,6 +257,7 @@ def edit_class(class_id):
         class_obj.name = request.form.get('class_name')
         class_obj.description = request.form.get('description')
         db.session.commit()
+        log_activity('edit', 'class', class_id, f'Sửa lớp: {class_obj.name}')
         flash('Đã cập nhật lớp!', 'success')
         return redirect(url_for('main.new_class'))
     return render_template('edit_class.html', class_obj=class_obj)
@@ -240,8 +268,10 @@ def delete_class(class_id):
         flash('Bạn không có quyền xóa lớp!', 'danger')
         return redirect(url_for('main.new_class'))
     class_obj = Class.query.get_or_404(class_id)
+    class_name = class_obj.name
     db.session.delete(class_obj)
     db.session.commit()
+    log_activity('delete', 'class', class_id, f'Xóa lớp: {class_name}')
     flash('Đã xóa lớp!', 'success')
     return redirect(url_for('main.new_class'))
 
@@ -407,6 +437,7 @@ def edit_dish(dish_id):
             )
             db.session.add(di)
         db.session.commit()
+        log_activity('edit', 'dish', dish.id, f'Cập nhật món ăn: {dish.name}')
         flash('Đã cập nhật món ăn!', 'success')
         return redirect(url_for('main.dish_list'))
     # Chuẩn bị dữ liệu nguyên liệu cho form
@@ -419,8 +450,10 @@ def delete_dish(dish_id):
     if session.get('role') not in ['admin', 'teacher']:
         return redirect_no_permission()
     dish = Dish.query.get_or_404(dish_id)
+    dish_name = dish.name
     db.session.delete(dish)
     db.session.commit()
+    log_activity('delete', 'dish', dish_id, f'Xóa món ăn: {dish_name}')
     flash('Đã xóa món ăn!', 'success')
     return redirect(url_for('main.dish_list'))
 # ================== TẠO MÓN ĂN ==================
@@ -461,6 +494,7 @@ def create_dish():
             )
             db.session.add(di)
         db.session.commit()
+        log_activity('create', 'dish', dish.id, f'Tạo món ăn: {name}')
         flash('Đã tạo món ăn thành công!', 'success')
         return redirect(url_for('main.dish_list'))
     return render_template('create_dish.html', products=products, product_units=product_units)
@@ -474,6 +508,7 @@ def index():
 
 @main.route('/about')
 def about():
+    log_activity('view', resource_type='homepage')
     mobile = is_mobile()
     return render_template('about.html', title='About Us', mobile=mobile)
 
@@ -569,6 +604,8 @@ def new_activity():
         new_post = Activity(title=title, description=content, date=date_val, image=image_url, class_id=class_id)
         db.session.add(new_post)
         db.session.commit()
+        
+        log_activity('create', 'activity', new_post.id, f'Tạo hoạt động: {title}')
         
         # Lưu activity_id vào session để upload batch sau
         session['temp_activity_id'] = new_post.id
@@ -737,6 +774,7 @@ def delete_activity(id):
         return redirect_no_permission()
     post = Activity.query.get_or_404(id)
     if post:
+        activity_title = post.title
         for img in post.images:
             img_path = os.path.join('app', 'static', img.filepath)
             if os.path.exists(img_path):
@@ -744,6 +782,7 @@ def delete_activity(id):
             db.session.delete(img)
         db.session.delete(post)
         db.session.commit()
+        log_activity('delete', 'activity', id, f'Xóa hoạt động: {activity_title}')
         flash('Đã xoá bài viết!', 'success')
     else:
         flash('Không tìm thấy bài viết để xoá!', 'danger')
@@ -820,6 +859,7 @@ def new_curriculum():
         new_week = Curriculum(week_number=week_number, class_id=class_id, content=content, material=None)
         db.session.add(new_week)
         db.session.commit()
+        log_activity('create', 'curriculum', new_week.id, f'Tạo chương trình tuần {week_number}')
         flash('Đã thêm chương trình học mới!', 'success')
         return redirect(url_for('main.curriculum'))
     # Set default data for new curriculum form
@@ -954,6 +994,7 @@ def new_student():
             new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code, avatar=avatar_path)
             db.session.add(new_child)
             db.session.commit()
+            log_activity('create', 'student', new_child.id, f'Tạo học sinh: {name}')
             if avatar_path:
                 flash('Đã thêm học sinh mới với ảnh đại diện!', 'success')
             else:
@@ -1529,6 +1570,8 @@ def login():
         if admin and (email_or_phone == admin.email or email_or_phone == admin.phone) and check_password_hash(admin.password, password):
             session['user_id'] = admin.id
             session['role'] = 'admin'
+            session['name'] = admin.name
+            log_activity('login', description=f'Admin {admin.name} đăng nhập')
             flash('Đăng nhập admin thành công!', 'success')
             login_attempts[user_ip] = 0
             last_login_time[user_ip] = now
@@ -1538,6 +1581,8 @@ def login():
         if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             session['role'] = 'parent'
+            session['name'] = user.name
+            log_activity('login', description=f'Phụ huynh {user.name} đăng nhập')
             flash('Đăng nhập thành công!', 'success')
             login_attempts[user_ip] = 0
             last_login_time[user_ip] = now
@@ -1545,6 +1590,8 @@ def login():
         elif staff and check_password_hash(staff.password, password):
             session['user_id'] = staff.id
             session['role'] = 'teacher'
+            session['name'] = staff.name
+            log_activity('login', description=f'Giáo viên {staff.name} đăng nhập')
             flash('Đăng nhập thành công!', 'success')
             login_attempts[user_ip] = 0
             last_login_time[user_ip] = now
@@ -1561,6 +1608,7 @@ def login():
 
 @main.route('/logout')
 def logout():
+    log_activity('logout', description=f'{session.get("name", "User")} đăng xuất')
     session.clear()
     flash('Đã đăng xuất!', 'success')
     return redirect(url_for('main.about'))
@@ -1648,6 +1696,163 @@ def accounts():
     masked_teachers = [mask_user(t) for t in teachers]
     return render_template('accounts.html', parents=masked_parents, teachers=masked_teachers, show_admin_create=False, title='Quản lý tài khoản', mobile=mobile)
 
+@main.route('/analytics')
+def analytics():
+    """Dashboard thống kê hoạt động người dùng với filter"""
+    if session.get('role') != 'admin':
+        return redirect_no_permission()
+    
+    mobile = is_mobile()
+    
+    # Get filter parameters
+    filter_user_type = request.args.get('user_type', '')
+    filter_action = request.args.get('action', '')
+    filter_user_name = request.args.get('user_name', '')
+    filter_resource = request.args.get('resource', '')
+    filter_days = request.args.get('days', '7')
+    # Ensure filter_days is integer
+    try:
+        filter_days = int(filter_days)
+    except (ValueError, TypeError):
+        filter_days = 7
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    
+    # Thống kê theo role
+    from sqlalchemy import func, desc, or_
+    from datetime import datetime, timedelta
+    
+    # Tổng lượt truy cập theo user_type
+    stats_by_role = db.session.query(
+        UserActivity.user_type,
+        func.count(UserActivity.id).label('count')
+    ).group_by(UserActivity.user_type).all()
+    
+    # Build filtered query
+    cutoff_date = datetime.now() - timedelta(days=filter_days)
+    query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
+    
+    if filter_user_type:
+        query = query.filter(UserActivity.user_type == filter_user_type)
+    if filter_action:
+        query = query.filter(UserActivity.action == filter_action)
+    if filter_user_name:
+        query = query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+    if filter_resource:
+        query = query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+    
+    # Paginated results
+    pagination = query.order_by(desc(UserActivity.timestamp)).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    recent_activities = pagination.items
+    
+    # User hoạt động nhiều nhất
+    week_ago = datetime.now() - timedelta(days=7)
+    top_users = db.session.query(
+        UserActivity.user_name,
+        UserActivity.user_type,
+        func.count(UserActivity.id).label('count')
+    ).filter(
+        UserActivity.timestamp >= week_ago,
+        UserActivity.user_id.isnot(None)
+    ).group_by(
+        UserActivity.user_name,
+        UserActivity.user_type
+    ).order_by(desc('count')).limit(10).all()
+    
+    # Số lượt truy cập khách vãng lai (30 ngày)
+    month_ago = datetime.now() - timedelta(days=30)
+    guest_visits = UserActivity.query.filter(
+        UserActivity.user_type == 'guest',
+        UserActivity.timestamp >= month_ago
+    ).count()
+    
+    # Số phụ huynh đăng nhập (30 ngày)
+    parent_logins = UserActivity.query.filter(
+        UserActivity.user_type == 'parent',
+        UserActivity.action == 'login',
+        UserActivity.timestamp >= month_ago
+    ).count()
+    
+    # Action phổ biến nhất
+    top_actions = db.session.query(
+        UserActivity.action,
+        func.count(UserActivity.id).label('count')
+    ).filter(
+        UserActivity.timestamp >= week_ago
+    ).group_by(UserActivity.action).order_by(desc('count')).limit(10).all()
+    
+    # Get distinct values for filters
+    all_user_types = db.session.query(UserActivity.user_type).distinct().all()
+    all_actions = db.session.query(UserActivity.action).distinct().all()
+    all_resources = db.session.query(UserActivity.resource_type).filter(
+        UserActivity.resource_type.isnot(None)
+    ).distinct().all()
+    
+    return render_template('analytics.html',
+                         stats_by_role=stats_by_role,
+                         recent_activities=recent_activities,
+                         activities=pagination,
+                         top_users=top_users,
+                         guest_visits=guest_visits,
+                         parent_logins=parent_logins,
+                         top_actions=top_actions,
+                         all_user_types=[t[0] for t in all_user_types if t[0]],
+                         all_actions=[a[0] for a in all_actions if a[0]],
+                         all_resources=[r[0] for r in all_resources if r[0]],
+                         filter_user_type=filter_user_type,
+                         filter_action=filter_action,
+                         filter_user_name=filter_user_name,
+                         filter_resource=filter_resource,
+                         filter_days=filter_days,
+                         title='Thống kê hoạt động',
+                         mobile=mobile)
+
+@main.route('/analytics/clear', methods=['POST'])
+def clear_activities():
+    """Xóa hoạt động theo khoảng thời gian"""
+    if session.get('role') != 'admin':
+        flash('Chỉ admin mới có quyền xóa log hoạt động!', 'danger')
+        return redirect(url_for('main.analytics'))
+    
+    from datetime import datetime
+    start_date = request.form.get('start_date')
+    end_date = request.form.get('end_date')
+    
+    if not start_date or not end_date:
+        flash('Vui lòng chọn ngày bắt đầu và ngày kết thúc!', 'danger')
+        return redirect(url_for('main.analytics'))
+    
+    try:
+        # Parse dates
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        # Set end_dt to end of day
+        end_dt = end_dt.replace(hour=23, minute=59, second=59)
+        
+        if start_dt > end_dt:
+            flash('Ngày bắt đầu phải trước ngày kết thúc!', 'danger')
+            return redirect(url_for('main.analytics'))
+        
+        # Delete activities in range
+        count = UserActivity.query.filter(
+            UserActivity.timestamp >= start_dt,
+            UserActivity.timestamp <= end_dt
+        ).delete()
+        
+        db.session.commit()
+        log_activity('delete', 'activity_log', None, f'Xóa {count} log từ {start_date} đến {end_date}')
+        flash(f'Đã xóa {count} hoạt động từ {start_date} đến {end_date}!', 'success')
+        
+    except ValueError as e:
+        flash(f'Định dạng ngày không hợp lệ: {str(e)}', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi xóa: {str(e)}', 'danger')
+    
+    return redirect(url_for('main.analytics'))
+
 @main.route('/curriculum/<int:week_number>/delete', methods=['POST'])
 def delete_curriculum(week_number):
     if session.get('role') not in ['admin', 'teacher']:
@@ -1669,6 +1874,7 @@ def delete_curriculum(week_number):
         class_name = week.class_obj.name if week.class_obj else ''
         db.session.delete(week)
         db.session.commit()
+        log_activity('delete', 'curriculum', week_number, f'Xóa chương trình tuần {week_number} lớp {class_name}')
         flash(f'Đã xoá chương trình học tuần {week_number} của lớp {class_name}!', 'success')
     else:
         flash('Không tìm thấy chương trình học để xoá!', 'danger')
@@ -1707,6 +1913,7 @@ def edit_curriculum(week_number):
         week.class_id = class_id
         week.content = json.dumps(curriculum_data, ensure_ascii=False)
         db.session.commit()
+        log_activity('edit', 'curriculum', week_number, f'Cập nhật chương trình tuần {week_number}')
         flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
         return redirect(url_for('main.curriculum'))
     data = json.loads(week.content)
@@ -1907,6 +2114,7 @@ def edit_student(student_id):
         # Commit tất cả thay đổi
         try:
             db.session.commit()
+            log_activity('edit', 'student', student_id, f'Sửa học sinh: {student.name}')
             if avatar_updated:
                 flash('Đã lưu thông tin và ảnh đại diện thành công!', 'success')
                 # Redirect back to edit page to see new avatar
@@ -1960,6 +2168,7 @@ def delete_student(student_id):
         db.session.delete(student)
         
         db.session.commit()
+        log_activity('delete', 'student', student_id, f'Xóa học sinh: {student_name}')
         flash(f'Đã xoá học sinh {student_name}!', 'success')
         
     except Exception as e:
@@ -2350,6 +2559,8 @@ def create_account():
             new_staff = Staff(name=name, position=position, contact_info=phone, email=email, phone=phone, password=generate_password_hash(password))
             db.session.add(new_staff)
         db.session.commit()
+        new_user_id = new_child.id if role == 'parent' else new_staff.id
+        log_activity('create', 'account', new_user_id, f'Tạo tài khoản {role}: {name}')
         flash('Tạo tài khoản thành công!', 'success')
         return redirect(url_for('main.accounts'))
     
@@ -2381,6 +2592,7 @@ def edit_account(user_id):
         if password:
             user.password = generate_password_hash(password)
         db.session.commit()
+        log_activity('edit', 'account', user_id, f'Cập nhật tài khoản: {user.name}')
         flash('Đã cập nhật thông tin tài khoản!', 'success')
         return redirect(url_for('main.accounts'))
     # Hide sensitive info for non-admins (should only be admin here, but for safety)
@@ -2402,8 +2614,10 @@ def delete_parent_account(user_id):
     if session.get('role') != 'admin':
         return redirect_no_permission()
     user = Child.query.get_or_404(user_id)
+    user_name = user.name
     db.session.delete(user)
     db.session.commit()
+    log_activity('delete', 'account', user_id, f'Xóa tài khoản phụ huynh: {user_name}')
     flash('Đã xoá tài khoản phụ huynh!', 'success')
     return redirect(url_for('main.accounts'))
 
@@ -2412,8 +2626,10 @@ def delete_teacher_account(user_id):
     if session.get('role') != 'admin':
         return redirect_no_permission()
     user = Staff.query.get_or_404(user_id)
+    user_name = user.name
     db.session.delete(user)
     db.session.commit()
+    log_activity('delete', 'account', user_id, f'Xóa tài khoản giáo viên: {user_name}')
     flash('Đã xoá tài khoản giáo viên!', 'success')
     return redirect(url_for('main.accounts'))
 
@@ -2477,6 +2693,7 @@ def edit_activity(id):
                         flash(f"Lỗi upload ảnh: {getattr(file, 'filename', 'unknown')} - {e}", 'danger')
                         continue
             db.session.commit()
+            log_activity('edit', 'activity', id, f'Cập nhật hoạt động: {post.title}')
             flash('Đã cập nhật bài viết!', 'success')
             return redirect(url_for('main.activities'))
         mobile = is_mobile()
@@ -2707,6 +2924,7 @@ def new_menu():
         
         db.session.add(new_menu)
         db.session.commit()
+        log_activity('create', 'menu', new_menu.id, f'Tạo thực đơn tuần {week_number}')
         flash('Đã thêm thực đơn mới!', 'success')
         return redirect(url_for('main.menu'))
     
@@ -2801,6 +3019,7 @@ def edit_menu(week_number):
             menu_item.week_number = new_week_number
             
         db.session.commit()
+        log_activity('edit', 'menu', menu_item.id, f'Cập nhật thực đơn tuần {menu_item.week_number}')
         flash(f'Đã cập nhật thực đơn tuần {menu_item.week_number}!', 'success')
         return redirect(url_for('main.menu'))
     
@@ -2869,6 +3088,7 @@ def delete_menu(week_number):
     if menu_item:
         db.session.delete(menu_item)
         db.session.commit()
+        log_activity('delete', 'menu', menu_item.id, f'Xóa thực đơn tuần {week_number}')
         flash(f'Đã xoá thực đơn tuần {week_number}!', 'success')
     else:
         flash('Không tìm thấy thực đơn để xoá!', 'danger')
@@ -4828,6 +5048,7 @@ def new_supplier():
         )
         db.session.add(supplier)
         db.session.commit()
+        log_activity('create', 'supplier', supplier.id, f'Tạo nhà cung cấp: {form.name.data}')
         flash('Thêm nhà cung cấp thành công!', 'success')
         return redirect(url_for('main.suppliers'))
     
@@ -4845,6 +5066,7 @@ def edit_supplier(supplier_id):
     if form.validate_on_submit():
         form.populate_obj(supplier)
         db.session.commit()
+        log_activity('edit', 'supplier', supplier_id, f'Cập nhật nhà cung cấp: {supplier.name}')
         flash('Cập nhật nhà cung cấp thành công!', 'success')
         return redirect(url_for('main.suppliers'))
     
@@ -4857,8 +5079,10 @@ def delete_supplier(supplier_id):
         return redirect_no_permission()
     
     supplier = Supplier.query.get_or_404(supplier_id)
+    supplier_name = supplier.name
     supplier.is_active = False
     db.session.commit()
+    log_activity('delete', 'supplier', supplier_id, f'Xóa nhà cung cấp: {supplier_name}')
     flash('Xóa nhà cung cấp thành công!', 'success')
     return redirect(url_for('main.suppliers'))
 
@@ -4914,6 +5138,7 @@ def new_product():
         )
         db.session.add(product)
         db.session.commit()
+        log_activity('create', 'product', product.id, f'Tạo sản phẩm: {form.name.data}')
         flash('Thêm sản phẩm thành công!', 'success')
         return redirect(url_for('main.products'))
     return render_template('new_product.html', form=form, product_units=product_units)
@@ -4935,6 +5160,7 @@ def edit_product(product_id):
     if form.validate_on_submit():
         form.populate_obj(product)
         db.session.commit()
+        log_activity('edit', 'product', product_id, f'Cập nhật sản phẩm: {product.name}')
         flash('Cập nhật sản phẩm thành công!', 'success')
         return redirect(url_for('main.products'))
     
@@ -4947,8 +5173,10 @@ def delete_product(product_id):
         return redirect_no_permission()
     
     product = Product.query.get_or_404(product_id)
+    product_name = product.name
     product.is_active = False
     db.session.commit()
+    log_activity('delete', 'product', product_id, f'Xóa sản phẩm: {product_name}')
     flash('Xóa sản phẩm thành công!', 'success')
     return redirect(url_for('main.products'))
 
@@ -5398,6 +5626,7 @@ def create_student_album(student_id):
                     db.session.add(photo)
         
         db.session.commit()
+        log_activity('create', 'album', album.id, f'Tạo album "{title}" cho học sinh {student.name}')
         flash(f'✅ Đã tạo album "{title}" cho {student.name}!', 'success')
         return redirect(url_for('main.student_albums_detail', student_id=student_id))
     
@@ -5467,6 +5696,8 @@ def delete_album(album_id):
     
     album = StudentAlbum.query.get_or_404(album_id)
     student_id = album.student_id
+    album_title = album.title
+    student_name = album.student.name
     
     # Xóa thư mục chứa ảnh
     album_dir = os.path.join(current_app.static_folder, 'student_albums', str(student_id), str(album_id))
@@ -5476,6 +5707,7 @@ def delete_album(album_id):
     
     db.session.delete(album)
     db.session.commit()
+    log_activity('delete', 'album', album_id, f'Xóa album "{album_title}" của học sinh {student_name}')
     
     flash('✅ Đã xóa album!', 'success')
     return redirect(url_for('main.student_albums_detail', student_id=student_id))
