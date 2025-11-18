@@ -513,11 +513,7 @@ def index():
 
 @main.route('/about')
 def about():
-    # Log activity nếu bảng đã tồn tại
-    try:
-        log_activity('view', resource_type='homepage')
-    except:
-        pass  # Bỏ qua nếu bảng chưa tồn tại
+    # Không log activity ở trang chủ để tránh lỗi khi chưa migrate
     mobile = is_mobile()
     return render_template('about.html', title='About Us', mobile=mobile)
 
@@ -1822,8 +1818,11 @@ def analytics():
         import traceback
         print(f"[ERROR] Analytics error: {str(e)}")
         print(traceback.format_exc())
-        flash(f'Lỗi khi tải thống kê: {str(e)}. Vui lòng chạy: flask db upgrade', 'danger')
-        return redirect(url_for('main.about'))
+        # Không redirect về about vì about có thể cũng bị lỗi
+        # Hiển thị trang lỗi đơn giản thay vì redirect
+        return render_template('base.html', 
+                             title='Lỗi Thống kê',
+                             error_message=f'Bảng UserActivity chưa tồn tại. Vui lòng chạy: flask db upgrade trên server.')
 
 @main.route('/analytics/clear', methods=['POST'])
 def clear_activities():

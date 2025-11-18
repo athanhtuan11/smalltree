@@ -1,0 +1,377 @@
+{% extends 'base.html' %}
+{% block title %}Thống kê hoạt động{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-graph-up"></i> Thống kê hoạt động hệ thống</h2>
+    
+    <!-- Clear Activities Form (Admin only) -->
+    {% if session.role == 'admin' %}
+    <div class="card mb-3 border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5><i class="bi bi-trash"></i> Xóa log hoạt động (Admin)</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('main.clear_activities') }}" onsubmit="return confirm('⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa tất cả log trong khoảng thời gian này?\n\nHành động này KHÔNG THỂ HOÀN TÁC!');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label">Từ ngày</label>
+                        <input type="date" name="start_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Đến ngày</label>
+                        <input type="date" name="end_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Xóa log trong khoảng thời gian
+                        </button>
+                        <small class="text-muted d-block mt-1">
+                            <i class="bi bi-exclamation-triangle"></i> Cẩn thận: Không thể hoàn tác
+                        </small>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5><i class="bi bi-funnel"></i> Bộ lọc</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('main.analytics') }}">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Vai trò</label>
+                        <select name="user_type" class="form-select">
+                            <option value="">Tất cả</option>
+                            <option value="guest" {% if request.args.get('user_type') == 'guest' %}selected{% endif %}>Khách</option>
+                            <option value="parent" {% if request.args.get('user_type') == 'parent' %}selected{% endif %}>Phụ huynh</option>
+                            <option value="teacher" {% if request.args.get('user_type') == 'teacher' %}selected{% endif %}>Giáo viên</option>
+                            <option value="admin" {% if request.args.get('user_type') == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Hành động</label>
+                        <select name="action" class="form-select">
+                            <option value="">Tất cả</option>
+                            <option value="login" {% if request.args.get('action') == 'login' %}selected{% endif %}>Đăng nhập</option>
+                            <option value="logout" {% if request.args.get('action') == 'logout' %}selected{% endif %}>Đăng xuất</option>
+                            <option value="view" {% if request.args.get('action') == 'view' %}selected{% endif %}>Xem</option>
+                            <option value="create" {% if request.args.get('action') == 'create' %}selected{% endif %}>Tạo mới</option>
+                            <option value="edit" {% if request.args.get('action') == 'edit' %}selected{% endif %}>Chỉnh sửa</option>
+                            <option value="delete" {% if request.args.get('action') == 'delete' %}selected{% endif %}>Xóa</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tên người dùng</label>
+                        <input type="text" name="user_name" class="form-control" placeholder="Nhập tên..." value="{{ request.args.get('user_name', '') }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Đối tượng</label>
+                        <select name="resource" class="form-select">
+                            <option value="">Tất cả</option>
+                            <option value="student" {% if request.args.get('resource') == 'student' %}selected{% endif %}>Học sinh</option>
+                            <option value="activity" {% if request.args.get('resource') == 'activity' %}selected{% endif %}>Hoạt động</option>
+                            <option value="class" {% if request.args.get('resource') == 'class' %}selected{% endif %}>Lớp học</option>
+                            <option value="dish" {% if request.args.get('resource') == 'dish' %}selected{% endif %}>Món ăn</option>
+                            <option value="menu" {% if request.args.get('resource') == 'menu' %}selected{% endif %}>Thực đơn</option>
+                            <option value="curriculum" {% if request.args.get('resource') == 'curriculum' %}selected{% endif %}>Giáo án</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Thời gian</label>
+                        <select name="days" class="form-select">
+                            <option value="1" {% if request.args.get('days') == '1' %}selected{% endif %}>24 giờ</option>
+                            <option value="7" {% if request.args.get('days') == '7' or not request.args.get('days') %}selected{% endif %}>7 ngày</option>
+                            <option value="30" {% if request.args.get('days') == '30' %}selected{% endif %}>30 ngày</option>
+                            <option value="90" {% if request.args.get('days') == '90' %}selected{% endif %}>90 ngày</option>
+                            <option value="365" {% if request.args.get('days') == '365' %}selected{% endif %}>1 năm</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i> Lọc</button>
+                        <a href="{{ url_for('main.analytics') }}" class="btn btn-secondary"><i class="bi bi-x"></i></a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-people"></i> Khách vãng lai</h5>
+                    <p class="card-text display-4">{{ guest_visits }}</p>
+                    <small>30 ngày qua</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-person-check"></i> Phụ huynh</h5>
+                    <p class="card-text display-4">{{ parent_logins }}</p>
+                    <small>Đăng nhập 30 ngày</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-activity"></i> Tổng hoạt động</h5>
+                    <p class="card-text display-4">{{ activities.total }}</p>
+                    <small>{{ request.args.get('days', '7') }} ngày qua</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-star"></i> Active Users</h5>
+                    <p class="card-text display-4">{{ top_users|length }}</p>
+                    <small>7 ngày qua</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats by Role -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="bi bi-pie-chart"></i> Phân bố theo vai trò</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Vai trò</th>
+                                <th>Số lượt truy cập</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in stats_by_role %}
+                            <tr>
+                                <td>
+                                    {% if stat.user_type == 'guest' %}
+                                        <span class="badge bg-secondary">Khách vãng lai</span>
+                                    {% elif stat.user_type == 'parent' %}
+                                        <span class="badge bg-success">Phụ huynh</span>
+                                    {% elif stat.user_type == 'teacher' %}
+                                        <span class="badge bg-info">Giáo viên</span>
+                                    {% elif stat.user_type == 'admin' %}
+                                        <span class="badge bg-danger">Admin</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ stat.user_type }}</span>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ stat.count }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="bi bi-bar-chart"></i> Hành động phổ biến (7 ngày)</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Hành động</th>
+                                <th>Số lần</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for action in top_actions %}
+                            <tr>
+                                <td>
+                                    {% if action.action == 'login' %}
+                                        <i class="bi bi-box-arrow-in-right text-primary"></i> Đăng nhập
+                                    {% elif action.action == 'logout' %}
+                                        <i class="bi bi-box-arrow-right text-secondary"></i> Đăng xuất
+                                    {% elif action.action == 'view' %}
+                                        <i class="bi bi-eye text-info"></i> Xem
+                                    {% elif action.action == 'create' %}
+                                        <i class="bi bi-plus-circle text-success"></i> Tạo mới
+                                    {% elif action.action == 'edit' %}
+                                        <i class="bi bi-pencil text-warning"></i> Chỉnh sửa
+                                    {% elif action.action == 'delete' %}
+                                        <i class="bi bi-trash text-danger"></i> Xóa
+                                    {% else %}
+                                        {{ action.action }}
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ action.count }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Users -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5><i class="bi bi-trophy"></i> Người dùng hoạt động nhiều nhất (7 ngày)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Tên</th>
+                                    <th>Vai trò</th>
+                                    <th>Số hoạt động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in top_users %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ user.user_name }}</td>
+                                    <td>
+                                        {% if user.user_type == 'parent' %}
+                                            <span class="badge bg-success">Phụ huynh</span>
+                                        {% elif user.user_type == 'teacher' %}
+                                            <span class="badge bg-info">Giáo viên</span>
+                                        {% elif user.user_type == 'admin' %}
+                                            <span class="badge bg-danger">Admin</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><strong>{{ user.count }}</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- All Activities with Pagination -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-list-ul"></i> Danh sách hoạt động</h5>
+                    <span class="badge bg-light text-dark">Tổng: {{ activities.total }} hoạt động</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>Người dùng</th>
+                                    <th>Vai trò</th>
+                                    <th>Hành động</th>
+                                    <th>Đối tượng</th>
+                                    <th>Mô tả</th>
+                                    <th>IP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in activities.items %}
+                                <tr>
+                                    <td><small>{{ activity.timestamp.strftime('%H:%M:%S<br>%d/%m/%Y')|safe }}</small></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if activity.user_type == 'guest' %}bg-secondary
+                                            {% elif activity.user_type == 'parent' %}bg-success
+                                            {% elif activity.user_type == 'teacher' %}bg-info
+                                            {% elif activity.user_type == 'admin' %}bg-danger
+                                            {% endif %}">
+                                            {{ activity.user_name or 'Khách' }}
+                                        </span>
+                                    </td>
+                                    <td><small>{{ activity.user_type }}</small></td>
+                                    <td>
+                                        {% if activity.action == 'login' %}
+                                            <i class="bi bi-box-arrow-in-right text-primary"></i> login
+                                        {% elif activity.action == 'logout' %}
+                                            <i class="bi bi-box-arrow-right text-secondary"></i> logout
+                                        {% elif activity.action == 'view' %}
+                                            <i class="bi bi-eye text-info"></i> view
+                                        {% elif activity.action == 'create' %}
+                                            <i class="bi bi-plus-circle text-success"></i> create
+                                        {% elif activity.action == 'edit' %}
+                                            <i class="bi bi-pencil text-warning"></i> edit
+                                        {% elif activity.action == 'delete' %}
+                                            <i class="bi bi-trash text-danger"></i> delete
+                                        {% else %}
+                                            {{ activity.action }}
+                                        {% endif %}
+                                    </td>
+                                    <td><small>{{ activity.resource_type or '-' }}</small></td>
+                                    <td><small>{{ activity.description or '-' }}</small></td>
+                                    <td><small>{{ activity.ip_address }}</small></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if activities.pages > 1 %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if not activities.has_prev %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('main.analytics', page=activities.prev_num, user_type=request.args.get('user_type'), action=request.args.get('action'), user_name=request.args.get('user_name'), resource=request.args.get('resource'), days=request.args.get('days')) }}">
+                                    <i class="bi bi-chevron-left"></i> Trước
+                                </a>
+                            </li>
+                            
+                            {% for p in range(1, activities.pages + 1) %}
+                                {% if p == activities.page %}
+                                    <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                                {% elif p <= 3 or p > activities.pages - 3 or (p >= activities.page - 1 and p <= activities.page + 1) %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('main.analytics', page=p, user_type=request.args.get('user_type'), action=request.args.get('action'), user_name=request.args.get('user_name'), resource=request.args.get('resource'), days=request.args.get('days')) }}">{{ p }}</a>
+                                    </li>
+                                {% elif p == 4 or p == activities.pages - 3 %}
+                                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <li class="page-item {% if not activities.has_next %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('main.analytics', page=activities.next_num, user_type=request.args.get('user_type'), action=request.args.get('action'), user_name=request.args.get('user_name'), resource=request.args.get('resource'), days=request.args.get('days')) }}">
+                                    Sau <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                        <p class="text-center text-muted">
+                            Trang {{ activities.page }} / {{ activities.pages }} | Hiển thị {{ activities.items|length }} / {{ activities.total }}
+                        </p>
+                    </nav>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-end mb-4">
+        <a href="{{ url_for('main.about') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Quay lại
+        </a>
+    </div>
+</div>
+{% endblock %}
