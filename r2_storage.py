@@ -19,7 +19,6 @@ class R2Storage:
     def __init__(self):
         """Khởi tạo kết nối R2"""
         if not is_r2_configured():
-            print("⚠️  Cảnh báo: R2 chưa được cấu hình. Ảnh sẽ lưu local.")
             self.enabled = False
             return
         
@@ -35,9 +34,7 @@ class R2Storage:
             self.bucket_name = R2_CONFIG['bucket_name']
             self.public_url = get_r2_public_url()
             self.enabled = True
-            print(f"✅ Đã kết nối R2: {self.bucket_name}")
         except Exception as e:
-            print(f"❌ Lỗi kết nối R2: {str(e)}")
             self.enabled = False
     
     def resize_image(self, image_data, filename):
@@ -59,7 +56,6 @@ class R2Storage:
             
             if img.width > max_width or img.height > max_height:
                 img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
-                print(f"📐 Đã resize ảnh: {filename}")
             
             # Convert sang bytes
             output = io.BytesIO()
@@ -69,7 +65,6 @@ class R2Storage:
             
             return output.getvalue()
         except Exception as e:
-            print(f"⚠️  Không thể resize ảnh: {str(e)}")
             return image_data
     
     def upload_file(self, file_data, filename, folder='activities'):
@@ -125,15 +120,11 @@ class R2Storage:
             
             # Tạo public URL
             public_url = f"{self.public_url}/{key}"
-            print(f"✅ Đã upload: {key}")
-            
             return public_url
             
         except ClientError as e:
-            print(f"❌ Lỗi upload R2: {str(e)}")
             return None
         except Exception as e:
-            print(f"❌ Lỗi không xác định: {str(e)}")
             return None
     
     def delete_file(self, file_url):
@@ -160,12 +151,56 @@ class R2Storage:
                 Bucket=self.bucket_name,
                 Key=key
             )
-            print(f"🗑️  Đã xóa: {key}")
             return True
             
         except Exception as e:
-            print(f"❌ Lỗi xóa file: {str(e)}")
             return False
+    
+    def delete_files_batch(self, file_urls):
+        """
+        Xóa nhiều files cùng lúc (batch delete)
+        
+        Args:
+            file_urls: List các URL hoặc keys cần xóa
+        
+        Returns:
+            dict: {'success': int, 'failed': int}
+        """
+        if not self.enabled:
+            return {'success': 0, 'failed': len(file_urls)}
+        
+        success_count = 0
+        failed_count = 0
+        
+        # Chuẩn bị danh sách objects cần xóa
+        objects_to_delete = []
+        for file_url in file_urls:
+            if file_url.startswith('http'):
+                key = file_url.replace(self.public_url + '/', '')
+            else:
+                key = file_url
+            objects_to_delete.append({'Key': key})
+        
+        # Xóa theo batch 1000 files (giới hạn của S3/R2)
+        batch_size = 1000
+        for i in range(0, len(objects_to_delete), batch_size):
+            batch = objects_to_delete[i:i+batch_size]
+            try:
+                response = self.s3_client.delete_objects(
+                    Bucket=self.bucket_name,
+                    Delete={'Objects': batch}
+                )
+                # Đếm số lượng thành công
+                deleted = response.get('Deleted', [])
+                success_count += len(deleted)
+                
+                # Đếm số lượng lỗi
+                errors = response.get('Errors', [])
+                failed_count += len(errors)
+            except Exception as e:
+                failed_count += len(batch)
+        
+        return {'success': success_count, 'failed': failed_count}
     
     def file_exists(self, key):
         """Kiểm tra file có tồn tại trên R2 không"""
@@ -205,7 +240,6 @@ class R2Storage:
             return files
             
         except Exception as e:
-            print(f"❌ Lỗi list files: {str(e)}")
             return []
     
     def get_storage_stats(self):
@@ -230,7 +264,6 @@ class R2Storage:
             }
             
         except Exception as e:
-            print(f"❌ Lỗi lấy stats: {str(e)}")
             return {'total_size': 0, 'total_files': 0}
 
 # Singleton instance

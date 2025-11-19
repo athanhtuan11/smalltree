@@ -812,27 +812,37 @@ def delete_activity(id):
     if post:
         activity_title = post.title
         
-        # Xóa tất cả ảnh của hoạt động
+        # Phân loại ảnh R2 và local
+        r2_images = []
+        local_images = []
+        
         for img in post.images:
-            # Kiểm tra nếu là URL R2 (bắt đầu bằng http)
             if img.filepath.startswith('http'):
-                # Xóa trên R2
-                try:
-                    if R2_ENABLED:
-                        r2 = get_r2_storage()
-                        if r2.enabled:
-                            r2.delete_file(img.filepath)
-                            print(f"🗑️  Đã xóa R2: {img.filepath}")
-                except Exception as e:
-                    print(f"⚠️  Không thể xóa R2: {e}")
+                r2_images.append(img.filepath)
             else:
-                # Xóa file local
-                img_path = os.path.join('app', 'static', img.filepath)
-                if os.path.exists(img_path):
+                local_images.append(img)
+        
+        # Xóa batch trên R2 (nhanh hơn)
+        if r2_images and R2_ENABLED:
+            try:
+                r2 = get_r2_storage()
+                if r2.enabled:
+                    result = r2.delete_files_batch(r2_images)
+                    print(f"✅ Xóa R2: {result['success']} thành công, {result['failed']} lỗi")
+            except Exception as e:
+                print(f"⚠️  Lỗi xóa batch R2: {e}")
+        
+        # Xóa files local
+        for img in local_images:
+            img_path = os.path.join('app', 'static', img.filepath)
+            if os.path.exists(img_path):
+                try:
                     os.remove(img_path)
-                    print(f"🗑️  Đã xóa local: {img_path}")
-            
-            # Xóa record trong database
+                except:
+                    pass
+        
+        # Xóa tất cả records trong database
+        for img in post.images:
             db.session.delete(img)
         
         # Xóa hoạt động

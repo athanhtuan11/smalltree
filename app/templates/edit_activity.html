@@ -64,7 +64,7 @@
         <div class="d-flex flex-wrap align-items-center">
             {% for img in post.images %}
             <div class="position-relative me-2 mb-2">
-                <img src="{{ url_for('static', filename=img.filepath) }}" class="gallery-img-edit shadow">
+                <img src="{{ img.filepath|image_url }}" class="gallery-img-edit shadow">
             </div>
             <form method="POST" action="{{ url_for('main.delete_activity_image', image_id=img.id, id=post.id) }}" style="display:inline;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
