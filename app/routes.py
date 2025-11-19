@@ -811,15 +811,35 @@ def delete_activity(id):
     post = Activity.query.get_or_404(id)
     if post:
         activity_title = post.title
+        
+        # Xóa tất cả ảnh của hoạt động
         for img in post.images:
-            img_path = os.path.join('app', 'static', img.filepath)
-            if os.path.exists(img_path):
-                os.remove(img_path)
+            # Kiểm tra nếu là URL R2 (bắt đầu bằng http)
+            if img.filepath.startswith('http'):
+                # Xóa trên R2
+                try:
+                    if R2_ENABLED:
+                        r2 = get_r2_storage()
+                        if r2.enabled:
+                            r2.delete_file(img.filepath)
+                            print(f"🗑️  Đã xóa R2: {img.filepath}")
+                except Exception as e:
+                    print(f"⚠️  Không thể xóa R2: {e}")
+            else:
+                # Xóa file local
+                img_path = os.path.join('app', 'static', img.filepath)
+                if os.path.exists(img_path):
+                    os.remove(img_path)
+                    print(f"🗑️  Đã xóa local: {img_path}")
+            
+            # Xóa record trong database
             db.session.delete(img)
+        
+        # Xóa hoạt động
         db.session.delete(post)
         db.session.commit()
         log_activity('delete', 'activity', id, f'Xóa hoạt động: {activity_title}')
-        flash('Đã xoá bài viết!', 'success')
+        flash('Đã xoá bài viết và tất cả ảnh!', 'success')
     else:
         flash('Không tìm thấy bài viết để xoá!', 'danger')
     mobile = is_mobile()
@@ -3587,13 +3607,27 @@ def delete_activity_image(id, image_id):
             return redirect_no_permission()
         img = ActivityImage.query.get_or_404(image_id)
         print(f"[LOG] Đang xoá ảnh: id={image_id}, filepath={img.filepath}")
-        # Xoá file vật lý
-        img_path = os.path.join('app', 'static', img.filepath)
-        if os.path.exists(img_path):
-            os.remove(img_path)
-            print(f"[LOG] Đã xoá file vật lý: {img_path}")
+        
+        # Kiểm tra nếu là URL R2 (bắt đầu bằng http)
+        if img.filepath.startswith('http'):
+            # Xóa trên R2
+            try:
+                if R2_ENABLED:
+                    r2 = get_r2_storage()
+                    if r2.enabled:
+                        r2.delete_file(img.filepath)
+                        print(f"[LOG] Đã xóa R2: {img.filepath}")
+            except Exception as e:
+                print(f"[LOG] Không thể xóa R2: {e}")
         else:
-            print(f"[LOG] File vật lý không tồn tại: {img_path}")
+            # Xóa file local
+            img_path = os.path.join('app', 'static', img.filepath)
+            if os.path.exists(img_path):
+                os.remove(img_path)
+                print(f"[LOG] Đã xoá file vật lý: {img_path}")
+            else:
+                print(f"[LOG] File vật lý không tồn tại: {img_path}")
+        
         db.session.delete(img)
         db.session.commit()
         print(f"[LOG] Đã xoá bản ghi ActivityImage id={image_id} khỏi DB")
