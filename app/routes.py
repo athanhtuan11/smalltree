@@ -681,16 +681,23 @@ def new_activity():
                             r2 = get_r2_storage()
                             if r2.enabled:
                                 optimized_data.seek(0)  # Reset stream
+                                # Đọc data trước khi upload để giữ backup
+                                image_data = optimized_data.read()
+                                optimized_data.seek(0)  # Reset lại
                                 r2_url = r2.upload_file(optimized_data, img_filename, folder='activities')
                                 if r2_url:
                                     print(f"✅ Đã upload lên R2: {img_filename}")
                         except Exception as e:
                             print(f"⚠️  Lỗi upload R2: {e}")
+                            image_data = optimized_data.getvalue()  # Fallback lấy data
+                    else:
+                        # Nếu R2 không enable, lấy data luôn
+                        image_data = optimized_data.getvalue()
                     
                     # Fallback: Lưu local nếu R2 không thành công
                     if not r2_url:
                         with open(img_path, 'wb') as f:
-                            f.write(optimized_data.getvalue())
+                            f.write(image_data)
                         rel_path = f'images/activities/{new_post.id}/{img_filename}'
                     else:
                         rel_path = r2_url  # Dùng R2 URL
