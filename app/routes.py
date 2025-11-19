@@ -1779,66 +1779,115 @@ def analytics():
         from sqlalchemy import func, desc, or_
         from datetime import datetime, timedelta
         
-        # Tổng lượt truy cập theo user_type
+        # Build base filtered query (áp dụng cho tất cả thống kê)
+        cutoff_date = datetime.now() - timedelta(days=filter_days)
+        base_query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
+        
+        # Áp dụng tất cả filters
+        if filter_user_type:
+            base_query = base_query.filter(UserActivity.user_type == filter_user_type)
+        if filter_action:
+            base_query = base_query.filter(UserActivity.action == filter_action)
+        if filter_user_name:
+            base_query = base_query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+        if filter_resource:
+            base_query = base_query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+        
+        # Tổng lượt truy cập theo user_type (đã filter)
         stats_by_role = db.session.query(
             UserActivity.user_type,
             func.count(UserActivity.id).label('count')
-        ).group_by(UserActivity.user_type).all()
+        ).filter(UserActivity.timestamp >= cutoff_date)
         
-        # Build filtered query
-        cutoff_date = datetime.now() - timedelta(days=filter_days)
-        query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
-        
+        # Áp dụng filters vào stats
         if filter_user_type:
-            query = query.filter(UserActivity.user_type == filter_user_type)
+            stats_by_role = stats_by_role.filter(UserActivity.user_type == filter_user_type)
         if filter_action:
-            query = query.filter(UserActivity.action == filter_action)
+            stats_by_role = stats_by_role.filter(UserActivity.action == filter_action)
         if filter_user_name:
-            query = query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+            stats_by_role = stats_by_role.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
         if filter_resource:
-            query = query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+            stats_by_role = stats_by_role.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
         
-        # Paginated results
-        pagination = query.order_by(desc(UserActivity.timestamp)).paginate(
+        stats_by_role = stats_by_role.group_by(UserActivity.user_type).all()
+        
+        # Paginated results (dùng base_query đã filter)
+        pagination = base_query.order_by(desc(UserActivity.timestamp)).paginate(
             page=page, per_page=per_page, error_out=False
         )
         recent_activities = pagination.items
         
-        # User hoạt động nhiều nhất
-        week_ago = datetime.now() - timedelta(days=7)
-        top_users = db.session.query(
+        # User hoạt động nhiều nhất (đã filter)
+        top_users_query = db.session.query(
             UserActivity.user_name,
             UserActivity.user_type,
             func.count(UserActivity.id).label('count')
         ).filter(
-            UserActivity.timestamp >= week_ago,
+            UserActivity.timestamp >= cutoff_date,
             UserActivity.user_id.isnot(None)
-        ).group_by(
+        )
+        
+        # Áp dụng filters vào top users
+        if filter_user_type:
+            top_users_query = top_users_query.filter(UserActivity.user_type == filter_user_type)
+        if filter_action:
+            top_users_query = top_users_query.filter(UserActivity.action == filter_action)
+        if filter_user_name:
+            top_users_query = top_users_query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+        if filter_resource:
+            top_users_query = top_users_query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+        
+        top_users = top_users_query.group_by(
             UserActivity.user_name,
             UserActivity.user_type
         ).order_by(desc('count')).limit(10).all()
         
-        # Số lượt truy cập khách vãng lai (30 ngày)
-        month_ago = datetime.now() - timedelta(days=30)
-        guest_visits = UserActivity.query.filter(
-            UserActivity.user_type == 'guest',
-            UserActivity.timestamp >= month_ago
-        ).count()
+        # Số lượt truy cập khách vãng lai (đã filter)
+        guest_query = UserActivity.query.filter(
+            UserActivity.timestamp >= cutoff_date
+        )
+        if not filter_user_type or filter_user_type == 'guest':
+            if filter_action:
+                guest_query = guest_query.filter(UserActivity.action == filter_action)
+            if filter_resource:
+                guest_query = guest_query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+            guest_visits = guest_query.filter(UserActivity.user_type == 'guest').count()
+        else:
+            guest_visits = 0
         
-        # Số phụ huynh đăng nhập (30 ngày)
-        parent_logins = UserActivity.query.filter(
-            UserActivity.user_type == 'parent',
-            UserActivity.action == 'login',
-            UserActivity.timestamp >= month_ago
-        ).count()
+        # Số phụ huynh đăng nhập (đã filter)
+        parent_query = UserActivity.query.filter(
+            UserActivity.timestamp >= cutoff_date
+        )
+        if not filter_user_type or filter_user_type == 'parent':
+            if not filter_action or filter_action == 'login':
+                if filter_resource:
+                    parent_query = parent_query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+                parent_logins = parent_query.filter(
+                    UserActivity.user_type == 'parent',
+                    UserActivity.action == 'login'
+                ).count()
+            else:
+                parent_logins = 0
+        else:
+            parent_logins = 0
         
-        # Action phổ biến nhất
-        top_actions = db.session.query(
+        # Action phổ biến nhất (đã filter)
+        top_actions_query = db.session.query(
             UserActivity.action,
             func.count(UserActivity.id).label('count')
-        ).filter(
-            UserActivity.timestamp >= week_ago
-        ).group_by(UserActivity.action).order_by(desc('count')).limit(10).all()
+        ).filter(UserActivity.timestamp >= cutoff_date)
+        
+        if filter_user_type:
+            top_actions_query = top_actions_query.filter(UserActivity.user_type == filter_user_type)
+        if filter_action:
+            top_actions_query = top_actions_query.filter(UserActivity.action == filter_action)
+        if filter_user_name:
+            top_actions_query = top_actions_query.filter(UserActivity.user_name.like(f'%{filter_user_name}%'))
+        if filter_resource:
+            top_actions_query = top_actions_query.filter(UserActivity.resource_type.like(f'%{filter_resource}%'))
+        
+        top_actions = top_actions_query.group_by(UserActivity.action).order_by(desc('count')).limit(10).all()
         
         # Get distinct values for filters
         all_user_types = db.session.query(UserActivity.user_type).distinct().all()
