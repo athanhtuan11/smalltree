@@ -61,6 +61,18 @@ def create_app():
     def inject_csrf_token():
         from flask_wtf.csrf import generate_csrf
         return dict(csrf_token=generate_csrf)
+    
+    # Jinja filter để xử lý URL ảnh (local vs R2)
+    @app.template_filter('image_url')
+    def image_url_filter(filepath):
+        """Convert image filepath to proper URL (handles both local and R2)"""
+        if not filepath:
+            return url_for('static', filename='images/default_avatar.png')
+        # Nếu đã là URL đầy đủ (R2), trả về nguyên văn
+        if filepath.startswith('http://') or filepath.startswith('https://'):
+            return filepath
+        # Nếu là đường dẫn local, thêm /static/
+        return url_for('static', filename=filepath)
 
     from app.routes import main
     app.register_blueprint(main)

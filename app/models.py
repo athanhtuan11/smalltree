@@ -13,7 +13,14 @@ class Child(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=False)
-    parent_contact = db.Column(db.String(100), nullable=False)
+    parent_contact = db.Column(db.String(100), nullable=False)  # Giữ lại cho tương thích
+    
+    # Thông tin phụ huynh chi tiết
+    father_name = db.Column(db.String(100))  # Họ và tên Bố
+    father_phone = db.Column(db.String(20))  # Số điện thoại Bố
+    mother_name = db.Column(db.String(100))  # Họ và tên Mẹ
+    mother_phone = db.Column(db.String(20))  # Số điện thoại Mẹ
+    
     class_name = db.Column(db.String(100))
     birth_date = db.Column(db.String(20))
     status = db.Column(db.String(20), default='Chưa điểm danh')
