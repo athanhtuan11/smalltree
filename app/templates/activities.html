@@ -13,6 +13,30 @@
     @media (max-width: 576px) {
         .activity-card-mobile { margin-left:-16px; margin-right:-16px; border-radius:0; }
     }
+    .share-dropdown { position: relative; }
+    .share-menu { 
+        position: absolute; 
+        bottom: 100%; 
+        right: 0; 
+        background: white; 
+        border: 1px solid #ddd; 
+        border-radius: 8px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+        padding: 8px 0; 
+        min-width: 180px; 
+        z-index: 1000;
+        display: none;
+    }
+    .share-menu.show { display: block; }
+    .share-menu a { 
+        display: block; 
+        padding: 8px 16px; 
+        color: #333; 
+        text-decoration: none; 
+        transition: background 0.2s;
+    }
+    .share-menu a:hover { background: #f5f5f5; }
+    .share-menu a i { width: 20px; margin-right: 8px; }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
     <h2 class="fw-bold mb-3 text-center" style="color:#43a047; font-size:2em;">Hoạt động nổi bật</h2>
@@ -45,29 +69,50 @@
                     <h5 class="card-title fw-bold" style="color:#43a047;" class="{% if mobile %}activity-title-mobile{% else %}activity-title-desktop{% endif %}">{{ post.title }}</h5>
                     <p class="card-text" style="color:#388e3c;">{{ post.content|safe }}</p>
                 </div>
-                <div class="card-footer bg-white border-0 text-end">
-                    <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ post.date_posted }}</small>
-                    {% if session['role'] in ['admin', 'teacher'] %}
-                    {% if mobile %}
-                    <div class="d-flex flex-column gap-2 mt-2">
-                        <a href="/activities/{{ post.id }}/edit" class="btn btn-warning btn-sm w-100"><i class="bi bi-pencil-square"></i> Sửa</a>
-                        <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;">
-                            {{ form.hidden_tag() }}
-                            <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
-                                <i class="bi bi-trash"></i> Xoá
-                            </button>
-                        </form>
+                <div class="card-footer bg-white border-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted"><i class="bi bi-calendar-event me-1"></i>{{ post.date_posted }}</small>
+                        <div class="d-flex gap-2 align-items-center">
+                            {# Nút Share #}
+                            <div class="share-dropdown">
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="toggleShare(event, {{ post.id }})" title="Chia sẻ">
+                                    <i class="bi bi-share"></i> Share
+                                </button>
+                                <div class="share-menu" id="shareMenu{{ post.id }}">
+                                    <a href="#" onclick="shareToFacebook(event, {{ post.id }})">
+                                        <i class="bi bi-facebook" style="color:#1877f2;"></i>Facebook
+                                    </a>
+                                    <a href="#" onclick="shareToZalo(event, {{ post.id }})">
+                                        <i class="bi bi-chat-dots" style="color:#0068ff;"></i>Zalo
+                                    </a>
+                                    <a href="#" onclick="copyLink(event, {{ post.id }})">
+                                        <i class="bi bi-link-45deg" style="color:#43a047;"></i>Copy link
+                                    </a>
+                                </div>
+                            </div>
+                            {% if session['role'] in ['admin', 'teacher'] %}
+                            {% if mobile %}
+                            <div class="d-flex flex-column gap-2">
+                                <a href="/activities/{{ post.id }}/edit" class="btn btn-warning btn-sm" onclick="event.stopPropagation();"><i class="bi bi-pencil-square"></i> Sửa</a>
+                                <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;" onclick="event.stopPropagation();">
+                                    {{ form.hidden_tag() }}
+                                    <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
+                                        <i class="bi bi-trash"></i> Xoá
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <a href="/activities/{{ post.id }}/edit" class="btn btn-sm btn-warning" onclick="event.stopPropagation();"><i class="bi bi-pencil-square"></i> Sửa</a>
+                            <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;" onclick="event.stopPropagation();">
+                                {{ form.hidden_tag() }}
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
+                                    <i class="bi bi-trash"></i> Xoá
+                                </button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
+                        </div>
                     </div>
-                    {% else %}
-                    <a href="/activities/{{ post.id }}/edit" class="btn btn-sm btn-warning ms-2"><i class="bi bi-pencil-square"></i> Sửa</a>
-                    <form method="POST" action="/activities/{{ post.id }}/delete" style="display:inline;">
-                        {{ form.hidden_tag() }}
-                        <button type="submit" class="btn btn-sm btn-danger ms-2" onclick="return confirm('Bạn có chắc muốn xoá bài viết này?');">
-                            <i class="bi bi-trash"></i> Xoá
-                        </button>
-                    </form>
-                    {% endif %}
-                    {% endif %}
                 </div>
             </div>
             </a>
@@ -79,4 +124,74 @@
         {% endfor %}
     </div>
 </div>
+
+<script>
+// Toggle share menu
+function toggleShare(event, postId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = document.getElementById('shareMenu' + postId);
+    // Close all other menus
+    document.querySelectorAll('.share-menu').forEach(m => {
+        if (m.id !== 'shareMenu' + postId) m.classList.remove('show');
+    });
+    menu.classList.toggle('show');
+}
+
+// Close share menu when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.share-dropdown')) {
+        document.querySelectorAll('.share-menu').forEach(m => m.classList.remove('show'));
+    }
+});
+
+// Share to Facebook
+function shareToFacebook(event, postId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const url = window.location.origin + '/activities/' + postId;
+    const shareUrl = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+}
+
+// Share to Zalo
+function shareToZalo(event, postId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const url = window.location.origin + '/activities/' + postId;
+    const shareUrl = 'https://zalo.me/share/link?url=' + encodeURIComponent(url);
+    window.open(shareUrl, '_blank', 'width=600,height=400');
+}
+
+// Copy link to clipboard
+function copyLink(event, postId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const url = window.location.origin + '/activities/' + postId;
+    
+    // Create temporary input
+    const tempInput = document.createElement('input');
+    tempInput.value = url;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    tempInput.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        alert('Đã copy link: ' + url);
+    } catch (err) {
+        // Fallback for modern browsers
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Đã copy link: ' + url);
+        }).catch(() => {
+            alert('Không thể copy link. Vui lòng thử lại!');
+        });
+    }
+    
+    document.body.removeChild(tempInput);
+    
+    // Close menu
+    document.getElementById('shareMenu' + postId).classList.remove('show');
+}
+</script>
 {% endblock %}

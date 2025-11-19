@@ -7,6 +7,14 @@ from calendar import monthrange
 from datetime import datetime, date, timedelta
 import io, zipfile, os, json, re, secrets, tempfile
 
+# Cloudflare R2 Storage
+try:
+    from r2_storage import get_r2_storage
+    R2_ENABLED = True
+except ImportError:
+    R2_ENABLED = False
+    print("⚠️  R2 Storage không khả dụng. Ảnh sẽ lưu local.")
+
 # Check for optional dependencies
 try:
     import openpyxl
@@ -666,12 +674,28 @@ def new_activity():
                     img_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{base_name}.jpg"
                     img_path = os.path.join(activity_dir, img_filename)
                     
-                    # Lưu ảnh đã tối ưu
-                    with open(img_path, 'wb') as f:
-                        f.write(optimized_data.getvalue())
+                    # Upload lên R2 (nếu có)
+                    r2_url = None
+                    if R2_ENABLED:
+                        try:
+                            r2 = get_r2_storage()
+                            if r2.enabled:
+                                optimized_data.seek(0)  # Reset stream
+                                r2_url = r2.upload_file(optimized_data, img_filename, folder='activities')
+                                if r2_url:
+                                    print(f"✅ Đã upload lên R2: {img_filename}")
+                        except Exception as e:
+                            print(f"⚠️  Lỗi upload R2: {e}")
+                    
+                    # Fallback: Lưu local nếu R2 không thành công
+                    if not r2_url:
+                        with open(img_path, 'wb') as f:
+                            f.write(optimized_data.getvalue())
+                        rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                    else:
+                        rel_path = r2_url  # Dùng R2 URL
                     
                     # Lưu vào database
-                    rel_path = f'images/activities/{new_post.id}/{img_filename}'
                     db.session.add(ActivityImage(
                         filename=img_filename, 
                         filepath=rel_path, 
