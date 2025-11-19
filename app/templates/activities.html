@@ -150,8 +150,22 @@ function shareToFacebook(event, postId) {
     event.preventDefault();
     event.stopPropagation();
     const url = window.location.origin + '/activities/' + postId;
-    const shareUrl = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
-    window.open(shareUrl, '_blank', 'width=600,height=400');
+    
+    // Kiểm tra nếu là mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Thử mở app Facebook trước (Deep link)
+        window.location.href = 'fb://facewebmodal/f?href=' + encodeURIComponent(url);
+        
+        // Fallback: Nếu không có app, mở web sau 1.5s
+        setTimeout(function() {
+            window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank');
+        }, 1500);
+    } else {
+        // Desktop: Mở Facebook web dialog
+        window.open('https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url), '_blank', 'width=600,height=400');
+    }
 }
 
 // Share to Zalo
@@ -159,8 +173,22 @@ function shareToZalo(event, postId) {
     event.preventDefault();
     event.stopPropagation();
     const url = window.location.origin + '/activities/' + postId;
-    const shareUrl = 'https://zalo.me/share/link?url=' + encodeURIComponent(url);
-    window.open(shareUrl, '_blank', 'width=600,height=400');
+    
+    // Kiểm tra nếu là mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Thử mở app Zalo trước (Deep link)
+        window.location.href = 'zalo://share?link=' + encodeURIComponent(url);
+        
+        // Fallback: Nếu không có app, mở web sau 1.5s
+        setTimeout(function() {
+            window.open('https://zalo.me/share/link?url=' + encodeURIComponent(url), '_blank');
+        }, 1500);
+    } else {
+        // Desktop: Mở Zalo web
+        window.open('https://zalo.me/share/link?url=' + encodeURIComponent(url), '_blank', 'width=600,height=400');
+    }
 }
 
 // Copy link to clipboard
