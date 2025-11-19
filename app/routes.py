@@ -674,31 +674,31 @@ def new_activity():
                     img_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{base_name}.jpg"
                     img_path = os.path.join(activity_dir, img_filename)
                     
+                    # Đọc data từ optimized_data trước (luôn cần cho fallback)
+                    optimized_data.seek(0)
+                    image_data = optimized_data.read()
+                    
                     # Upload lên R2 (nếu có)
                     r2_url = None
                     if R2_ENABLED:
                         try:
                             r2 = get_r2_storage()
                             if r2.enabled:
-                                optimized_data.seek(0)  # Reset stream
-                                # Đọc data trước khi upload để giữ backup
-                                image_data = optimized_data.read()
-                                optimized_data.seek(0)  # Reset lại
-                                r2_url = r2.upload_file(optimized_data, img_filename, folder='activities')
+                                # Tạo BytesIO mới từ image_data cho R2
+                                from io import BytesIO
+                                r2_stream = BytesIO(image_data)
+                                r2_url = r2.upload_file(r2_stream, img_filename, folder='activities')
                                 if r2_url:
                                     print(f"✅ Đã upload lên R2: {img_filename}")
                         except Exception as e:
                             print(f"⚠️  Lỗi upload R2: {e}")
-                            image_data = optimized_data.getvalue()  # Fallback lấy data
-                    else:
-                        # Nếu R2 không enable, lấy data luôn
-                        image_data = optimized_data.getvalue()
                     
                     # Fallback: Lưu local nếu R2 không thành công
                     if not r2_url:
                         with open(img_path, 'wb') as f:
                             f.write(image_data)
                         rel_path = f'images/activities/{new_post.id}/{img_filename}'
+                        print(f"💾 Đã lưu local: {rel_path}")
                     else:
                         rel_path = r2_url  # Dùng R2 URL
                     
@@ -1018,6 +1018,12 @@ def new_student():
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
         
+        # Lấy thông tin phụ huynh chi tiết
+        father_name = request.form.get('father_name')
+        father_phone = request.form.get('father_phone')
+        mother_name = request.form.get('mother_name')
+        mother_phone = request.form.get('mother_phone')
+        
         # Validate class first
         if not any(c.name == class_name for c in classes):
             flash('Lớp không hợp lệ!', 'danger')
@@ -1047,7 +1053,19 @@ def new_student():
         
         # Create student
         try:
-            new_child = Child(name=name, age=0, parent_contact=parent_contact, class_name=class_name, birth_date=birth_date, student_code=student_code, avatar=avatar_path)
+            new_child = Child(
+                name=name, 
+                age=0, 
+                parent_contact=parent_contact,
+                father_name=father_name,
+                father_phone=father_phone,
+                mother_name=mother_name,
+                mother_phone=mother_phone,
+                class_name=class_name, 
+                birth_date=birth_date, 
+                student_code=student_code, 
+                avatar=avatar_path
+            )
             db.session.add(new_child)
             db.session.commit()
             log_activity('create', 'student', new_child.id, f'Tạo học sinh: {name}')
@@ -2190,6 +2208,12 @@ def edit_student(student_id):
         student.class_name = class_name
         student.birth_date = request.form.get('birth_date')
         student.parent_contact = request.form.get('parent_contact')
+        
+        # Cập nhật thông tin phụ huynh chi tiết
+        student.father_name = request.form.get('father_name')
+        student.father_phone = request.form.get('father_phone')
+        student.mother_name = request.form.get('mother_name')
+        student.mother_phone = request.form.get('mother_phone')
         
         # Xử lý avatar riêng biệt
         avatar_updated = False

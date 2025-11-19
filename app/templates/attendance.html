@@ -159,7 +159,7 @@
                     <tr style="background: #f1f8e9;">
                         <td class="text-center">
                             {% if student.avatar %}
-                                <img src="{{ url_for('static', filename=student.avatar) }}?v={{ range(1000, 9999) | random }}" 
+                                <img src="{{ student.avatar|image_url }}?v={{ range(1000, 9999) | random }}" 
                                      alt="{{ student.name }}" 
                                      class="rounded-circle border border-success avatar-attendance" 
                                      onerror="this.src='{{ url_for('static', filename='images/default_avatar.png') }}'">

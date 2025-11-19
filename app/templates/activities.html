@@ -61,7 +61,7 @@
                 {% if post.images and post.images|length > 0 %}
                 <div class="d-flex flex-wrap gap-2 justify-content-center p-2">
                     {% for img in post.images[:3] %}
-                        <img src="{{ url_for('static', filename=img.filepath) }}" alt="Ảnh hoạt động" style="height:80px; width:auto; border-radius:8px; object-fit:cover; box-shadow:0 2px 8px #e0e0e0;">
+                        <img src="{{ img.filepath|image_url }}" alt="Ảnh hoạt động" style="height:80px; width:auto; border-radius:8px; object-fit:cover; box-shadow:0 2px 8px #e0e0e0;">
                     {% endfor %}
                 </div>
                 {% endif %}

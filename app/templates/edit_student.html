@@ -65,14 +65,37 @@
             </script>
         </div>
         <div class="mb-3">
-            <label for="parent_contact" class="form-label">Liên hệ phụ huynh</label>
-            <input type="text" class="form-control" id="parent_contact" name="parent_contact" value="{{ student.parent_contact }}">
+            <label for="parent_contact" class="form-label">Liên hệ phụ huynh (chung)</label>
+            <input type="text" class="form-control" id="parent_contact" name="parent_contact" value="{{ student.parent_contact }}" placeholder="SĐT chung hoặc email">
         </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="father_name" class="form-label">Họ và tên Bố</label>
+                <input type="text" class="form-control" id="father_name" name="father_name" value="{{ student.father_name or '' }}" placeholder="Nguyễn Văn A">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="father_phone" class="form-label">Số điện thoại Bố</label>
+                <input type="text" class="form-control" id="father_phone" name="father_phone" value="{{ student.father_phone or '' }}" placeholder="0901234567">
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="mother_name" class="form-label">Họ và tên Mẹ</label>
+                <input type="text" class="form-control" id="mother_name" name="mother_name" value="{{ student.mother_name or '' }}" placeholder="Trần Thị B">
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="mother_phone" class="form-label">Số điện thoại Mẹ</label>
+                <input type="text" class="form-control" id="mother_phone" name="mother_phone" value="{{ student.mother_phone or '' }}" placeholder="0907654321">
+            </div>
+        </div>
+        
         <div class="mb-3">
             <label for="avatar" class="form-label">Ảnh đại diện học sinh</label>
             <div class="mb-2">
                 <img id="avatar-preview" 
-                     src="{% if student.avatar %}{{ url_for('static', filename=student.avatar) }}{% else %}{{ url_for('static', filename='images/default_avatar.png') }}{% endif %}" 
+                     src="{% if student.avatar %}{{ student.avatar|image_url }}{% else %}{{ url_for('static', filename='images/default_avatar.png') }}{% endif %}" 
                      alt="avatar" 
                      class="rounded-circle border" 
                      style="width:80px;height:80px;object-fit:cover;">

@@ -66,6 +66,7 @@ def create_app():
     @app.template_filter('image_url')
     def image_url_filter(filepath):
         """Convert image filepath to proper URL (handles both local and R2)"""
+        from flask import url_for
         if not filepath:
             return url_for('static', filename='images/default_avatar.png')
         # Nếu đã là URL đầy đủ (R2), trả về nguyên văn

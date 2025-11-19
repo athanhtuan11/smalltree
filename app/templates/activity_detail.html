@@ -18,8 +18,8 @@
                         <div class="row g-2">
                             {% for img in activity.gallery %}
                             <div class="col-6 col-md-4 col-lg-3">
-                                <a href="{{ url_for('static', filename=img.filepath) }}" target="_blank">
-                                    <img src="{{ url_for('static', filename=img.filepath) }}" class="img-fluid rounded shadow-sm mb-2" style="max-height:140px; object-fit:cover; width:100%;" alt="Ảnh hoạt động">
+                                <a href="{{ img.filepath|image_url }}" target="_blank">
+                                    <img src="{{ img.filepath|image_url }}" class="img-fluid rounded shadow-sm mb-2" style="max-height:140px; object-fit:cover; width:100%;" alt="Ảnh hoạt động">
                                 </a>
                             </div>
                             {% endfor %}

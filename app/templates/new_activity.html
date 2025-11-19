@@ -1,14 +1,5 @@
 {% extends 'base.html' %}
-{% block content %}            <div class="form-text text-success">
-                <strong>🚀 Tự động tối ưu hóa ảnh:</strong>
-                <ul class="mb-1 mt-1">
-                    <li>✅ Chấp nhận mọi kích thước - tự động resize về 1200x900px</li>
-                    <li>✅ Chấp nhận mọi định dạng ảnh - tự động chuyển về JPEG</li> 
-                    <li>✅ Tự động nén để giảm dung lượng xuống ~200-500KB/ảnh</li>
-                    <li>✅ Không giới hạn số lượng - upload thoải mái!</li>
-                    <li>🎯 <strong>Không bao giờ báo lỗi</strong> - hệ thống sẽ tự sửa tất cả</li>
-                </ul>
-            </div>ll CSS -->
+{% block content %}
 <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
 <style>
     .quill-editor { min-height:180px; }
@@ -53,15 +44,6 @@
         <div class="mb-3">
             <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
             <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple onchange="debugFiles()">
-            <div class="form-text text-success">
-                <strong>� Đã tối ưu hóa upload:</strong>
-                <ul class="mb-1 mt-1">
-                    <li>Tối đa 50MB cho tất cả ảnh (khoảng 50-100 ảnh)</li>
-                    <li>Mỗi ảnh tối đa 10MB, sẽ được tự động nén về 1200x900px</li>
-                    <li>Định dạng hỗ trợ: JPG, PNG, GIF, JFIF</li>
-                    <li>Xử lý từng ảnh một để tránh lỗi 413</li>
-                </ul>
-            </div>
             <!-- Debug info để test -->
             <div id="debug-info" class="mt-2" style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: none;">
                 <small><strong>Debug:</strong> <span id="debug-text">Chưa chọn file nào</span></small>

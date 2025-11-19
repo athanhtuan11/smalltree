@@ -13,13 +13,15 @@ class Child(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=False)
-    parent_contact = db.Column(db.String(100), nullable=False)  # Giữ lại cho tương thích
     
-    # Thông tin phụ huynh chi tiết
+    # Thông tin phụ huynh chi tiết (thay thế parent_contact cũ)
     father_name = db.Column(db.String(100))  # Họ và tên Bố
     father_phone = db.Column(db.String(20))  # Số điện thoại Bố
     mother_name = db.Column(db.String(100))  # Họ và tên Mẹ
     mother_phone = db.Column(db.String(20))  # Số điện thoại Mẹ
+    
+    # Deprecated: Giữ lại tạm để không mất data cũ trên server, sẽ xóa sau
+    parent_contact = db.Column(db.String(100), nullable=True)
     
     class_name = db.Column(db.String(100))
     birth_date = db.Column(db.String(20))
