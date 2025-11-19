@@ -18,19 +18,31 @@ def download_avatars_from_r2():
         downloaded_count = 0
         skipped_count = 0
         error_count = 0
+        fixed_path_count = 0
         
         for student in students:
             if not student.avatar:
                 continue
-                
-            # Check if avatar is R2 URL
-            if student.avatar.startswith('http'):
-                print(f"\n📥 Đang xử lý {student.name} ({student.student_code})")
-                print(f"   R2 URL: {student.avatar}")
-                
+            
+            # Extract R2 URL from broken path like "images/students/https://..."
+            r2_url = None
+            if 'http' in student.avatar:
+                if student.avatar.startswith('images/students/http'):
+                    # Broken path: extract R2 URL
+                    r2_url = student.avatar.replace('images/students/', '')
+                    print(f"\n🔧 Fix broken path: {student.name} ({student.student_code})")
+                    print(f"   Before: {student.avatar}")
+                    print(f"   R2 URL: {r2_url}")
+                elif student.avatar.startswith('http'):
+                    # Direct R2 URL
+                    r2_url = student.avatar
+                    print(f"\n📥 Đang xử lý {student.name} ({student.student_code})")
+                    print(f"   R2 URL: {r2_url}")
+            
+            if r2_url:
                 try:
                     # Download from R2
-                    response = requests.get(student.avatar, timeout=10)
+                    response = requests.get(r2_url, timeout=10)
                     if response.status_code == 200:
                         # Extract filename or create new one
                         filename = f"student_{student.student_code}_{secure_filename(student.name)}.jpg"
@@ -49,7 +61,11 @@ def download_avatars_from_r2():
                         
                         print(f"   ✅ Downloaded: {filename}")
                         print(f"   📁 New path: {student.avatar}")
-                        downloaded_count += 1
+                        
+                        if 'images/students/http' in old_avatar:
+                            fixed_path_count += 1
+                        else:
+                            downloaded_count += 1
                     else:
                         print(f"   ❌ Failed to download: HTTP {response.status_code}")
                         error_count += 1
@@ -62,16 +78,20 @@ def download_avatars_from_r2():
                 skipped_count += 1
         
         # Commit all changes
-        if downloaded_count > 0:
+        total_changes = downloaded_count + fixed_path_count
+        if total_changes > 0:
             db.session.commit()
             print(f"\n{'='*60}")
-            print(f"✅ Đã download {downloaded_count} avatars từ R2 về local")
+            if fixed_path_count > 0:
+                print(f"🔧 Đã fix {fixed_path_count} avatars có path lỗi")
+            if downloaded_count > 0:
+                print(f"✅ Đã download {downloaded_count} avatars từ R2 về local")
             print(f"⏭️  Bỏ qua {skipped_count} avatars đã ở local")
             if error_count > 0:
                 print(f"❌ Lỗi {error_count} avatars")
             print(f"{'='*60}")
         else:
-            print(f"\n✅ Không có avatar nào từ R2. Tất cả đã ở local.")
+            print(f"\n✅ Không có avatar nào cần xử lý. Tất cả đã ở local.")
             print(f"   (Bỏ qua {skipped_count} avatars)")
 
 if __name__ == '__main__':
