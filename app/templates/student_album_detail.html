@@ -104,7 +104,7 @@
                                             or album.photos|first %}
                         {% if cover_photo %}
                         <div class="position-relative">
-                            <img src="{{ url_for('static', filename=cover_photo.filepath) }}" 
+                            <img src="{{ cover_photo.filepath|image_url }}" 
                                  class="card-img-top album-cover" alt="Album cover">
                             <div class="position-absolute top-0 end-0 m-2">
                                 <span class="badge bg-dark bg-opacity-75">

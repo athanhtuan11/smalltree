@@ -1039,14 +1039,10 @@ def new_student():
             flash('Lớp không hợp lệ!', 'danger')
             return redirect(url_for('main.new_student'))
             
-        # Process avatar separately - Upload to R2
+        # Process avatar separately - Save locally on VPS
         avatar_path = None
         avatar_file = request.files.get('avatar')
         
-        # Initialize R2 storage
-        r2 = None
-        if R2_ENABLED:
-            r2 = get_r2_storage()
         if avatar_file and avatar_file.filename:
             import os
             from werkzeug.utils import secure_filename
@@ -1056,20 +1052,11 @@ def new_student():
             else:
                 try:
                     filename = f"student_{student_code}_{secure_filename(avatar_file.filename)}"
-                    
-                    # Upload to R2
-                    r2_url = r2.upload_file(avatar_file, f'students/{filename}')
-                    
-                    if r2_url:
-                        avatar_path = r2_url
-                    else:
-                        # Fallback to local storage if R2 fails
-                        save_dir = os.path.join('app', 'static', 'images', 'students')
-                        os.makedirs(save_dir, exist_ok=True)
-                        local_path = os.path.join(save_dir, filename)
-                        avatar_file.save(local_path)
-                        avatar_path = local_path.replace('app/static/', '').replace('\\', '/')
-                        flash('Ảnh được lưu local do R2 không khả dụng.', 'info')
+                    save_dir = os.path.join('app', 'static', 'images', 'students')
+                    os.makedirs(save_dir, exist_ok=True)
+                    local_path = os.path.join(save_dir, filename)
+                    avatar_file.save(local_path)
+                    avatar_path = local_path.replace('app/static/', '').replace('\\', '/')
                 except Exception as e:
                     flash(f'Lỗi khi lưu ảnh đại diện: {str(e)}. Học sinh sẽ được tạo không có ảnh.', 'warning')
                     avatar_path = None
@@ -2227,9 +2214,6 @@ def edit_student(student_id):
     classes = Class.query.order_by(Class.name).all()
     
     if request.method == 'POST':
-        print(f"[DEBUG] Form data: {dict(request.form)}")
-        print(f"[DEBUG] Files: {dict(request.files)}")
-        
         class_name = request.form.get('class_name')
         # Validate class against database
         if not any(c.name == class_name for c in classes):
@@ -2249,13 +2233,8 @@ def edit_student(student_id):
         student.mother_name = request.form.get('mother_name')
         student.mother_phone = request.form.get('mother_phone')
         
-        # Xử lý avatar riêng biệt
+        # Xử lý avatar riêng biệt - Save locally on VPS
         avatar_updated = False
-        
-        # Initialize R2 storage
-        r2 = None
-        if R2_ENABLED:
-            r2 = get_r2_storage()
         
         avatar_file = request.files.get('avatar')
         if avatar_file and avatar_file.filename:
@@ -2266,32 +2245,18 @@ def edit_student(student_id):
                 flash('Chỉ cho phép upload ảnh jpg, jpeg, png, gif! Thông tin khác đã được lưu.', 'warning')
             else:
                 try:
-                    # Delete old avatar (both R2 and local)
-                    if student.avatar:
-                        if student.avatar.startswith('http'):
-                            # Delete from R2
-                            r2.delete_file(student.avatar)
-                        else:
-                            # Delete local file
-                            old_path = os.path.join('app', 'static', student.avatar)
-                            if os.path.exists(old_path):
-                                os.remove(old_path)
+                    # Delete old avatar (local only)
+                    if student.avatar and not student.avatar.startswith('http'):
+                        old_path = os.path.join('app', 'static', student.avatar)
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
                     
                     filename = f"student_{student.student_code}_{secure_filename(avatar_file.filename)}"
-                    
-                    # Upload to R2
-                    r2_url = r2.upload_file(avatar_file, f'students/{filename}')
-                    
-                    if r2_url:
-                        student.avatar = r2_url
-                    else:
-                        # Fallback to local storage if R2 fails
-                        save_dir = os.path.join('app', 'static', 'images', 'students')
-                        os.makedirs(save_dir, exist_ok=True)
-                        avatar_path = os.path.join(save_dir, filename)
-                        avatar_file.save(avatar_path)
-                        student.avatar = avatar_path.replace('app/static/', '').replace('\\', '/')
-                        flash('Ảnh được lưu local do R2 không khả dụng.', 'info')
+                    save_dir = os.path.join('app', 'static', 'images', 'students')
+                    os.makedirs(save_dir, exist_ok=True)
+                    avatar_path = os.path.join(save_dir, filename)
+                    avatar_file.save(avatar_path)
+                    student.avatar = avatar_path.replace('app/static/', '').replace('\\', '/')
                     
                     avatar_updated = True
                 except Exception as e:
@@ -5799,6 +5764,9 @@ def create_student_album(student_id):
         db.session.add(album)
         db.session.flush()  # Để lấy album.id
         
+        # Khởi tạo R2 storage
+        r2 = get_r2_storage()
+        
         # Xử lý upload ảnh
         uploaded_files = request.files.getlist('photos')
         if uploaded_files:
@@ -5808,18 +5776,31 @@ def create_student_album(student_id):
             for i, file in enumerate(uploaded_files):
                 if file and file.filename:
                     filename = secrets.token_hex(16) + '.' + file.filename.rsplit('.', 1)[1].lower()
-                    filepath = os.path.join(upload_dir, filename)
-                    file.save(filepath)
+                    r2_key = f"albums/{student_id}/{album.id}/{filename}"
+                    
+                    # Upload to R2
+                    r2_url = r2.upload_file(file, r2_key)
+                    
+                    # Fallback to local if R2 fails
+                    if not r2_url:
+                        filepath = os.path.join(upload_dir, filename)
+                        file.save(filepath)
+                        file_path_or_url = f"student_albums/{student_id}/{album.id}/{filename}"
+                        file_size = os.path.getsize(filepath)
+                    else:
+                        file_path_or_url = r2_url
+                        file_size = len(file.read())
+                        file.seek(0)  # Reset file pointer
                     
                     # Tạo record ảnh
                     photo = StudentPhoto(
                         album_id=album.id,
                         filename=filename,
-                        filepath=f"student_albums/{student_id}/{album.id}/{filename}",
+                        filepath=file_path_or_url,
                         original_filename=file.filename,
                         caption=request.form.get(f'caption_{i}', ''),
                         upload_date=datetime.now(),
-                        file_size=os.path.getsize(filepath),
+                        file_size=file_size,
                         image_order=i,
                         is_cover_photo=(i == 0)  # Ảnh đầu tiên làm ảnh đại diện
                     )
@@ -5899,11 +5880,29 @@ def delete_album(album_id):
     album_title = album.title
     student_name = album.student.name
     
-    # Xóa thư mục chứa ảnh
-    album_dir = os.path.join(current_app.static_folder, 'student_albums', str(student_id), str(album_id))
-    if os.path.exists(album_dir):
-        import shutil
-        shutil.rmtree(album_dir)
+    # Khởi tạo R2 storage
+    r2 = get_r2_storage()
+    
+    # Phân loại và xóa ảnh từ R2 hoặc local
+    r2_images = []
+    local_images = []
+    
+    for photo in album.photos:
+        if photo.filepath.startswith('http'):
+            r2_images.append(photo.filepath)
+        else:
+            local_images.append(photo.filepath)
+    
+    # Xóa ảnh R2 theo batch
+    if r2_images:
+        r2.delete_files_batch(r2_images)
+    
+    # Xóa thư mục local nếu còn
+    if local_images:
+        album_dir = os.path.join(current_app.static_folder, 'student_albums', str(student_id), str(album_id))
+        if os.path.exists(album_dir):
+            import shutil
+            shutil.rmtree(album_dir)
     
     db.session.delete(album)
     db.session.commit()

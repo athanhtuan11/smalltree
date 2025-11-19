@@ -96,13 +96,13 @@
         <div class="col-lg-3 col-md-4 col-6">
             <div class="card photo-card h-100">
                 <div class="position-relative">
-                    <img src="{{ url_for('static', filename=photo.filepath) }}" 
+                    <img src="{{ photo.filepath|image_url }}" 
                          class="card-img-top photo-thumbnail" 
                          alt="{{ photo.original_filename }}"
                          data-bs-toggle="modal" 
                          data-bs-target="#photoModal"
                          data-photo-id="{{ photo.id }}"
-                         data-photo-src="{{ url_for('static', filename=photo.filepath) }}"
+                         data-photo-src="{{ photo.filepath|image_url }}"
                          data-photo-caption="{{ photo.caption or '' }}"
                          data-photo-filename="{{ photo.original_filename }}"
                          data-photo-upload="{{ photo.upload_date.strftime('%d/%m/%Y %H:%M') }}">
@@ -293,7 +293,7 @@ const photos = [
     {% for photo in photos %}
     {
         id: {{ photo.id }},
-        src: "{{ url_for('static', filename=photo.filepath) }}",
+        src: "{{ photo.filepath|image_url }}",
         caption: "{{ photo.caption or '' }}",
         filename: "{{ photo.original_filename }}",
         upload: "{{ photo.upload_date.strftime('%d/%m/%Y %H:%M') }}"
