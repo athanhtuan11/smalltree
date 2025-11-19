@@ -6,7 +6,7 @@ Chạy 1 lần hoặc setup cronjob để tự động migrate
 import os
 from datetime import datetime, timedelta
 from app import create_app, db
-from app.models import Activity, ActivityImage, Child, StudentAlbum, StudentAlbumImage
+from app.models import Activity, ActivityImage, Child, StudentAlbum, StudentPhoto
 from r2_storage import get_r2_storage
 from config_r2 import MIGRATION_CONFIG
 
@@ -71,8 +71,8 @@ def migrate_student_images(r2, batch_size=50):
     app = create_app()
     with app.app_context():
         students = Child.query.filter(
-            Child.image.isnot(None),
-            ~Child.image.like('http%')
+            Child.avatar.isnot(None),
+            ~Child.avatar.like('http%')
         ).limit(batch_size).all()
         
         migrated = 0
@@ -80,7 +80,7 @@ def migrate_student_images(r2, batch_size=50):
         
         for student in students:
             try:
-                local_path = os.path.join('app/static', student.image)
+                local_path = os.path.join('app/static', student.avatar)
                 
                 if not os.path.exists(local_path):
                     continue
@@ -94,7 +94,7 @@ def migrate_student_images(r2, batch_size=50):
                     r2_url = r2.upload_file(f, filename, folder='students')
                 
                 if r2_url:
-                    student.image = r2_url
+                    student.avatar = r2_url
                     db.session.commit()
                     
                     try:
@@ -118,8 +118,8 @@ def migrate_album_images(r2, batch_size=50):
     """Migrate ảnh album"""
     app = create_app()
     with app.app_context():
-        albums = StudentAlbumImage.query.filter(
-            ~StudentAlbumImage.filepath.like('http%')
+        albums = StudentPhoto.query.filter(
+            ~StudentPhoto.filepath.like('http%')
         ).limit(batch_size).all()
         
         migrated = 0
