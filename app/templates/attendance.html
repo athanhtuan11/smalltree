@@ -151,7 +151,7 @@
                         <th>Mã số học sinh</th>
                         <th>Lớp</th>
                         <th>Ngày sinh</th>
-                        <th>Liên hệ phụ huynh</th>
+                        <th>Thông tin phụ huynh</th>
                         <th>Có mặt</th>
                 </thead>
                 <tbody>
@@ -179,7 +179,24 @@
                         <td>{{ student.student_code }}</td>
                         <td>{{ student.class_name if student.class_name else '' }}</td>
                         <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}</td>
-                        <td>{{ student.parent_contact }}</td>
+                        <td>
+                            {% if student.father_name or student.mother_name %}
+                                <div style="font-size:0.9em;">
+                                    {% if student.father_name %}
+                                        <div><strong>Bố:</strong> {{ student.father_name }}
+                                        {% if student.father_phone %} - {{ student.father_phone }}{% endif %}</div>
+                                    {% endif %}
+                                    {% if student.mother_name %}
+                                        <div><strong>Mẹ:</strong> {{ student.mother_name }}
+                                        {% if student.mother_phone %} - {{ student.mother_phone }}{% endif %}</div>
+                                    {% endif %}
+                                </div>
+                            {% elif student.parent_contact %}
+                                {{ student.parent_contact }}
+                            {% else %}
+                                <span class="text-muted">Chưa có</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="d-flex flex-column flex-md-row gap-2 attendance-radio-mobile">
                                 <div class="form-check">

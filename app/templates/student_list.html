@@ -79,7 +79,24 @@
                 <td>{% if student.student_code == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.student_code }}{% endif %}</td>
                 <td>{% if student.class_name == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.class_name }}{% endif %}</td>
                 <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% endif %}</td>
-                <td>{% if student.parent_contact == 'Ẩn' %}<span title="Chỉ admin mới xem được">Ẩn</span>{% else %}{{ student.parent_contact }}{% endif %}</td>
+                <td>
+                    {% if student.father_name or student.mother_name %}
+                        <div style="font-size:0.85em;">
+                            {% if student.father_name %}
+                                <div><strong>Bố:</strong> {{ student.father_name }}{% if student.father_phone %} - {{ student.father_phone }}{% endif %}</div>
+                            {% endif %}
+                            {% if student.mother_name %}
+                                <div><strong>Mẹ:</strong> {{ student.mother_name }}{% if student.mother_phone %} - {{ student.mother_phone }}{% endif %}</div>
+                            {% endif %}
+                        </div>
+                    {% elif student.parent_contact and student.parent_contact != 'Ẩn' %}
+                        {{ student.parent_contact }}
+                    {% elif student.parent_contact == 'Ẩn' %}
+                        <span title="Chỉ admin mới xem được">Ẩn</span>
+                    {% else %}
+                        <span class="text-muted">Chưa có</span>
+                    {% endif %}
+                </td>
                 {% if session.get('role') in ['admin', 'teacher'] %}
                 <td>
                     <a href="/students/{{ student.id }}/edit" class="btn btn-warning btn-sm me-1" title="Chỉnh sửa thông tin"><i class="bi bi-pencil-square"></i></a>
