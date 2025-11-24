@@ -885,6 +885,90 @@ def activity_detail(id):
     form = DeleteActivityForm()
     return render_template('activity_detail.html', activity=activity, title=post.title, mobile=mobile, form=form)
 
+@main.route('/activities/<int:id>/download')
+def download_activity_images(id):
+    post = Activity.query.get_or_404(id)
+    if not post:
+        flash('Không tìm thấy bài viết!', 'danger')
+        return redirect(url_for('main.activities'))
+    
+    # Kiểm tra quyền truy cập
+    user_role = session.get('role')
+    user_id = session.get('user_id')
+    if user_role == 'parent':
+        child = Child.query.filter_by(id=user_id).first()
+        class_name = child.class_name if child else None
+        class_obj = Class.query.filter_by(name=class_name).first() if class_name else None
+        class_id = class_obj.id if class_obj else None
+        if post.class_id is not None and post.class_id != class_id:
+            flash('Bạn không có quyền tải bài viết này!', 'danger')
+            return redirect(url_for('main.activities'))
+    
+    # Kiểm tra có hình ảnh không
+    if not post.images or len(post.images) == 0:
+        flash('Bài viết này không có hình ảnh để tải!', 'warning')
+        return redirect(url_for('main.activity_detail', id=id))
+    
+    # Tạo file ZIP trong bộ nhớ
+    memory_file = io.BytesIO()
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for idx, img in enumerate(post.images, 1):
+            try:
+                # Xử lý đường dẫn hình ảnh
+                filepath = img.filepath
+                
+                # Nếu là R2 URL, tải từ R2
+                if filepath.startswith('http'):
+                    if R2_ENABLED:
+                        try:
+                            import requests
+                            response = requests.get(filepath, timeout=10)
+                            if response.status_code == 200:
+                                # Lấy extension từ URL hoặc dùng jpg mặc định
+                                ext = os.path.splitext(filepath)[1] or '.jpg'
+                                filename = f"{idx:03d}{ext}"
+                                zf.writestr(filename, response.content)
+                        except Exception as e:
+                            print(f"Lỗi tải ảnh từ R2: {e}")
+                            continue
+                    else:
+                        continue
+                else:
+                    # Hình ảnh local
+                    # Loại bỏ tiền tố 'images/' nếu có
+                    if filepath.startswith('images/'):
+                        filepath = filepath.replace('images/', '', 1)
+                    
+                    local_path = os.path.join(current_app.root_path, 'static', 'images', filepath)
+                    
+                    if os.path.exists(local_path):
+                        # Lấy tên file gốc hoặc tạo tên mới
+                        original_filename = os.path.basename(local_path)
+                        ext = os.path.splitext(original_filename)[1]
+                        filename = f"{idx:03d}{ext}"
+                        
+                        with open(local_path, 'rb') as f:
+                            zf.writestr(filename, f.read())
+            except Exception as e:
+                print(f"Lỗi xử lý ảnh {idx}: {e}")
+                continue
+    
+    memory_file.seek(0)
+    
+    # Tạo tên file ZIP từ tiêu đề bài viết
+    safe_title = re.sub(r'[^\w\s-]', '', post.title)
+    safe_title = re.sub(r'[-\s]+', '_', safe_title)
+    zip_filename = f"{safe_title}_{post.date.strftime('%Y%m%d')}.zip"
+    
+    log_activity('download', 'activity', id, f'Tải hình ảnh hoạt động: {post.title}')
+    
+    return send_file(
+        memory_file,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=zip_filename
+    )
+
 @main.route('/curriculum/new', methods=['GET', 'POST'])
 def new_curriculum():
     if session.get('role') not in ['admin', 'teacher']:
