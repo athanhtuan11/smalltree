@@ -292,7 +292,7 @@
                             <tbody>
                                 {% for activity in activities.items %}
                                 <tr>
-                                    <td><small>{{ activity.timestamp.strftime('%H:%M:%S<br>%d/%m/%Y')|safe }}</small></td>
+                                    <td><small>{{ activity.timestamp|vietnam_time('%H:%M:%S<br>%d/%m/%Y')|safe }}</small></td>
                                     <td>
                                         <span class="badge 
                                             {% if activity.user_type == 'guest' %}bg-secondary

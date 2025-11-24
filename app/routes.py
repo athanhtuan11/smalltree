@@ -37,9 +37,14 @@ main = Blueprint('main', __name__)
 def log_activity(action, resource_type=None, resource_id=None, description=None):
     """Helper function để ghi nhận hoạt động người dùng"""
     try:
+        from datetime import datetime, timezone, timedelta
         user_type = session.get('role', 'guest')
         user_id = session.get('user_id')
         user_name = session.get('name', 'Khách vãng lai')
+        
+        # Lấy thời gian Việt Nam (UTC+7)
+        vietnam_tz = timezone(timedelta(hours=7))
+        vietnam_time = datetime.now(vietnam_tz)
         
         activity = UserActivity(
             user_id=user_id,
@@ -50,7 +55,8 @@ def log_activity(action, resource_type=None, resource_id=None, description=None)
             resource_id=resource_id,
             description=description,
             ip_address=request.remote_addr,
-            user_agent=request.headers.get('User-Agent', '')[:500]
+            user_agent=request.headers.get('User-Agent', '')[:500],
+            timestamp=vietnam_time
         )
         db.session.add(activity)
         db.session.commit()
@@ -1900,10 +1906,12 @@ def analytics():
         
         # Thống kê theo role
         from sqlalchemy import func, desc, or_
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         # Build base filtered query (áp dụng cho tất cả thống kê)
-        cutoff_date = datetime.now() - timedelta(days=filter_days)
+        # Sử dụng timezone Việt Nam (UTC+7)
+        vietnam_tz = timezone(timedelta(hours=7))
+        cutoff_date = datetime.now(vietnam_tz) - timedelta(days=filter_days)
         base_query = UserActivity.query.filter(UserActivity.timestamp >= cutoff_date)
         
         # Áp dụng tất cả filters

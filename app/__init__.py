@@ -45,6 +45,25 @@ def create_app():
         except Exception:
             return value
     
+    # Filter để chuyển timestamp về múi giờ Việt Nam (UTC+7)
+    @app.template_filter('vietnam_time')
+    def vietnam_time_filter(value, format='%H:%M:%S %d/%m/%Y'):
+        if not value:
+            return ''
+        try:
+            from datetime import datetime, timezone, timedelta
+            # Nếu timestamp đã có timezone info
+            if hasattr(value, 'tzinfo') and value.tzinfo is not None:
+                # Chuyển về Việt Nam timezone (UTC+7)
+                vietnam_tz = timezone(timedelta(hours=7))
+                vietnam_time = value.astimezone(vietnam_tz)
+                return vietnam_time.strftime(format)
+            else:
+                # Nếu là naive datetime, giả định nó đã ở UTC+7
+                return value.strftime(format)
+        except Exception as e:
+            return str(value)
+    
     # Luôn lấy SQLALCHEMY_DATABASE_URI từ config.py (mặc định là SQLite)
     app.config.from_object('config.Config')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
