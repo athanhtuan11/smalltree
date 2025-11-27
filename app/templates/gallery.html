@@ -14,7 +14,9 @@
         <div class="gallery-images d-flex flex-wrap justify-content-start align-items-start">
             {% for img in images %}
                 <div class="m-2 shadow-sm" style="border-radius:10px; overflow:hidden; background:#fff;">
-                    <img src="{{ url_for('static', filename=img.filepath) }}" alt="Ảnh hoạt động" style="max-width:220px; max-height:180px; object-fit:cover; border-radius:10px;">
+                    <a href="{{ img.filepath|image_url }}" target="_blank">
+                        <img src="{{ img.filepath|image_url }}" alt="Ảnh hoạt động" style="max-width:220px; max-height:180px; object-fit:cover; border-radius:10px; cursor:pointer;">
+                    </a>
                 </div>
             {% else %}
                 <p>Chưa có ảnh hoạt động nào.</p>
