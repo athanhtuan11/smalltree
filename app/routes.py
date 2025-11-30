@@ -4538,6 +4538,8 @@ def export_food_safety_process(week_number):
                 ws3.title = sheet_title
             else:
                 ws3 = wb3.create_sheet(title=sheet_title)
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Header chính tương tự các bước trước
             ws3['A1'] = "TÊN CƠ SỞ: MNĐL Cây Nhỏ"
             ws3['A1'].font = Font(bold=True, size=12)
@@ -4754,6 +4756,8 @@ def export_food_safety_process(week_number):
                 ws4.title = sheet_title
             else:
                 ws4 = wb4.create_sheet(title=sheet_title)
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Header chính tương tự ws3
             ws4['A1'] = "TÊN CƠ SỞ: MNĐL Cây Nhỏ"
             ws4['A1'].font = Font(bold=True, size=12)
@@ -4931,6 +4935,8 @@ def export_food_safety_process(week_number):
                 ws5.title = sheet_title
             else:
                 ws5 = wb5.create_sheet(title=sheet_title)
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Header chính tương tự ws3
             ws5['A1'] = "TÊN CƠ SỞ: MNĐL Cây Nhỏ"
             ws5['A1'].font = Font(bold=True, size=12)
