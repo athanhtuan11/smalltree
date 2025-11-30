@@ -5124,6 +5124,8 @@ def export_food_safety_process(week_number):
                 ws6.title = sheet_title
             else:
                 ws6 = wb6.create_sheet(title=sheet_title)
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Header chính tương tự ws6
             
             ws6['D2'] = "PHIẾU TIẾP NHẬN VÀ KIỂM TRA CHẤT LƯỢNG THỰC PHẨM"
