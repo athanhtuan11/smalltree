@@ -5202,7 +5202,7 @@ def export_food_safety_process(week_number):
 
             for (name, unit, category, supplier), info in daily_ingredients.items():
                 # Quy đổi đơn vị nếu cần để hiển thị
-                qty = info['total_qty']
+                qty = info['total_qty']  # Số lượng tính bằng đơn vị gốc (gram/ml từ món ăn)
                 display_unit = unit
                 if unit and unit.lower() in ['g', 'gram', 'gr']:
                     display_unit = 'kg'
@@ -5213,11 +5213,20 @@ def export_food_safety_process(week_number):
                 else:
                     display_qty = round(qty, 2)
 
-                # Tính giá tiền: giá sản phẩm * số lượng dự kiến mua
+                # Tính giá tiền: product.price tương ứng với product.unit
+                # Nếu product.unit là kg/lít → dùng display_qty (đã quy đổi)
+                # Nếu product.unit là gram/ml → dùng qty (chưa quy đổi)
                 product = info['product']  # Product object
                 total_price = 0
                 if product and product.price:
-                    total_price = round(product.price * display_qty, 0)  # Làm tròn VNĐ
+                    product_unit_lower = (product.unit or '').lower()
+                    # Kiểm tra xem product.unit là đơn vị lớn (kg/lít) hay nhỏ (gram/ml)
+                    if product_unit_lower in ['kg', 'kilogram', 'lít', 'lit', 'liter', 'l']:
+                        # product.price là giá/kg hoặc giá/lít → dùng display_qty
+                        total_price = round(product.price * display_qty, 0)
+                    else:
+                        # product.price là giá/gram hoặc giá/ml → dùng qty
+                        total_price = round(product.price * qty, 0)
                     price_display = f"{total_price:,.0f} đ"
                     daily_total_cost += total_price  # Cộng vào tổng chi phí
                 else:
