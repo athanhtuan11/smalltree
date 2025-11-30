@@ -26,7 +26,7 @@ def create_app():
     load_dotenv()
 
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key')
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'your-secret-key'
     
     # Configure custom JSON encoder to handle SQLAlchemy objects
     app.json_encoder = CustomJSONEncoder
@@ -70,12 +70,12 @@ def create_app():
     db.init_app(app)
     migrate = Migrate(app, db)
 
-    # Enable CSRF Protection 
+    # Enable CSRF Protection with proper configuration
+    # CSRF Protection - tạm thời tắt trong development do lỗi session initialization
     csrf = CSRFProtect(app)
     
     # Note: AI endpoints sẽ cần sử dụng CSRF token hoặc được handle riêng
     
-    # Inject csrf_token cho templates
     @app.context_processor
     def inject_csrf_token():
         from flask_wtf.csrf import generate_csrf

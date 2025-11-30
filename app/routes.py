@@ -1358,6 +1358,16 @@ def invoice():
         today = datetime.today()
         year, m = today.year, today.month
         month = f"{year:04d}-{m:02d}"
+    
+    # Tính tháng học phí (tháng tiếp theo)
+    next_m = m + 1
+    next_year = year
+    if next_m > 12:
+        next_m = 1
+        next_year += 1
+    next_month = f"{next_year:04d}-{next_m:02d}"
+    next_month_num = f"{next_m:02d}"
+    
     num_days = monthrange(year, m)[1]
     days_in_month = [f"{year:04d}-{m:02d}-{day:02d}" for day in range(1, num_days+1)]
     students = Child.query.filter_by(is_active=True).all()
@@ -1491,8 +1501,14 @@ def invoice():
                             para.alignment = 1
                         # Loại bỏ paragraph trống để tiết kiệm không gian
                         # Format title with proper month and year display
-                        month_year, month_num = month.split('-')
-                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {month_num} NĂM {month_year}', 0)
+                        # Tính tháng học phí (tháng tiếp theo)
+                        current_year, current_month = map(int, month.split('-'))
+                        fee_month = current_month + 1
+                        fee_year = current_year
+                        if fee_month > 12:
+                            fee_month = 1
+                            fee_year += 1
+                        title = doc.add_heading(f'THÔNG BÁO HỌC PHÍ THÁNG {fee_month:02d} NĂM {fee_year}', 0)
                         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
                         run = title.runs[0]
                         run.font.size = Pt(12)  # Giảm từ 14 xuống 12 cho A5
@@ -1731,7 +1747,7 @@ def invoice():
                     invoices.append(f"Học sinh {student.name}: Có mặt {days_present} ngày, vắng không phép {days_absent_unexcused} ngày, vắng có phép {days_absent_excused} ngày. Tiền ăn: {meal_cost:,}đ + Học phí: {tuition:,}đ{extra_text} = Tổng: {total:,}đ")
     mobile = is_mobile()
     student_ages = {student.id: calculate_age(student.birth_date) if student.birth_date else 0 for student in students}
-    return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, absent_excused_days=absent_excused_days, services_dict=services_dict, selected_month=month, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
+    return render_template('invoice.html', students=students, attendance_days=attendance_days, absent_unexcused_days=absent_unexcused_days, absent_excused_days=absent_excused_days, services_dict=services_dict, selected_month=month, next_month=next_month, next_month_num=next_month_num, invoices=invoices, days_in_month=days_in_month, records={ (r.child_id, r.date): r for r in records_raw }, student_ages=student_ages, title='Xuất hóa đơn', mobile=mobile)
 
 
 @main.route('/login', methods=['GET', 'POST'])
@@ -3905,10 +3921,32 @@ def export_food_safety_process(week_number):
             'established_date': getattr(supplier, 'established_date', 'Chưa cập nhật')
         }
     
-    # Ước tính số học sinh từ config
-    def get_student_count():
-        return Child.query.count()
-    student_count = get_student_count()
+    # Tính số học sinh có mặt theo từng ngày trong tuần
+    def get_daily_attendance_for_week(week_number):
+        """Trả về dict số học sinh có mặt mỗi ngày trong tuần"""
+        from datetime import date
+        year = datetime.now().year
+        week_start = date.fromisocalendar(year, int(week_number), 1)
+        week_dates = [week_start + timedelta(days=i) for i in range(6)]  # Thứ 2 đến Thứ 7
+        
+        daily_attendance = {}
+        days_vn = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+        
+        for i, day in enumerate(week_dates):
+            day_str = day.strftime('%Y-%m-%d')
+            # Đếm số học sinh CÓ MẶT trong ngày này
+            count = AttendanceRecord.query.filter(
+                AttendanceRecord.date == day_str,
+                AttendanceRecord.status == 'Có mặt'
+            ).count()
+            # Nếu không có dữ liệu điểm danh, dùng tổng số học sinh active
+            if count == 0:
+                count = Child.query.filter_by(is_active=True).count()
+            daily_attendance[days_vn[i]] = count
+        
+        return daily_attendance
+    
+    daily_attendance = get_daily_attendance_for_week(week_number)
     
     
 
@@ -3940,34 +3978,49 @@ def export_food_safety_process(week_number):
     # Refactor: Aggregate all ingredients from the actual weekly menu using real dish/ingredient data
     from collections import defaultdict
     ingredient_totals = defaultdict(lambda: {'total_qty': 0, 'unit': '', 'category': '', 'supplier': None, 'product': None, 'usage_frequency': 0})
-    dish_appearance_count = defaultdict(int)
+    dish_by_day = defaultdict(list)  # Lưu món ăn theo từng ngày
     dishes = set()
 
-    # 1. Count how many times each dish appears in the week
-    for day_data in menu_data.values():
-        for slot_dish in day_data.values():
-            if slot_dish:
-                # Support both single dish and comma-separated dishes
-                for dish_name in [d.strip() for d in slot_dish.split(',') if d.strip()]:
-                    dish_appearance_count[dish_name] += 1
-                    dishes.add(dish_name)
+    # 1. Lưu món ăn theo từng ngày để tính nguyên liệu theo số học sinh có mặt mỗi ngày
+    days_order = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    for day in days_order:
+        if day in menu_data:
+            day_data = menu_data[day]
+            for slot_dish in day_data.values():
+                if slot_dish:
+                    # Support both single dish and comma-separated dishes
+                    for dish_name in [d.strip() for d in slot_dish.split(',') if d.strip()]:
+                        dish_by_day[day].append(dish_name)
+                        dishes.add(dish_name)
 
-    # 2. For each dish, get its ingredients and sum up total needed for the week
-    for dish_name, appearances in dish_appearance_count.items():
-        dish = Dish.query.filter_by(name=dish_name).first()
-        if not dish:
+    # 2. Tính nguyên liệu cho từng ngày với số học sinh có mặt của ngày đó
+    for day, dish_list in dish_by_day.items():
+        students_today = daily_attendance.get(day, 0)
+        if students_today == 0:
             continue
-        for di in dish.ingredients:
-            product = di.product
-            if not product:
-                continue
-            key = (di.product.name, di.unit, di.product.category, di.product.supplier)
-            # Fix: multiply by appearances to account for how many times dish is served in the week
-            qty = di.quantity * student_count * appearances
             
-            if key not in ingredient_totals:
-                ingredient_totals[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
-            ingredient_totals[key]['total_qty'] += qty
+        # Đếm số lần mỗi món xuất hiện trong ngày này
+        dish_count_today = defaultdict(int)
+        for dish_name in dish_list:
+            dish_count_today[dish_name] += 1
+        
+        # Tính nguyên liệu cho ngày này
+        for dish_name, count_in_day in dish_count_today.items():
+            dish = Dish.query.filter_by(name=dish_name).first()
+            if not dish:
+                continue
+            for di in dish.ingredients:
+                product = di.product
+                if not product:
+                    continue
+                key = (di.product.name, di.unit, di.product.category, di.product.supplier)
+                # Tính: (lượng/học sinh) × (số học sinh có mặt hôm nay) × (số lần món xuất hiện trong ngày)
+                qty = di.quantity * students_today * count_in_day
+                
+                if key not in ingredient_totals:
+                    ingredient_totals[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product, 'usage_frequency': 0}
+                ingredient_totals[key]['total_qty'] += qty
+                ingredient_totals[key]['usage_frequency'] += 1
     
     # 3. Split into fresh, dry, fruit by category
     fresh_ingredients_with_qty = []
@@ -3975,16 +4028,27 @@ def export_food_safety_process(week_number):
     fruit_ingredients_with_qty = []
     
     def convert_to_kg(quantity, unit):
-        """Convert quantity to kg based on unit"""
-        unit = unit.lower()
-        if 'kg' in unit:
-            return quantity
-        elif 'g' in unit or 'gram' in unit:
+        """
+        Convert quantity to kg/lít based on unit
+        - Món ăn thường lưu theo gram/ml cho 1 học sinh
+        - Phiếu tiếp nhận cần kg/lít
+        - Nếu đơn vị là gram/ml → chia 1000
+        - Nếu đơn vị đã là kg/lít → giữ nguyên
+        """
+        unit = unit.lower().strip()
+        
+        # Đơn vị nhỏ (gram, ml) → chuyển sang kg/lít
+        if 'gram' in unit or unit == 'g' or 'gr' in unit:
             return quantity / 1000
-        elif 'lít' in unit or 'l' in unit:
-            return quantity  # Assume 1 liter = 1 kg for liquids
+        elif 'ml' in unit or 'milliliter' in unit:
+            return quantity / 1000
+        # Đơn vị lớn (kg, lít) → giữ nguyên
+        elif 'kg' in unit or 'kilogram' in unit:
+            return quantity
+        elif 'lít' in unit or 'liter' in unit or unit == 'l':
+            return quantity
+        # Đơn vị khác (gói, hộp, quả, củ...) → giữ nguyên
         else:
-            # For other units like 'gói', 'hộp', etc., return as is
             return quantity
     
     for name, info in ingredient_totals.items():
@@ -4047,6 +4111,8 @@ def export_food_safety_process(week_number):
                 ws1 = wb1.create_sheet(title=sheet_title)
             # Lấy menu ngày
             menu_today = menu_data.get(day_key, {})
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Tính nguyên liệu thực tế cho ngày này
             daily_ingredients = {}
             for meal in menu_today.values():
@@ -4056,7 +4122,7 @@ def export_food_safety_process(week_number):
                     if dish:
                         for di in dish.ingredients:
                             key = (di.product.name, di.unit, di.product.category, di.product.supplier)
-                            qty = di.quantity * student_count
+                            qty = di.quantity * students_today
                             if key not in daily_ingredients:
                                 daily_ingredients[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
                             daily_ingredients[key]['total_qty'] += qty
@@ -4098,7 +4164,7 @@ def export_food_safety_process(week_number):
             ws1['O2'].fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
             info_data = [
                 (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'O', "Mẫu số 1.1"),
-                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'O', f"Số học sinh: {student_count}"),
+                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'O', f"Số học sinh: {students_today}"),
                 (5, 'A', "Địa điểm: Bếp ăn Trường MNĐL Cây Nhỏ", 'O', "Phiên bản: v2.0")
             ]
             for row, col_a, text_a, col_o, text_o in info_data:
@@ -4199,8 +4265,8 @@ def export_food_safety_process(week_number):
             stats_info = [
                 f"• Tổng số loại thực phẩm tươi: {total_items} loại",
                 f"• Tổng khối lượng ước tính: {total_weight:.1f} kg",
-                f"• Số học sinh phục vụ: {student_count} em",
-                f"• Khối lượng trung bình/học sinh: {(total_weight/student_count):.2f} kg/em/ngày" if student_count else "• Khối lượng trung bình/học sinh: N/A"
+                f"• Số học sinh phục vụ: {students_today} em",
+                f"• Khối lượng trung bình/học sinh: {(total_weight/students_today):.2f} kg/em/ngày" if students_today else "• Khối lượng trung bình/học sinh: N/A"
             ]
             for i, stat in enumerate(stats_info, 1):
                 ws1[f'A{stats_row + i}'] = stat
@@ -4265,6 +4331,8 @@ def export_food_safety_process(week_number):
                 ws2 = wb2.create_sheet(title=sheet_title)
             # Lấy menu ngày
             menu_today = menu_data.get(day_key, {})
+            # Lấy số học sinh có mặt ngày này
+            students_today = daily_attendance.get(day_key, 0)
             # Tính nguyên liệu thực tế cho ngày này
             daily_ingredients = {}
             for meal in menu_today.values():
@@ -4274,7 +4342,7 @@ def export_food_safety_process(week_number):
                     if dish:
                         for di in dish.ingredients:
                             key = (di.product.name, di.unit, di.product.category, di.product.supplier)
-                            qty = di.quantity * student_count
+                            qty = di.quantity * students_today
                             if key not in daily_ingredients:
                                 daily_ingredients[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
                             daily_ingredients[key]['total_qty'] += qty
@@ -4311,7 +4379,7 @@ def export_food_safety_process(week_number):
             ws2['N2'].fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
             info_data2 = [
                 (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'N', "Mẫu số 1.2"),
-                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'N', f"Số học sinh: {student_count}"),
+                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'N', f"Số học sinh: {students_today}"),
                 (5, 'A', "Địa điểm: Kho thực phẩm khô - MNĐL Cây Nhỏ", 'N', "")
             ]
             for row, col_a, text_a, col_n, text_n in info_data2:
@@ -4410,8 +4478,8 @@ def export_food_safety_process(week_number):
             stats_info2 = [
                 f"• Tổng số loại thực phẩm khô: {total_items2} loại",
                 f"• Tổng khối lượng ước tính: {total_weight2:.1f} kg",
-                f"• Số học sinh phục vụ: {student_count} em",
-                f"• Khối lượng trung bình/học sinh: {(total_weight2/student_count):.2f} kg/em/ngày" if student_count else "• Khối lượng trung bình/học sinh: N/A"
+                f"• Số học sinh phục vụ: {students_today} em",
+                f"• Khối lượng trung bình/học sinh: {(total_weight2/students_today):.2f} kg/em/ngày" if students_today else "• Khối lượng trung bình/học sinh: N/A"
             ]
             for i, stat in enumerate(stats_info2, 1):
                 ws2[f'A{stats_row2 + i}'] = stat
@@ -4484,7 +4552,7 @@ def export_food_safety_process(week_number):
             ws3['M2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data3 = [
                 (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'M', "Mẫu số 2.0"),
-                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'M', f"Số học sinh: {student_count}"),
+                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'M', f"Số học sinh: {students_today}"),
                 (5, 'A', "Địa điểm: Bếp chế biến - MNĐL Cây Nhỏ", 'M', "")
             ]
             for row, col_a, text_a, col_m, text_m in info_data3:
@@ -4586,7 +4654,7 @@ def export_food_safety_process(week_number):
                     meal_name,  # CA/BỮA ĂN chỉ tên bữa
                     dish_names,  # TÊN MÓN ĂN (danh sách món)
                     main_ingredients,  # NGUYÊN LIỆU CHÍNH (toàn bộ nguyên liệu các món)
-                    student_count,  # SỐ SUẤT (phần)
+                    students_today,  # SỐ SUẤT (phần)
                     so_che_str,  # THỜI GIAN SƠ CHẾ XONG (ngày, giờ)
                     che_bien_str,  # THỜI GIAN CHẾ BIẾN XONG (ngày, giờ)
                     "Trang phục gọn gàng, vệ sinh cá nhân sạch sẽ",  # Người tham gia chế biến
@@ -4614,7 +4682,7 @@ def export_food_safety_process(week_number):
             ws3[f'A{stats_row3}'].font = Font(bold=True, size=11, color="006600")
             ws3[f'A{stats_row3}'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
             total_servings = stt - 1
-            total_portions = total_servings * student_count
+            total_portions = total_servings * students_today
             stats_info3 = [
                 f"• Tổng số lần phục vụ: {total_servings} lần",
                 f"• Tổng số suất ăn phục vụ: {total_portions} suất",
@@ -4700,7 +4768,7 @@ def export_food_safety_process(week_number):
             ws4['J2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data4 = [
                 (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'J', "Mẫu số 3.0"),
-                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'J', f"Số học sinh: {student_count}"),
+                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'J', f"Số học sinh: {students_today}"),
                 (5, 'A', "Địa điểm: Phòng ăn - MNĐL Cây Nhỏ", 'J', "")
             ]
             for row, col_a, text_a, col_m, text_m in info_data4:
@@ -4770,7 +4838,7 @@ def export_food_safety_process(week_number):
                     stt,  # STT
                     meal_name,  # CA/BỮA ĂN
                     dish_names,  # TÊN MÓN ĂN
-                    student_count,  # SỐ SUẤT
+                    students_today,  # SỐ SUẤT
                     chia_xong_str,  # THỜI GIAN CHIA MÓN ĂN XONG
                     bat_dau_an_str,  # THỜI GIAN BẮT ĐẦU ĂN
                     "Đảm bảo vệ sinh",  # DỤNG CỤ CHIA, CHỨA ĐỰNG
@@ -4796,7 +4864,7 @@ def export_food_safety_process(week_number):
             ws4[f'A{stats_row4}'].font = Font(bold=True, size=11, color="006600")
             ws4[f'A{stats_row4}'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
             total_servings = stt - 1
-            total_portions = total_servings * student_count
+            total_portions = total_servings * students_today
             stats_info4 = [
                 f"• Tổng số lần phục vụ: {total_servings} lần",
                 f"• Tổng số suất ăn phục vụ: {total_portions} suất",
@@ -4877,7 +4945,7 @@ def export_food_safety_process(week_number):
             ws5['J2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data4 = [
                 (3, 'A', f"Người kiểm tra: Nguyễn Thị Vân", 'J', "Mẫu số 5"),
-                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'J', f"Số học sinh: {student_count}"),
+                (4, 'A', f"Ngày kiểm tra: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}", 'J', f"Số học sinh: {students_today}"),
                 (5, 'A', "Địa điểm: Phòng ăn - MNĐL Cây Nhỏ", 'F', f"Ngày tiếp phẩm: {day_date.strftime('%d/%m/%Y')} - {days_vn[day_offset]}")
             ]
             for row, col_a, text_a, col_m, text_m in info_data4:
@@ -4955,7 +5023,7 @@ def export_food_safety_process(week_number):
                     stt,  # STT
                     meal_name,  # CA/BỮA ĂN
                     dish_names,  # TÊN MẪU THỨC ĂN
-                    student_count,  # SỐ SUẤT ĂN
+                    students_today,  # SỐ SUẤT ĂN
                     150,  # KHỐI LƯỢNG/THỂ TÍCH MẪU
                     "Hộp Inox chuyên dụng",  # DỤNG CỤ CHỨA MẪU
                     "2-4°C",  # NHIỆT ĐỘ BẢO QUẢN
@@ -4983,7 +5051,7 @@ def export_food_safety_process(week_number):
             ws5[f'A{stats_row5}'].font = Font(bold=True, size=11, color="006600")
             ws5[f'A{stats_row5}'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
             total_servings = stt - 1
-            total_portions = total_servings * student_count
+            total_portions = total_servings * students_today
             stats_info5 = [
                 f"• Tổng số lần phục vụ: {total_servings} lần",
                 f"• Tổng số suất ăn phục vụ: {total_portions} suất",
@@ -5062,7 +5130,7 @@ def export_food_safety_process(week_number):
             info_data4 = [
                 (1, 'A', f"Phòng GD&ĐT: XÃ ĐỨC TRỌNG", 'J', ""),
                 (2, 'A', f"Đơn vị: MẦM NON CÂY NHỎ", 'J', ""),
-                (3, 'A', f"Số suất: {student_count}", 'F', "")
+                (3, 'A', f"Số suất: {students_today}", 'F', "")
             ]
             for row, col_a, text_a, col_m, text_m in info_data4:
                 ws6[f'{col_a}{row}'] = text_a
@@ -5070,27 +5138,11 @@ def export_food_safety_process(week_number):
                 ws6[f'{col_m}{row}'] = text_m
                 ws6[f'{col_m}{row}'].font = Font(bold=True, size=10)
                 ws6[f'{col_m}{row}'].fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
-            # Dòng thông tin bữa ăn - Món ăn
-            meal_dish_lines = []
-            for meal_key, meal_name in meal_times.items():
-                dishes = []
-                if menu_data[day_key].get(meal_key):
-                    dishes = [d.strip() for d in menu_data[day_key][meal_key].split(',') if d.strip()]
-                if dishes:
-                    meal_dish_lines.append(f"{meal_name}: {', '.join(dishes)}")
-                else:
-                    meal_dish_lines.append(f"{meal_name}: (không có món)")
-            ws6['A5'] = " | ".join(meal_dish_lines)
-            ws6['A5'].font = Font(bold=True, size=10, color="006600")
-            ws6['A5'].fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
-            ws6.merge_cells('A5:G5')
-            ws6.row_dimensions[5].height = 48
-            ws6['A5'].alignment = Alignment(wrap_text=True, vertical='center', horizontal='left')
             # Thêm dòng tiêu đề lớn phía trên bảng
-            ws6['A7'] = "I. Tiếp nhận, kiểm tra chất lượng thực phẩm và chế biến"
-            ws6['A7'].font = Font(bold=True, size=12, color="8B0000")
-            ws6['A7'].fill = PatternFill(start_color="FFF2E6", end_color="FFF2E6", fill_type="solid")
-            ws6.merge_cells('A7:G7')
+            ws6['A5'] = "I. Tiếp nhận, kiểm tra chất lượng thực phẩm và chế biến"
+            ws6['A5'].font = Font(bold=True, size=12, color="8B0000")
+            ws6['A5'].fill = PatternFill(start_color="FFF2E6", end_color="FFF2E6", fill_type="solid")
+            ws6.merge_cells('A5:G5')
 
             headers6_main = [
                 'STT', 'TÊN THỰC PHẨM',
@@ -5099,7 +5151,7 @@ def export_food_safety_process(week_number):
                 'NHẬN XÉT'
             ]
             for i, header in enumerate(headers6_main, 1):
-                cell = ws6.cell(row=8, column=i, value=header)
+                cell = ws6.cell(row=6, column=i, value=header)
                 cell.font = Font(bold=True, size=9, color="FFFFFF")
                 cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
                 cell.fill = PatternFill(start_color="8B0000", end_color="8B0000", fill_type="solid")
@@ -5109,7 +5161,7 @@ def export_food_safety_process(week_number):
                 '', '', '', ''
             ]
             for i, header in enumerate(sub_headers6, 1):
-                cell = ws6.cell(row=9, column=i, value=header)
+                cell = ws6.cell(row=7, column=i, value=header)
                 cell.font = Font(bold=True, size=8)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.fill = PatternFill(start_color="CD5C5C", end_color="CD5C5C", fill_type="solid")
@@ -5121,17 +5173,17 @@ def export_food_safety_process(week_number):
             ws6.column_dimensions['F'].width = 15
             ws6.column_dimensions['G'].width = 20
             for col in ['B', 'C', 'D', 'E', 'F', 'G']:
-                cell = ws6[f'{col}8']
+                cell = ws6[f'{col}6']
                 cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            # ws6.merge_cells('H8:I8')
+            # ws6.merge_cells('H6:I6')
             for i in range(1, 8):   
-                cell = ws6.cell(row=10, column=i, value=i)
+                cell = ws6.cell(row=8, column=i, value=i)
                 cell.font = Font(bold=True, size=8)
                 cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.fill = PatternFill(start_color="F0F8FF", end_color="F0F8FF", fill_type="solid")
                 cell.border = thin_border
             # Ghi dữ liệu món ăn từng ngày
-            row_num = 11
+            row_num = 9
             stt = 1
             daily_total_cost = 0  # Tổng chi phí trong ngày
             # Tổng hợp nguyên liệu trong ngày (chỉ 1 lần cho ngày hiện tại)
@@ -5143,7 +5195,7 @@ def export_food_safety_process(week_number):
                     if dish:
                         for di in dish.ingredients:
                             key = (di.product.name, di.unit, di.product.category, di.product.supplier)
-                            qty = di.quantity * student_count
+                            qty = di.quantity * students_today
                             if key not in daily_ingredients:
                                 daily_ingredients[key] = {'total_qty': 0, 'unit': di.unit, 'category': di.product.category, 'supplier': di.product.supplier, 'product': di.product}
                             daily_ingredients[key]['total_qty'] += qty
