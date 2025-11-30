@@ -7,9 +7,18 @@
     .dish-item { margin-bottom: 5px; padding: 2px; border-radius: 3px; }
     .dish-item:hover { background-color: #f8f9fa; }
     .meal-section { max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    .menu-cell-btn { 
+        min-height: 50px; 
+        white-space: normal; 
+        text-align: left; 
+        padding: 8px 12px;
+        line-height: 1.3;
+        font-size: 0.9em;
+    }
     @media (max-width: 576px) {
         .menu-textarea { min-width:100px; font-size:0.98em; padding:0.35em 0.5em; }
         .meal-section { max-height: 200px; }
+        .menu-cell-btn { font-size: 0.85em; padding: 6px 8px; }
     }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
@@ -167,9 +176,13 @@ function updateAllButtons() {
             const selected = selectedDishes[day][meal];
             
             if (selected.length > 0) {
-                button.textContent = `${selected.length} món`;
+                // Hiển thị tên món, ngắn gọn nếu quá dài
+                const dishNames = selected.map(d => d.name).join(', ');
+                button.textContent = dishNames.length > 30 ? dishNames.substring(0, 30) + '...' : dishNames;
                 button.classList.remove('btn-outline-success');
                 button.classList.add('btn-success');
+                button.style.whiteSpace = 'normal';
+                button.style.textAlign = 'left';
             } else {
                 button.textContent = 'Chọn món';
                 button.classList.remove('btn-success');
@@ -260,9 +273,13 @@ function saveDishSelection() {
     // Update button text
     const button = document.querySelector(`[data-day="${currentDay}"][data-meal="${currentMeal}"]`);
     if (selected.length > 0) {
-        button.textContent = `${selected.length} món`;
+        // Hiển thị tên món, ngắn gọn nếu quá dài
+        const dishNames = selected.map(d => d.name).join(', ');
+        button.textContent = dishNames.length > 30 ? dishNames.substring(0, 30) + '...' : dishNames;
         button.classList.remove('btn-outline-success');
         button.classList.add('btn-success');
+        button.style.whiteSpace = 'normal';
+        button.style.textAlign = 'left';
     } else {
         button.textContent = 'Chọn món';
         button.classList.remove('btn-success');

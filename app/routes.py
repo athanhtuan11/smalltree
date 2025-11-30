@@ -470,10 +470,17 @@ def delete_dish(dish_id):
         return redirect_no_permission()
     dish = Dish.query.get_or_404(dish_id)
     dish_name = dish.name
-    db.session.delete(dish)
-    db.session.commit()
-    log_activity('delete', 'dish', dish_id, f'Xóa món ăn: {dish_name}')
-    flash('Đã xóa món ăn!', 'success')
+    
+    try:
+        # Xóa món ăn (cascade sẽ tự động xóa DishIngredient)
+        db.session.delete(dish)
+        db.session.commit()
+        log_activity('delete', 'dish', dish_id, f'Xóa món ăn: {dish_name}')
+        flash(f'Đã xóa món ăn "{dish_name}"! Lưu ý: Món này có thể vẫn còn trong thực đơn cũ, vui lòng kiểm tra và cập nhật lại thực đơn.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Không thể xóa món ăn: {str(e)}', 'danger')
+        
     return redirect(url_for('main.dish_list'))
 # ================== TẠO MÓN ĂN ==================
 @main.route('/dish/new', methods=['GET', 'POST'])
