@@ -2483,7 +2483,7 @@ def export_students():
         ws.title = "Danh sách học sinh"
         
         # Tạo header
-        headers = ['STT', 'Họ và tên', 'Lớp', 'Mã học sinh', 'Ngày sinh', 'Liên hệ phụ huynh']
+        headers = ['STT', 'Họ và tên', 'Mã học sinh', 'Ngày sinh', 'Cân nặng (kg)', 'Chiều cao (cm)', 'BMI', 'Đánh giá']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True, color="FFFFFF")
@@ -2502,13 +2502,34 @@ def export_students():
         
         # Thêm dữ liệu học sinh
         for row, student in enumerate(students, 2):
+            # Lấy thông tin BMI mới nhất
+            latest_bmi = BmiRecord.query.filter_by(student_id=student.id).order_by(BmiRecord.date.desc()).first()
+            
+            weight = latest_bmi.weight if latest_bmi else ''
+            height = latest_bmi.height if latest_bmi else ''
+            bmi = round(latest_bmi.bmi, 2) if latest_bmi else ''
+            
+            # Tính đánh giá BMI
+            assessment = ''
+            if latest_bmi and latest_bmi.bmi:
+                if latest_bmi.bmi < 18.5:
+                    assessment = 'Gầy'
+                elif latest_bmi.bmi < 25:
+                    assessment = 'Bình thường'
+                elif latest_bmi.bmi < 30:
+                    assessment = 'Thừa cân'
+                else:
+                    assessment = 'Béo phì'
+            
             data = [
                 row - 1,  # STT
                 student.name,
-                student.class_name or '',
                 student.student_code or '',
                 student.birth_date or '',
-                student.parent_contact or ''
+                weight,
+                height,
+                bmi,
+                assessment
             ]
             
             for col, value in enumerate(data, 1):
