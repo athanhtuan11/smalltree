@@ -1116,9 +1116,9 @@ def curriculum():
         # Chỉ admin/teacher mới được chọn class_id qua URL
         class_id = request.args.get('class_id', type=int)
     if class_id:
-        weeks = Curriculum.query.filter_by(class_id=class_id).order_by(Curriculum.week_number).all()
+        weeks = Curriculum.query.filter_by(class_id=class_id).order_by(Curriculum.week_number.desc()).all()
     else:
-        weeks = Curriculum.query.order_by(Curriculum.week_number).all()
+        weeks = Curriculum.query.order_by(Curriculum.week_number.desc()).all()
     curriculum = []
     for week in weeks:
         try:
@@ -3100,7 +3100,7 @@ def delete_bmi_record(record_id):
 @main.route('/menu')
 def menu():
     # Chỉ sử dụng Menu model cho thực đơn
-    menus = Menu.query.order_by(Menu.week_number).all()
+    menus = Menu.query.order_by(Menu.week_number.desc()).all()
     menu = []
     
     for menu_item in menus:
