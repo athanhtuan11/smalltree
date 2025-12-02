@@ -52,14 +52,15 @@
                             <div class="fw-bold text-primary">{{ latest_bmi if latest_bmi else '-' }}</div>
                             {% if latest_bmi is not none %}
                             <div class="mt-1">
-                                {% if latest_bmi < 5 %}
-                                <span class="badge bg-warning text-dark">Thiếu cân: &lt;5</span>
-                                {% elif latest_bmi < 85 %}
-                                <span class="badge bg-success">Bình thường: 5 – 85</span>
-                                {% elif latest_bmi < 95 %}
-                                <span class="badge bg-orange text-white" style="background-color:#ff9800;">Thừa cân: 85 – 95</span>
+                                {% set assessment = student|assess_bmi(latest_bmi) %}
+                                {% if 'Thiếu cân' in assessment %}
+                                <span class="badge bg-warning text-dark">{{ assessment }}</span>
+                                {% elif 'Bình thường' in assessment %}
+                                <span class="badge bg-success">{{ assessment }}</span>
+                                {% elif 'Thừa cân' in assessment %}
+                                <span class="badge bg-orange text-white" style="background-color:#ff9800;">{{ assessment }}</span>
                                 {% else %}
-                                <span class="badge bg-danger">Béo phì: &gt;95</span>
+                                <span class="badge bg-danger">{{ assessment }}</span>
                                 {% endif %}
                             </div>
                             {% endif %}
@@ -92,12 +93,7 @@
                                         <td>{{ record.height }}</td>
                                         <td>{{ record.bmi }}</td>
                                         <td>
-                                            {# Demo: Giả lập phân loại theo phần trăm, thực tế cần dữ liệu percentile #}
-                                            {% if record.bmi < 5 %}Thiếu cân: &lt;5
-                                            {% elif record.bmi < 85 %}Bình thường hoặc khỏe mạnh: 5 – 85
-                                            {% elif record.bmi < 95 %}Thừa cân (Nguy cơ béo phì): 85 – 95
-                                            {% else %}Béo phì: &gt;95
-                                            {% endif %}
+                                            {{ student|assess_bmi(record.bmi) }}
                                         </td>
                                         <td>
                                             <form method="POST" action="/bmi-record/{{ record.id }}/delete" style="display:inline-block;">

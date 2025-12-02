@@ -93,6 +93,31 @@ def create_app():
             return filepath
         # Nếu là đường dẫn local, thêm /static/
         return url_for('static', filename=filepath)
+    
+    # Jinja filter để đánh giá BMI cho trẻ em
+    @app.template_filter('assess_bmi')
+    def assess_bmi_filter(student, bmi_value):
+        """Đánh giá BMI theo tuổi của trẻ (dùng trong template)"""
+        from app.routes import assess_child_bmi
+        from datetime import datetime
+        
+        if not student or not hasattr(student, 'birth_date') or not student.birth_date or not bmi_value:
+            return 'Chưa có đủ thông tin'
+        
+        try:
+            # Convert birth_date từ string hoặc date object sang datetime
+            if isinstance(student.birth_date, str):
+                birth_date_obj = datetime.strptime(student.birth_date, '%Y-%m-%d')
+            else:
+                birth_date_obj = student.birth_date
+            
+            # Tính age_months
+            age_months = (datetime.now() - birth_date_obj).days // 30
+            gender = getattr(student, 'gender', 'unknown')
+            return assess_child_bmi(bmi_value, age_months, gender)
+        except Exception as e:
+            print(f"[ERROR] Lỗi assess_bmi filter: {e}")
+            return 'Chưa có đủ thông tin'
 
     from app.routes import main
     app.register_blueprint(main)

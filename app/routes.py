@@ -34,6 +34,35 @@ except ImportError:
 
 main = Blueprint('main', __name__)
 
+def assess_child_bmi(bmi, age_months, gender='unknown'):
+    """
+    Đánh giá BMI cho trẻ em theo percentile đơn giản hóa
+    Trả về: "Thiếu cân: <5%", "Bình thường: 5-85%", "Thừa cân: 85-95%", "Béo phì: >95%"
+    """
+    if age_months < 0 or bmi is None:
+        return 'Chưa có đủ thông tin'
+    
+    # Ngưỡng BMI đơn giản theo tuổi (xấp xỉ percentile 5%, 85%, 95%)
+    if age_months < 24:  # 0-2 tuổi
+        p5, p85, p95 = 13.5, 17.5, 18.5
+    elif age_months < 36:  # 2-3 tuổi  
+        p5, p85, p95 = 13.5, 17.0, 18.0
+    elif age_months < 48:  # 3-4 tuổi
+        p5, p85, p95 = 13.5, 16.5, 17.5
+    elif age_months < 60:  # 4-5 tuổi
+        p5, p85, p95 = 14.0, 16.5, 17.5
+    else:  # > 5 tuổi
+        p5, p85, p95 = 14.0, 17.0, 18.5
+    
+    if bmi < p5:
+        return 'Thiếu cân: <5%'
+    elif bmi < p85:
+        return 'Bình thường: 5-85%'
+    elif bmi < p95:
+        return 'Thừa cân: 85-95%'
+    else:
+        return 'Béo phì: >95%'
+
 def log_activity(action, resource_type=None, resource_id=None, description=None):
     """Helper function để ghi nhận hoạt động người dùng"""
     try:
@@ -2509,17 +2538,16 @@ def export_students():
             height = latest_bmi.height if latest_bmi else ''
             bmi = round(latest_bmi.bmi, 2) if latest_bmi else ''
             
-            # Tính đánh giá BMI
+            # Tính đánh giá BMI theo tuổi (percentile cho trẻ em)
             assessment = ''
-            if latest_bmi and latest_bmi.bmi:
-                if latest_bmi.bmi < 18.5:
-                    assessment = 'Gầy'
-                elif latest_bmi.bmi < 25:
-                    assessment = 'Bình thường'
-                elif latest_bmi.bmi < 30:
-                    assessment = 'Thừa cân'
-                else:
-                    assessment = 'Béo phì'
+            if latest_bmi and latest_bmi.bmi and student.birth_date:
+                try:
+                    birth_date_obj = datetime.strptime(str(student.birth_date), '%Y-%m-%d') if isinstance(student.birth_date, str) else student.birth_date
+                    age_months = (datetime.now() - birth_date_obj).days // 30
+                    assessment = assess_child_bmi(latest_bmi.bmi, age_months)
+                except Exception as e:
+                    print(f"[ERROR] Lỗi tính age_months cho {student.name}: {e}")
+                    assessment = 'Chưa có đủ thông tin'
             
             data = [
                 row - 1,  # STT
