@@ -4363,6 +4363,19 @@ def export_food_safety_process(week_number):
                         cell.font = Font(bold=True, size=11)
                     else:
                         cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws1.page_setup.orientation = ws1.ORIENTATION_LANDSCAPE
+            ws1.page_setup.paperSize = ws1.PAPERSIZE_A4
+            ws1.page_setup.fitToPage = True
+            ws1.page_setup.fitToWidth = 1
+            ws1.page_setup.fitToHeight = 0
+            ws1.print_options.horizontalCentered = True
+            ws1.page_margins.left = 0.5
+            ws1.page_margins.right = 0.5
+            ws1.page_margins.top = 0.75
+            ws1.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb1.sheetnames:
             wb1.remove(wb1['Sheet'])
         file1_buffer = BytesIO()
@@ -4574,6 +4587,19 @@ def export_food_safety_process(week_number):
                         cell.font = Font(bold=True, size=11)
                     else:
                         cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws2.page_setup.orientation = ws2.ORIENTATION_LANDSCAPE
+            ws2.page_setup.paperSize = ws2.PAPERSIZE_A4
+            ws2.page_setup.fitToPage = True
+            ws2.page_setup.fitToWidth = 1
+            ws2.page_setup.fitToHeight = 0
+            ws2.print_options.horizontalCentered = True
+            ws2.page_margins.left = 0.5
+            ws2.page_margins.right = 0.5
+            ws2.page_margins.top = 0.75
+            ws2.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb2.sheetnames:
             wb2.remove(wb2['Sheet'])
         file2_buffer = BytesIO()
@@ -4792,6 +4818,19 @@ def export_food_safety_process(week_number):
                             cell.font = Font(bold=True, size=11)
                         else:
                             cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws3.page_setup.orientation = ws3.ORIENTATION_LANDSCAPE
+            ws3.page_setup.paperSize = ws3.PAPERSIZE_A4
+            ws3.page_setup.fitToPage = True
+            ws3.page_setup.fitToWidth = 1
+            ws3.page_setup.fitToHeight = 0
+            ws3.print_options.horizontalCentered = True
+            ws3.page_margins.left = 0.5
+            ws3.page_margins.right = 0.5
+            ws3.page_margins.top = 0.75
+            ws3.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb3.sheetnames:
             wb3.remove(wb3['Sheet'])
 
@@ -4972,6 +5011,19 @@ def export_food_safety_process(week_number):
                         cell.font = Font(bold=True, size=11)
                     else:
                         cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws4.page_setup.orientation = ws4.ORIENTATION_LANDSCAPE
+            ws4.page_setup.paperSize = ws4.PAPERSIZE_A4
+            ws4.page_setup.fitToPage = True
+            ws4.page_setup.fitToWidth = 1
+            ws4.page_setup.fitToHeight = 0
+            ws4.print_options.horizontalCentered = True
+            ws4.page_margins.left = 0.5
+            ws4.page_margins.right = 0.5
+            ws4.page_margins.top = 0.75
+            ws4.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb4.sheetnames:
             wb4.remove(wb4['Sheet'])
         file4_buffer = BytesIO()
@@ -5161,6 +5213,19 @@ def export_food_safety_process(week_number):
                         cell.font = Font(bold=True, size=11)
                     else:
                         cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws5.page_setup.orientation = ws5.ORIENTATION_LANDSCAPE
+            ws5.page_setup.paperSize = ws5.PAPERSIZE_A4
+            ws5.page_setup.fitToPage = True
+            ws5.page_setup.fitToWidth = 1
+            ws5.page_setup.fitToHeight = 0
+            ws5.print_options.horizontalCentered = True
+            ws5.page_margins.left = 0.5
+            ws5.page_margins.right = 0.5
+            ws5.page_margins.top = 0.75
+            ws5.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb5.sheetnames:
             wb5.remove(wb5['Sheet'])
         file5_buffer = BytesIO()
@@ -5378,6 +5443,19 @@ def export_food_safety_process(week_number):
                         cell.font = Font(bold=True, size=11)
                     else:
                         cell.font = Font(size=9)
+            
+            # Page setup cho in A4
+            ws6.page_setup.orientation = ws6.ORIENTATION_PORTRAIT
+            ws6.page_setup.paperSize = ws6.PAPERSIZE_A4
+            ws6.page_setup.fitToPage = True
+            ws6.page_setup.fitToWidth = 1
+            ws6.page_setup.fitToHeight = 0
+            ws6.print_options.horizontalCentered = True
+            ws6.page_margins.left = 0.5
+            ws6.page_margins.right = 0.5
+            ws6.page_margins.top = 0.75
+            ws6.page_margins.bottom = 0.75
+        
         if 'Sheet' in wb6.sheetnames:
             wb6.remove(wb6['Sheet'])
         file6_buffer = BytesIO()
