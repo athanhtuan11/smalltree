@@ -5192,8 +5192,8 @@ def export_food_safety_process(week_number):
             ws6['J2'].font = Font(bold=True, size=10)
             ws6['J2'].fill = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
             info_data4 = [
-                (1, 'A', f"Phòng GD&ĐT: XÃ ĐỨC TRỌNG", 'J', ""),
-                (2, 'A', f"Đơn vị: MẦM NON CÂY NHỎ", 'J', ""),
+                (1, 'A', f"Phòng GD&ĐT: XÃ ĐỨC TRỌNG", 'J', f"Ngày: {day_date.strftime('%d/%m/%Y')}"),
+                (2, 'A', f"Đơn vị: MẦM NON CÂY NHỎ", 'J', f"Thứ: {days_vn[day_offset]}"),
                 (3, 'A', f"Số suất: {students_today}", 'F', "")
             ]
             for row, col_a, text_a, col_m, text_m in info_data4:
