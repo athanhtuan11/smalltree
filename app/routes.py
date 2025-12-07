@@ -3081,7 +3081,7 @@ def edit_bmi_record(record_id):
     if date_str and weight and height:
         record.date = date.fromisoformat(date_str)
         record.weight = float(weight)
-        record.height = request.form.get('height')
+        record.height = float(height)  # Sửa: phải convert sang float, không dùng request.form.get() trực tiếp
         record.bmi = round(float(weight) / ((float(height)/100) ** 2), 2)
         db.session.commit()
         flash('Đã cập nhật chỉ số BMI!', 'success')
