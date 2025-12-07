@@ -46,23 +46,51 @@
                             <label class="form-label mb-0" style="font-size:0.95em;">Chiều cao (cm)</label>
                             <input type="number" step="0.1" min="30" name="height" class="form-control form-control-sm" required>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label mb-0" style="font-size:0.95em;">Chỉ số BMI</label>
-                            {% set latest_bmi = (bmi_history[student.id][0].bmi if bmi_history and bmi_history[student.id]|length > 0 else None) %}
-                            <div class="fw-bold text-primary">{{ latest_bmi if latest_bmi else '-' }}</div>
-                            {% if latest_bmi is not none %}
-                            <div class="mt-1">
-                                {% set assessment = student|assess_bmi(latest_bmi) %}
-                                {% if 'Thiếu cân' in assessment %}
-                                <span class="badge bg-warning text-dark">{{ assessment }}</span>
-                                {% elif 'Bình thường' in assessment %}
-                                <span class="badge bg-success">{{ assessment }}</span>
-                                {% elif 'Thừa cân' in assessment %}
-                                <span class="badge bg-orange text-white" style="background-color:#ff9800;">{{ assessment }}</span>
-                                {% else %}
-                                <span class="badge bg-danger">{{ assessment }}</span>
-                                {% endif %}
+                        <div class="col-12">
+                            <label class="form-label mb-1 fw-bold" style="font-size:0.95em;">Đánh giá tăng trưởng (WHO)</label>
+                            {% if bmi_history and bmi_history[student.id]|length > 0 %}
+                            {% set latest_record = bmi_history[student.id][0] %}
+                            {% set growth = student|assess_growth(latest_record.weight, latest_record.height, latest_record.bmi) %}
+                            
+                            <div class="row g-2">
+                                <!-- BMI -->
+                                <div class="col-12">
+                                    <small class="text-muted">BMI: </small>
+                                    <span class="fw-bold">{{ latest_record.bmi }}</span>
+                                    {% if growth.bmi.assessment %}
+                                    <span class="badge bg-{{ growth.bmi.badge }} ms-1" style="font-size:0.75em;">
+                                        {{ growth.bmi.assessment }}
+                                        {% if growth.bmi.z_score is not none %} (z={{ growth.bmi.z_score }}){% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Cân nặng -->
+                                <div class="col-12">
+                                    <small class="text-muted">Cân nặng: </small>
+                                    <span class="fw-bold">{{ latest_record.weight }} kg</span>
+                                    {% if growth.weight.assessment %}
+                                    <span class="badge bg-{{ growth.weight.badge }} ms-1" style="font-size:0.75em;">
+                                        {{ growth.weight.assessment }}
+                                        {% if growth.weight.z_score is not none %} (z={{ growth.weight.z_score }}){% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Chiều cao -->
+                                <div class="col-12">
+                                    <small class="text-muted">Chiều cao: </small>
+                                    <span class="fw-bold">{{ latest_record.height }} cm</span>
+                                    {% if growth.height.assessment %}
+                                    <span class="badge bg-{{ growth.height.badge }} ms-1" style="font-size:0.75em;">
+                                        {{ growth.height.assessment }}
+                                        {% if growth.height.z_score is not none %} (z={{ growth.height.z_score }}){% endif %}
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </div>
+                            {% else %}
+                            <div class="text-muted" style="font-size:0.9em;">Chưa có dữ liệu đo lường</div>
                             {% endif %}
                         </div>
                         <div class="col-12 d-flex gap-2 mt-2">
@@ -80,20 +108,23 @@
                                         <th>Cân nặng</th>
                                         <th>Chiều cao</th>
                                         <th>BMI</th>
-                                        <th>Đánh giá</th>
+                                        <th style="min-width:200px;">Đánh giá WHO</th>
                                         <th>Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% if bmi_history and bmi_history[student.id] %}
                                     {% for record in bmi_history[student.id] %}
+                                    {% set growth = student|assess_growth(record.weight, record.height, record.bmi) %}
                                     <tr>
                                         <td>{{ record.date.strftime('%d/%m/%Y') }}</td>
-                                        <td>{{ record.weight }}</td>
-                                        <td>{{ record.height }}</td>
+                                        <td>{{ record.weight }} kg</td>
+                                        <td>{{ record.height }} cm</td>
                                         <td>{{ record.bmi }}</td>
-                                        <td>
-                                            {{ student|assess_bmi(record.bmi) }}
+                                        <td style="font-size:0.8em;">
+                                            <div><strong>BMI:</strong> <span class="badge bg-{{ growth.bmi.badge }}">{{ growth.bmi.assessment }}</span></div>
+                                            <div><strong>Cân:</strong> <span class="badge bg-{{ growth.weight.badge }}">{{ growth.weight.assessment }}</span></div>
+                                            <div><strong>Cao:</strong> <span class="badge bg-{{ growth.height.badge }}">{{ growth.height.assessment }}</span></div>
                                         </td>
                                         <td>
                                             <form method="POST" action="/bmi-record/{{ record.id }}/delete" style="display:inline-block;">

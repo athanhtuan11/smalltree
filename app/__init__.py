@@ -94,11 +94,11 @@ def create_app():
         # Nếu là đường dẫn local, thêm /static/
         return url_for('static', filename=filepath)
     
-    # Jinja filter để đánh giá BMI cho trẻ em
+    # Jinja filter để đánh giá BMI cho trẻ em theo WHO
     @app.template_filter('assess_bmi')
     def assess_bmi_filter(student, bmi_value):
-        """Đánh giá BMI theo tuổi của trẻ (dùng trong template)"""
-        from app.routes import assess_child_bmi
+        """Đánh giá BMI theo tuổi của trẻ (dùng trong template) - WHO standards"""
+        from app.routes import assess_child_growth_who
         from datetime import datetime
         
         if not student or not hasattr(student, 'birth_date') or not student.birth_date or not bmi_value:
@@ -114,10 +114,46 @@ def create_app():
             # Tính age_months
             age_months = (datetime.now() - birth_date_obj).days // 30
             gender = getattr(student, 'gender', 'unknown')
-            return assess_child_bmi(bmi_value, age_months, gender)
+            
+            # Sử dụng WHO standards
+            growth_data = assess_child_growth_who(age_months, gender, bmi=bmi_value)
+            return growth_data['bmi']['assessment'] or 'Chưa có đủ thông tin'
         except Exception as e:
             print(f"[ERROR] Lỗi assess_bmi filter: {e}")
             return 'Chưa có đủ thông tin'
+    
+    # Jinja filter để đánh giá đầy đủ tăng trưởng (BMI, cân nặng, chiều cao)
+    @app.template_filter('assess_growth')
+    def assess_growth_filter(student, weight=None, height=None, bmi=None):
+        """Đánh giá tăng trưởng đầy đủ theo WHO standards - trả về dict với 3 chỉ số"""
+        from app.routes import assess_child_growth_who
+        from datetime import datetime
+        
+        result = {
+            'bmi': {'assessment': 'Chưa có đủ thông tin', 'badge': 'secondary'},
+            'weight': {'assessment': 'Chưa có đủ thông tin', 'badge': 'secondary'},
+            'height': {'assessment': 'Chưa có đủ thông tin', 'badge': 'secondary'}
+        }
+        
+        if not student or not hasattr(student, 'birth_date') or not student.birth_date:
+            return result
+        
+        try:
+            # Convert birth_date
+            if isinstance(student.birth_date, str):
+                birth_date_obj = datetime.strptime(student.birth_date, '%Y-%m-%d')
+            else:
+                birth_date_obj = student.birth_date
+            
+            age_months = (datetime.now() - birth_date_obj).days // 30
+            gender = getattr(student, 'gender', 'unknown')
+            
+            # Đánh giá theo WHO
+            growth_data = assess_child_growth_who(age_months, gender, bmi=bmi, weight_kg=weight, height_cm=height)
+            return growth_data
+        except Exception as e:
+            print(f"[ERROR] Lỗi assess_growth filter: {e}")
+            return result
 
     from app.routes import main
     app.register_blueprint(main)

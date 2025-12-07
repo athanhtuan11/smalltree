@@ -34,34 +34,198 @@ except ImportError:
 
 main = Blueprint('main', __name__)
 
-def assess_child_bmi(bmi, age_months, gender='unknown'):
+def get_who_bmi_median_sd(age_months, gender):
     """
-    Đánh giá BMI cho trẻ em theo percentile đơn giản hóa
-    Trả về: "Thiếu cân: <5%", "Bình thường: 5-85%", "Thừa cân: 85-95%", "Béo phì: >95%"
+    Lấy giá trị median (M) và SD (S) của BMI theo tuổi và giới tính
+    Dữ liệu từ WHO Child Growth Standards (BMI-for-age)
     """
-    if age_months < 0 or bmi is None:
-        return 'Chưa có đủ thông tin'
+    # Dữ liệu WHO BMI-for-age (simplified) - giá trị xấp xỉ cho trẻ 2-6 tuổi
+    # Format: age_months: (median, sd)
     
-    # Ngưỡng BMI đơn giản theo tuổi (xấp xỉ percentile 5%, 85%, 95%)
-    if age_months < 24:  # 0-2 tuổi
-        p5, p85, p95 = 13.5, 17.5, 18.5
-    elif age_months < 36:  # 2-3 tuổi  
-        p5, p85, p95 = 13.5, 17.0, 18.0
-    elif age_months < 48:  # 3-4 tuổi
-        p5, p85, p95 = 13.5, 16.5, 17.5
-    elif age_months < 60:  # 4-5 tuổi
-        p5, p85, p95 = 14.0, 16.5, 17.5
-    else:  # > 5 tuổi
-        p5, p85, p95 = 14.0, 17.0, 18.5
-    
-    if bmi < p5:
-        return 'Thiếu cân: <5%'
-    elif bmi < p85:
-        return 'Bình thường: 5-85%'
-    elif bmi < p95:
-        return 'Thừa cân: 85-95%'
+    if gender.lower() in ['male', 'nam', 'boy', 'm']:
+        # Boys BMI-for-age WHO standards
+        who_data = {
+            24: (16.0, 1.3), 30: (15.8, 1.3), 36: (15.7, 1.3), 42: (15.6, 1.3),
+            48: (15.5, 1.4), 54: (15.4, 1.4), 60: (15.3, 1.4), 66: (15.3, 1.5),
+            72: (15.3, 1.5)
+        }
     else:
-        return 'Béo phì: >95%'
+        # Girls BMI-for-age WHO standards
+        who_data = {
+            24: (16.0, 1.3), 30: (15.8, 1.3), 36: (15.7, 1.3), 42: (15.5, 1.3),
+            48: (15.4, 1.4), 54: (15.3, 1.4), 60: (15.2, 1.4), 66: (15.2, 1.5),
+            72: (15.2, 1.5)
+        }
+    
+    # Tìm age_months gần nhất trong data
+    if age_months < 24:
+        return None, None  # Không đánh giá BMI cho trẻ < 2 tuổi
+    
+    # Làm tròn xuống bội số của 6 tháng
+    age_key = (age_months // 6) * 6
+    if age_key > 72:
+        age_key = 72
+    
+    return who_data.get(age_key, (15.5, 1.4))
+
+def get_who_weight_median_sd(age_months, gender):
+    """
+    Lấy giá trị median và SD của cân nặng (kg) theo tuổi và giới tính
+    Dữ liệu từ WHO Child Growth Standards (Weight-for-age)
+    """
+    if gender.lower() in ['male', 'nam', 'boy', 'm']:
+        # Boys Weight-for-age WHO standards (kg)
+        who_data = {
+            0: (3.3, 0.4), 6: (7.9, 0.9), 12: (9.6, 1.1), 18: (10.9, 1.2),
+            24: (12.2, 1.3), 30: (13.3, 1.4), 36: (14.3, 1.5), 42: (15.2, 1.6),
+            48: (16.2, 1.8), 54: (17.2, 1.9), 60: (18.3, 2.1), 66: (19.4, 2.3),
+            72: (20.5, 2.5)
+        }
+    else:
+        # Girls Weight-for-age WHO standards (kg)
+        who_data = {
+            0: (3.2, 0.4), 6: (7.3, 0.9), 12: (9.0, 1.0), 18: (10.2, 1.2),
+            24: (11.5, 1.3), 30: (12.5, 1.4), 36: (13.5, 1.5), 42: (14.4, 1.6),
+            48: (15.4, 1.8), 54: (16.4, 2.0), 60: (17.5, 2.2), 66: (18.6, 2.4),
+            72: (19.8, 2.6)
+        }
+    
+    # Làm tròn xuống bội số của 6 tháng
+    age_key = (age_months // 6) * 6
+    if age_key > 72:
+        age_key = 72
+    
+    return who_data.get(age_key, (18.0, 2.0))
+
+def get_who_height_median_sd(age_months, gender):
+    """
+    Lấy giá trị median và SD của chiều cao (cm) theo tuổi và giới tính
+    Dữ liệu từ WHO Child Growth Standards (Height-for-age)
+    """
+    if gender.lower() in ['male', 'nam', 'boy', 'm']:
+        # Boys Height-for-age WHO standards (cm)
+        who_data = {
+            0: (49.9, 1.9), 6: (67.6, 2.5), 12: (75.7, 2.8), 18: (82.3, 3.0),
+            24: (87.8, 3.3), 30: (92.3, 3.5), 36: (96.1, 3.7), 42: (99.6, 3.9),
+            48: (102.9, 4.1), 54: (106.0, 4.3), 60: (109.0, 4.5), 66: (111.8, 4.6),
+            72: (114.6, 4.8)
+        }
+    else:
+        # Girls Height-for-age WHO standards (cm)
+        who_data = {
+            0: (49.1, 1.9), 6: (65.7, 2.4), 12: (74.0, 2.8), 18: (80.7, 3.0),
+            24: (86.4, 3.3), 30: (91.1, 3.6), 36: (95.1, 3.8), 42: (98.7, 4.0),
+            48: (101.9, 4.2), 54: (105.0, 4.4), 60: (108.0, 4.5), 66: (110.8, 4.7),
+            72: (113.5, 4.9)
+        }
+    
+    # Làm tròn xuống bội số của 6 tháng
+    age_key = (age_months // 6) * 6
+    if age_key > 72:
+        age_key = 72
+    
+    return who_data.get(age_key, (105.0, 4.5))
+
+def calculate_z_score(value, median, sd):
+    """Tính z-score cho giá trị đo được"""
+    if median is None or sd is None or sd == 0:
+        return None
+    return (value - median) / sd
+
+def assess_who_indicator(z_score, indicator_type='bmi'):
+    """
+    Đánh giá z-score theo WHO standards
+    
+    indicator_type:
+    - 'bmi': BMI-for-age
+    - 'weight': Weight-for-age  
+    - 'height': Height-for-age
+    """
+    if z_score is None:
+        return 'Chưa có đủ thông tin', 'secondary'
+    
+    if indicator_type == 'bmi':
+        if z_score < -3:
+            return 'Suy dinh dưỡng nặng (< -3 SD)', 'danger'
+        elif z_score < -2:
+            return 'Gầy còm (< -2 SD)', 'warning'
+        elif z_score <= 1:
+            return 'Bình thường (-2 đến +1 SD)', 'success'
+        elif z_score <= 2:
+            return 'Nguy cơ thừa cân (+1 đến +2 SD)', 'info'
+        elif z_score <= 3:
+            return 'Thừa cân (+2 đến +3 SD)', 'warning'
+        else:
+            return 'Béo phì (> +3 SD)', 'danger'
+    
+    elif indicator_type == 'weight':
+        if z_score < -3:
+            return 'Nhẹ cân nghiêm trọng (< -3 SD)', 'danger'
+        elif z_score < -2:
+            return 'Nhẹ cân (< -2 SD)', 'warning'
+        elif z_score <= 2:
+            return 'Cân nặng bình thường (-2 đến +2 SD)', 'success'
+        else:
+            return 'Thừa cân (> +2 SD)', 'warning'
+    
+    elif indicator_type == 'height':
+        if z_score < -3:
+            return 'Thấp còi nghiêm trọng (< -3 SD)', 'danger'
+        elif z_score < -2:
+            return 'Thấp còi (< -2 SD)', 'warning'
+        elif z_score <= 3:
+            return 'Chiều cao bình thường (-2 đến +3 SD)', 'success'
+        else:
+            return 'Cao bất thường (> +3 SD)', 'info'
+    
+    return 'Chưa xác định', 'secondary'
+
+def assess_child_growth_who(age_months, gender, bmi=None, weight_kg=None, height_cm=None):
+    """
+    Đánh giá tăng trưởng trẻ em theo WHO Child Growth Standards
+    Trả về dict với đánh giá BMI, cân nặng, chiều cao
+    """
+    result = {
+        'bmi': {'assessment': None, 'badge': 'secondary', 'z_score': None},
+        'weight': {'assessment': None, 'badge': 'secondary', 'z_score': None},
+        'height': {'assessment': None, 'badge': 'secondary', 'z_score': None}
+    }
+    
+    # BMI assessment (chỉ cho trẻ >= 2 tuổi)
+    if bmi is not None:
+        if age_months < 24:
+            result['bmi']['assessment'] = 'Trẻ < 2 tuổi không đánh giá BMI'
+            result['bmi']['badge'] = 'secondary'
+        else:
+            median, sd = get_who_bmi_median_sd(age_months, gender)
+            if median and sd:
+                z_score = calculate_z_score(bmi, median, sd)
+                result['bmi']['z_score'] = round(z_score, 2) if z_score else None
+                assessment, badge = assess_who_indicator(z_score, 'bmi')
+                result['bmi']['assessment'] = assessment
+                result['bmi']['badge'] = badge
+    
+    # Weight-for-age assessment
+    if weight_kg is not None:
+        median, sd = get_who_weight_median_sd(age_months, gender)
+        if median and sd:
+            z_score = calculate_z_score(weight_kg, median, sd)
+            result['weight']['z_score'] = round(z_score, 2) if z_score else None
+            assessment, badge = assess_who_indicator(z_score, 'weight')
+            result['weight']['assessment'] = assessment
+            result['weight']['badge'] = badge
+    
+    # Height-for-age assessment
+    if height_cm is not None:
+        median, sd = get_who_height_median_sd(age_months, gender)
+        if median and sd:
+            z_score = calculate_z_score(height_cm, median, sd)
+            result['height']['z_score'] = round(z_score, 2) if z_score else None
+            assessment, badge = assess_who_indicator(z_score, 'height')
+            result['height']['assessment'] = assessment
+            result['height']['badge'] = badge
+    
+    return result
 
 def log_activity(action, resource_type=None, resource_id=None, description=None):
     """Helper function để ghi nhận hoạt động người dùng"""
@@ -2512,7 +2676,7 @@ def export_students():
         ws.title = "Danh sách học sinh"
         
         # Tạo header
-        headers = ['STT', 'Họ và tên', 'Mã học sinh', 'Ngày sinh', 'Cân nặng (kg)', 'Chiều cao (cm)', 'BMI', 'Đánh giá']
+        headers = ['STT', 'Họ và tên', 'Mã học sinh', 'Ngày sinh', 'Cân nặng (kg)', 'Chiều cao (cm)', 'BMI', 'Đánh giá BMI', 'Đánh giá Cân nặng', 'Đánh giá Chiều cao']
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True, color="FFFFFF")
@@ -2538,16 +2702,31 @@ def export_students():
             height = latest_bmi.height if latest_bmi else ''
             bmi = round(latest_bmi.bmi, 2) if latest_bmi else ''
             
-            # Tính đánh giá BMI theo tuổi (percentile cho trẻ em)
-            assessment = ''
-            if latest_bmi and latest_bmi.bmi and student.birth_date:
+            # Tính đánh giá đầy đủ theo WHO standards (BMI, cân nặng, chiều cao)
+            bmi_assessment = ''
+            weight_assessment = ''
+            height_assessment = ''
+            
+            if latest_bmi and student.birth_date:
                 try:
                     birth_date_obj = datetime.strptime(str(student.birth_date), '%Y-%m-%d') if isinstance(student.birth_date, str) else student.birth_date
                     age_months = (datetime.now() - birth_date_obj).days // 30
-                    assessment = assess_child_bmi(latest_bmi.bmi, age_months)
+                    gender = getattr(student, 'gender', 'unknown')
+                    
+                    # Đánh giá đầy đủ
+                    growth_data = assess_child_growth_who(
+                        age_months, 
+                        gender, 
+                        bmi=latest_bmi.bmi if latest_bmi.bmi else None,
+                        weight_kg=latest_bmi.weight if latest_bmi.weight else None,
+                        height_cm=latest_bmi.height if latest_bmi.height else None
+                    )
+                    
+                    bmi_assessment = growth_data['bmi']['assessment'] or ''
+                    weight_assessment = growth_data['weight']['assessment'] or ''
+                    height_assessment = growth_data['height']['assessment'] or ''
                 except Exception as e:
-                    print(f"[ERROR] Lỗi tính age_months cho {student.name}: {e}")
-                    assessment = 'Chưa có đủ thông tin'
+                    print(f"[ERROR] Lỗi đánh giá WHO cho {student.name}: {e}")
             
             data = [
                 row - 1,  # STT
@@ -2557,7 +2736,9 @@ def export_students():
                 weight,
                 height,
                 bmi,
-                assessment
+                bmi_assessment,
+                weight_assessment,
+                height_assessment
             ]
             
             for col, value in enumerate(data, 1):
