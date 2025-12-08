@@ -3254,12 +3254,12 @@ def bmi_index():
     bmi_id = None
 
     if request.method == 'POST':
-        student_id = int(request.form['student_id'])
-        
-        # Kiểm tra quyền: Parent chỉ được nhập cho con mình
-        if session.get('role') == 'parent' and student_id != session.get('user_id'):
-            flash('Bạn chỉ có thể nhập BMI cho con mình!', 'danger')
+        # Phụ huynh không được phép nhập BMI
+        if session.get('role') == 'parent':
+            flash('Phụ huynh chỉ được xem chỉ số BMI, không được nhập mới!', 'danger')
             return redirect(url_for('main.bmi_index'))
+        
+        student_id = int(request.form['student_id'])
         
         weight = float(request.form['weight'])
         height = float(request.form['height']) / 100  # đổi cm sang m
@@ -3322,6 +3322,11 @@ def edit_bmi_record(record_id):
 
 @main.route('/bmi-record/<int:record_id>/delete', methods=['POST'])
 def delete_bmi_record(record_id):
+    # Phụ huynh không được phép xóa BMI
+    if session.get('role') == 'parent':
+        flash('Phụ huynh chỉ được xem chỉ số BMI, không được xóa!', 'danger')
+        return redirect(url_for('main.bmi_index'))
+    
     record = BmiRecord.query.get_or_404(record_id)
     db.session.delete(record)
     db.session.commit()

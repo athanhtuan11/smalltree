@@ -31,6 +31,7 @@
                     <div class="mb-1 text-muted" style="font-size:0.95em;">
                         Lớp: <span class="fw-bold">{{ student.class_name if student.class_name else '-' }}</span> | Ngày sinh: <span class="fw-bold">{{ student.birth_date if student.birth_date else '-' }}</span>
                     </div>
+                    {% if session.get('role') in ['admin', 'teacher'] %}
                     <form method="POST" class="row g-2 align-items-center">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <input type="hidden" name="student_id" value="{{ student.id }}">
@@ -98,6 +99,11 @@
                             <button type="button" class="btn btn-secondary btn-sm flex-fill" onclick="toggleBmiHistory({{ student.id }})">Xem lịch sử BMI</button>
                         </div>
                     </form>
+                    {% else %}
+                    <div class="col-12 mt-2">
+                        <button type="button" class="btn btn-secondary btn-sm w-100" onclick="toggleBmiHistory({{ student.id }})">Xem lịch sử BMI của con</button>
+                    </div>
+                    {% endif %}
                     <div id="bmi-history-{{ student.id }}" style="display:none; margin-top:8px;">
                         <div class="fw-bold mb-1" style="color:#43a047;">Lịch sử chỉ số BMI:</div>
                         <div style="overflow-x:auto;">
@@ -127,10 +133,14 @@
                                             <div><strong>Cao:</strong> <span class="badge bg-{{ growth.height.badge }}">{{ growth.height.assessment }}</span></div>
                                         </td>
                                         <td>
+                                            {% if session.get('role') in ['admin', 'teacher'] %}
                                             <form method="POST" action="/bmi-record/{{ record.id }}/delete" style="display:inline-block;">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                                 <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Bạn có chắc muốn xoá?')">Xoá</button>
                                             </form>
+                                            {% else %}
+                                            <span class="text-muted" style="font-size:0.85em;">-</span>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
