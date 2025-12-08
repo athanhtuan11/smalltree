@@ -45,22 +45,39 @@
     }
 </style>
 <div class="container-fluid mt-4 mb-4 px-0">
-    <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Điểm danh học sinh theo ngày</h2>
+    <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">
+        {% if session.get('role') == 'parent' %}
+            Thông tin điểm danh và đánh giá của con
+        {% else %}
+            Điểm danh học sinh theo ngày
+        {% endif %}
+    </h2>
     <div class="d-flex flex-column flex-md-row gap-2 mb-3 attendance-btn-group-mobile">
+        {% if session.get('role') in ['admin', 'teacher'] %}
         <a href="/classes/new" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">Tạo Lớp mới</a>
         <a href="/attendance/new" class="btn btn-primary {% if mobile %}attendance-btn-mobile{% endif %}">Tạo học sinh mới</a>
-        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}" {% if session['role'] == 'parent' %}style="display:none;"{% endif %}>Xem lịch sử điểm danh / Xuất hóa đơn</a>
+        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">Xem lịch sử điểm danh / Xuất hóa đơn</a>
         <a href="/students" class="btn btn-secondary {% if mobile %}attendance-btn-mobile{% endif %}">Danh sách học sinh</a>
         <a href="/bmi-index" class="btn btn-warning text-dark {% if mobile %}attendance-btn-mobile{% endif %}">Chỉ Số BMI</a>
+        {% endif %}
+        {% if session.get('role') == 'parent' %}
+        <a href="/bmi-index" class="btn btn-warning text-dark {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-heart-pulse-fill me-1"></i> Chỉ Số BMI của con
+        </a>
+        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-calendar3 me-1"></i> Xem lịch sử tháng
+        </a>
+        {% endif %}
         <div class="d-flex justify-content-end mb-3">
         </div>
     </div>
     <form method="get" action="">
         <div class="row mb-3">
             <div class="col-md-4">
-                <label for="attendance_date" class="form-label">Chọn ngày điểm danh:</label>
+                <label for="attendance_date" class="form-label">Chọn ngày xem:</label>
                 <input type="date" id="attendance_date" name="attendance_date" class="form-control" value="{{ current_date }}" onchange="this.form.submit()">
             </div>
+            {% if session.get('role') in ['admin', 'teacher'] %}
             <div class="col-md-4">
                 <label for="class_name" class="form-label">Lọc theo lớp:</label>
                 <select id="class_name" name="class_name" class="form-select" onchange="this.form.submit()">
@@ -75,6 +92,7 @@
                 <input type="text" id="student_search" class="form-control" placeholder="Nhập tên học sinh..." autocomplete="off">
                 <div id="student_suggestions" class="list-group position-absolute w-100" style="z-index:1000; max-height:220px; overflow-y:auto; border-radius:0.5rem; box-shadow:0 2px 8px rgba(60,60,60,0.18); font-size:0.97em;"></div>
             </div>
+            {% endif %}
         </div>
     </form>
     <style>
@@ -230,6 +248,9 @@
                                     <tr>
                                         <td>Ăn sáng</td>
                                         <td>
+                                            {% if session.get('role') == 'parent' %}
+                                                <span class="fw-bold">{{ student.breakfast if student.breakfast else 'Chưa cập nhật' }}</span>
+                                            {% else %}
                                             <select name="breakfast_{{ student.id }}" class="form-select form-select-sm">
                                                 <option value="" {% if not student.breakfast %}selected{% endif %}>--Chọn--</option>
                                                 <option value="Hết" {% if student.breakfast=='Hết' %}selected{% endif %}>Hết</option>
@@ -238,11 +259,15 @@
                                                 <option value="3/4" {% if student.breakfast=='3/4' %}selected{% endif %}>3/4</option>
                                                 <option value="Không ăn" {% if student.breakfast=='Không ăn' %}selected{% endif %}>Không ăn</option>
                                             </select>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>Ăn trưa</td>
                                         <td>
+                                            {% if session.get('role') == 'parent' %}
+                                                <span class="fw-bold">{{ student.lunch if student.lunch else 'Chưa cập nhật' }}</span>
+                                            {% else %}
                                             <select name="lunch_{{ student.id }}" class="form-select form-select-sm">
                                                 <option value="" {% if not student.lunch %}selected{% endif %}>--Chọn--</option>
                                                 <option value="Hết" {% if student.lunch=='Hết' %}selected{% endif %}>Hết</option>
@@ -251,11 +276,15 @@
                                                 <option value="3/4" {% if student.lunch=='3/4' %}selected{% endif %}>3/4</option>
                                                 <option value="Không ăn" {% if student.lunch=='Không ăn' %}selected{% endif %}>Không ăn</option>
                                             </select>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>Ăn xế</td>
                                         <td>
+                                            {% if session.get('role') == 'parent' %}
+                                                <span class="fw-bold">{{ student.snack if student.snack else 'Chưa cập nhật' }}</span>
+                                            {% else %}
                                             <select name="snack_{{ student.id }}" class="form-select form-select-sm">
                                                 <option value="" {% if not student.snack %}selected{% endif %}>--Chọn--</option>
                                                 <option value="Hết" {% if student.snack=='Hết' %}selected{% endif %}>Hết</option>
@@ -264,11 +293,18 @@
                                                 <option value="3/4" {% if student.snack=='3/4' %}selected{% endif %}>3/4</option>
                                                 <option value="Không ăn" {% if student.snack=='Không ăn' %}selected{% endif %}>Không ăn</option>
                                             </select>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     <tr>
                                         <td>Đi vệ sinh (ỉa)</td>
                                         <td>
+                                            {% if session.get('role') == 'parent' %}
+                                                <span class="fw-bold">{{ student.toilet if student.toilet else 'Chưa cập nhật' }}</span>
+                                                {% if student.toilet_times %}
+                                                <span class="ms-2">({{ student.toilet_times }} lần)</span>
+                                                {% endif %}
+                                            {% else %}
                                             <select name="toilet_{{ student.id }}" class="form-select form-select-sm mb-1">
                                                 <option value="" {% if not student.toilet %}selected{% endif %}>--Chọn--</option>
                                                 <option value="Có" {% if student.toilet=='Có' %}selected{% endif %}>Có</option>
@@ -281,6 +317,7 @@
                                                 <option value="{{ i }}" {% if student.toilet_times==i %}selected{% endif %}>{{ i }}</option>
                                                 {% endfor %}
                                             </select>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     <tr>
@@ -300,7 +337,9 @@
                 </tbody>
             </table>
         </div>
+    {% if session.get('role') in ['admin', 'teacher'] %}
     <button type="submit" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}" id="save-all-btn">Lưu điểm danh</button>
+    {% endif %}
 <script>
 // Khi nhấn nút Lưu điểm danh chung, scroll lên đầu trang
 document.addEventListener('DOMContentLoaded', function() {
@@ -314,9 +353,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
     </form>
 </div>
-{% if session['role'] == 'parent' %}
-    <script>
-        window.location.href = '/attendance/history';
-    </script>
-{% endif %}
 {% endblock %}

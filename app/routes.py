@@ -1386,18 +1386,26 @@ def attendance():
     if not session.get('role'):
         flash('Bạn phải đăng nhập mới truy cập được trang này!', 'danger')
         return redirect(url_for('main.about'))
-    if session.get('role') == 'parent':
-        return redirect(url_for('main.attendance_history'))
+    
     from datetime import date
     attendance_date = request.args.get('attendance_date') or date.today().strftime('%Y-%m-%d')
-    selected_class = request.args.get('class_name')
-    # Lấy danh sách lớp từ bảng Class
-    class_names = [c.name for c in Class.query.order_by(Class.name).all()]
-    # Lọc học sinh theo lớp
-    if selected_class:
-        students = Child.query.filter_by(class_name=selected_class, is_active=True).order_by(Child.student_code).all()
+    
+    # Phân quyền: Parent chỉ xem con mình
+    if session.get('role') == 'parent':
+        user_id = session.get('user_id')
+        child = Child.query.filter_by(id=user_id).first()
+        students = [child] if child else []
+        selected_class = None
+        class_names = []
     else:
-        students = Child.query.filter_by(is_active=True).order_by(Child.student_code).all()
+        selected_class = request.args.get('class_name')
+        # Lấy danh sách lớp từ bảng Class
+        class_names = [c.name for c in Class.query.order_by(Class.name).all()]
+        # Lọc học sinh theo lớp
+        if selected_class:
+            students = Child.query.filter_by(class_name=selected_class, is_active=True).order_by(Child.student_code).all()
+        else:
+            students = Child.query.filter_by(is_active=True).order_by(Child.student_code).all()
     
     # Lấy TẤT CẢ attendance records cho ngày này một lần (thay vì query từng student)
     student_ids = [s.id for s in students]
@@ -3208,12 +3216,30 @@ def edit_activity(id):
 
 @main.route('/bmi-index', methods=['GET', 'POST'])
 def bmi_index():
-    students = Child.query.all()
+    # Kiểm tra đăng nhập
+    if not session.get('role'):
+        flash('Bạn phải đăng nhập mới truy cập được trang này!', 'danger')
+        return redirect(url_for('main.about'))
+    
+    # Phân quyền: Parent chỉ xem con mình, Admin/Teacher xem tất cả
+    if session.get('role') == 'parent':
+        user_id = session.get('user_id')
+        child = Child.query.filter_by(id=user_id).first()
+        students = [child] if child else []
+    else:
+        students = Child.query.filter_by(is_active=True).all()
+    
     bmi = None
     bmi_id = None
 
     if request.method == 'POST':
         student_id = int(request.form['student_id'])
+        
+        # Kiểm tra quyền: Parent chỉ được nhập cho con mình
+        if session.get('role') == 'parent' and student_id != session.get('user_id'):
+            flash('Bạn chỉ có thể nhập BMI cho con mình!', 'danger')
+            return redirect(url_for('main.bmi_index'))
+        
         weight = float(request.form['weight'])
         height = float(request.form['height']) / 100  # đổi cm sang m
         bmi = round(weight / (height * height), 2)
@@ -3230,6 +3256,9 @@ def bmi_index():
         )
         db.session.add(new_record)
         db.session.commit()
+        
+        log_activity('create', 'bmi_record', new_record.id, f'Thêm BMI cho {Child.query.get(student_id).name}')
+        flash('Đã lưu chỉ số BMI!', 'success')
 
     bmi_history = {}
     for student in students:
