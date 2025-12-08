@@ -19,8 +19,25 @@
         </div>
         {% if type == 'parent' %}
         <div class="mb-3">
-            <label for="parent_contact" class="form-label">Tên phụ huynh</label>
+            <label for="parent_contact" class="form-label">Tên phụ huynh (cũ)</label>
             <input type="text" id="parent_contact" name="parent_contact" class="form-control" value="{{ user.parent_contact }}" {% if user.parent_contact == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
+            <small class="form-text text-muted">Trường này sẽ được thay thế bằng thông tin chi tiết bố/mẹ bên dưới</small>
+        </div>
+        <div class="mb-3">
+            <label for="father_name" class="form-label">Họ tên bố</label>
+            <input type="text" id="father_name" name="father_name" class="form-control" value="{{ user.father_name or '' }}" {% if user.father_name == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
+        </div>
+        <div class="mb-3">
+            <label for="father_phone" class="form-label">Số điện thoại bố</label>
+            <input type="text" id="father_phone" name="father_phone" class="form-control" value="{{ user.father_phone or '' }}" {% if user.father_phone == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
+        </div>
+        <div class="mb-3">
+            <label for="mother_name" class="form-label">Họ tên mẹ</label>
+            <input type="text" id="mother_name" name="mother_name" class="form-control" value="{{ user.mother_name or '' }}" {% if user.mother_name == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
+        </div>
+        <div class="mb-3">
+            <label for="mother_phone" class="form-label">Số điện thoại mẹ</label>
+            <input type="text" id="mother_phone" name="mother_phone" class="form-control" value="{{ user.mother_phone or '' }}" {% if user.mother_phone == 'Ẩn' %}readonly style="background:#eee;"{% endif %}>
         </div>
         <div class="mb-3">
             <label for="student_code" class="form-label">Mã số học sinh</label>

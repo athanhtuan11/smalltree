@@ -1314,6 +1314,18 @@ def new_student():
         name = request.form.get('name')
         # student_code lấy từ hidden input, đã sinh sẵn
         student_code = request.form.get('student_code') or next_code
+        
+        # Kiểm tra nếu mã đã tồn tại, tìm mã mới
+        existing = Child.query.filter_by(student_code=student_code).first()
+        if existing:
+            # Tìm mã số mới chưa sử dụng
+            counter = int(student_code)
+            while existing:
+                counter += 1
+                student_code = str(counter).zfill(3)
+                existing = Child.query.filter_by(student_code=student_code).first()
+            flash(f'Mã số học sinh đã tồn tại, đã tự động chuyển sang mã mới: {student_code}', 'info')
+        
         class_name = request.form.get('class_name')
         birth_date = request.form.get('birth_date')
         parent_contact = request.form.get('parent_contact')
@@ -3090,6 +3102,10 @@ def edit_account(user_id):
             user.student_code = request.form.get('student_code')
             user.class_name = request.form.get('class_name')
             user.birth_date = request.form.get('birth_date')
+            user.father_name = request.form.get('father_name')
+            user.father_phone = request.form.get('father_phone')
+            user.mother_name = request.form.get('mother_name')
+            user.mother_phone = request.form.get('mother_phone')
         elif user_type == 'teacher':
             user.position = request.form.get('position')
         password = request.form.get('password')
@@ -3108,7 +3124,12 @@ def edit_account(user_id):
         'phone': user.phone if show_sensitive else 'Ẩn',
         'student_code': getattr(user, 'student_code', None) if show_sensitive else 'Ẩn',
         'class_name': getattr(user, 'class_name', None) if show_sensitive else 'Ẩn',
+        'birth_date': getattr(user, 'birth_date', None) if show_sensitive else 'Ẩn',
         'parent_contact': getattr(user, 'parent_contact', None) if show_sensitive else 'Ẩn',
+        'father_name': getattr(user, 'father_name', None) if show_sensitive else 'Ẩn',
+        'father_phone': getattr(user, 'father_phone', None) if show_sensitive else 'Ẩn',
+        'mother_name': getattr(user, 'mother_name', None) if show_sensitive else 'Ẩn',
+        'mother_phone': getattr(user, 'mother_phone', None) if show_sensitive else 'Ẩn',
         'position': getattr(user, 'position', None) if show_sensitive else 'Ẩn',
     }
     return render_template('edit_account.html', user=masked_user, type=user_type, title='Chỉnh sửa tài khoản', classes=classes)
