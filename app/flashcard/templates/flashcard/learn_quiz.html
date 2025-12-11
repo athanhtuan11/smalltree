@@ -1,0 +1,61 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Quiz Mode - {{ deck.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 20px 20px 0 20px; position: relative; z-index: 100;">
+    <a href="{{ url_for('flashcard.deck_detail', deck_id=deck.id) }}" class="btn btn-success">
+        <i class="bi bi-arrow-left me-2"></i>Quay lại
+    </a>
+</div>
+
+<div class="flashcard-container">
+    <div class="flashcard-header">
+        <div class="card-counter">1 / {{ cards|length }}</div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: 0%;"></div>
+        </div>
+        <div style="font-size: 1.2rem; font-weight: bold;">❓ Quiz Mode</div>
+    </div>
+    
+    <div id="quiz-content">
+        <!-- JavaScript sẽ render câu hỏi ở đây -->
+    </div>
+</div>
+
+<script>
+const cardsData = {{ cards|tojson }};
+const childId = {{ child_id if child_id else 'null' }};
+
+console.log('Quiz Mode - Cards data:', cardsData);
+console.log('Total cards:', cardsData ? cardsData.length : 0);
+
+let quizMode;
+
+window.addEventListener('DOMContentLoaded', () => {
+    if (!cardsData || cardsData.length === 0) {
+        document.getElementById('quiz-content').innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+                <h2>❌ Không có dữ liệu thẻ</h2>
+                <p>Vui lòng thêm thẻ vào bộ này</p>
+                <a href="{{ url_for('flashcard.deck_detail', deck_id=deck.id) }}" class="btn btn-primary">Quay lại</a>
+            </div>
+        `;
+        return;
+    }
+    
+    try {
+        quizMode = new QuizMode(cardsData, childId);
+    } catch (error) {
+        console.error('Error initializing QuizMode:', error);
+        document.getElementById('quiz-content').innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+                <h2>❌ Lỗi khởi tạo Quiz</h2>
+                <p>${error.message}</p>
+                <a href="{{ url_for('flashcard.deck_detail', deck_id=deck.id) }}" class="btn btn-primary">Quay lại</a>
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}

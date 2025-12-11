@@ -1,0 +1,92 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}{{ deck.title }}{% endblock %}
+
+{% block content %}
+<div class="deck-detail">
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('flashcard.deck_list', age_group=deck.age_group) }}" class="btn btn-outline-success">
+            <i class="bi bi-arrow-left me-2"></i>Quay lại
+        </a>
+    </div>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert" style="margin: 20px;">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <div class="deck-header">
+        {% if deck.cover_image %}
+        <img src="{{ url_for('static', filename=deck.cover_image) }}" alt="{{ deck.title }}">
+        {% else %}
+        <div style="width: 200px; height: 200px; background: linear-gradient(135deg, var(--pastel-mint), var(--pastel-pink)); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 5rem; margin: 0 auto 20px;">
+            📚
+        </div>
+        {% endif %}
+        
+        <h1>{{ deck.title }}</h1>
+        <p class="description">{{ deck.description or 'Học vui với flashcard!' }}</p>
+        <div style="font-size: 1.2rem; color: #666; margin-bottom: 10px;">
+            📝 {{ cards_count }} thẻ
+        </div>
+        
+        {% if progress %}
+        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, var(--pastel-yellow), white); border-radius: 15px;">
+            <p style="margin: 0;"><strong>Tiến độ của bé:</strong></p>
+            <p style="margin: 5px 0;">⭐ {{ progress.stars }} sao | 🔥 Streak {{ progress.streak_days }} ngày</p>
+            <p style="margin: 5px 0;">📖 Đã học {{ progress.learned_cards }}/{{ cards_count }} thẻ</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <h2 style="text-align: center; font-size: 2rem; margin-bottom: 30px;">Chọn cách học</h2>
+    
+    <div class="mode-selection">
+        <a href="{{ url_for('flashcard.learn_flash', deck_id=deck.id) }}" class="mode-card flash-mode">
+            <div class="icon">🎴</div>
+            <h3>Flash Mode</h3>
+            <p>Xem thẻ và nghe phát âm</p>
+            <p style="font-size: 0.9rem; color: #999; margin-top: 10px;">Phù hợp: Làm quen từ mới</p>
+        </a>
+        
+        <a href="{{ url_for('flashcard.learn_quiz', deck_id=deck.id) }}" class="mode-card quiz-mode">
+            <div class="icon">❓</div>
+            <h3>Quiz Mode</h3>
+            <p>Trắc nghiệm 3 đáp án</p>
+            <p style="font-size: 0.9rem; color: #999; margin-top: 10px;">Phù hợp: Kiểm tra kiến thức</p>
+        </a>
+        
+        <a href="{{ url_for('flashcard.learn_audio', deck_id=deck.id) }}" class="mode-card audio-mode">
+            <div class="icon">🎧</div>
+            <h3>Audio Mode</h3>
+            <p>Nghe và chọn hình</p>
+            <p style="font-size: 0.9rem; color: #999; margin-top: 10px;">Phù hợp: Luyện nghe</p>
+        </a>
+    </div>
+</div>
+
+<script>
+anime({
+    targets: '.deck-header',
+    scale: [0.9, 1],
+    opacity: [0, 1],
+    duration: 600,
+    easing: 'easeOutQuad'
+});
+
+anime({
+    targets: '.mode-card',
+    translateY: [40, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(150, {start: 300}),
+    duration: 700,
+    easing: 'easeOutElastic(1, .6)'
+});
+</script>
+{% endblock %}

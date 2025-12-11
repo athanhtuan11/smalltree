@@ -339,3 +339,75 @@ class UserActivity(db.Model):
     
     def __repr__(self):
         return f'<UserActivity {self.user_type} - {self.action} - {self.resource_type}>'
+
+# ================== FLASHCARD SYSTEM ==================
+class Deck(db.Model):
+    """Bộ thẻ flashcard (Animals, Colors, Numbers...)"""
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)  # "Con vật", "Màu sắc"
+    description = db.Column(db.String(500))
+    age_group = db.Column(db.String(10), nullable=False)  # "1-3", "3-5", "5-7"
+    cover_image = db.Column(db.String(300))  # Hình bìa
+    created_by = db.Column(db.Integer, db.ForeignKey('staff.id'))  # Giáo viên tạo
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    is_active = db.Column(db.Boolean, default=True)  # Hiển thị hay ẩn
+    order = db.Column(db.Integer, default=0)  # Thứ tự hiển thị
+    
+    cards = db.relationship('Card', backref='deck', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<Deck {self.title} - {self.age_group}>'
+
+class Card(db.Model):
+    """Thẻ flashcard trong một bộ"""
+    id = db.Column(db.Integer, primary_key=True)
+    deck_id = db.Column(db.Integer, db.ForeignKey('deck.id'), nullable=False)
+    front_text = db.Column(db.String(255), nullable=False)  # "Dog", "Con chó"
+    back_text = db.Column(db.String(255))  # Giải thích thêm (optional)
+    image_url = db.Column(db.String(300), nullable=False)  # Hình minh họa
+    audio_url = db.Column(db.String(300))  # File âm thanh (optional)
+    order = db.Column(db.Integer, default=0)  # Thứ tự trong bộ
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    
+    progress = db.relationship('CardProgress', backref='card', lazy=True)
+    
+    def __repr__(self):
+        return f'<Card {self.front_text}>'
+
+class CardProgress(db.Model):
+    """Tiến độ học của học sinh cho từng thẻ (Anki-style spaced repetition)"""
+    id = db.Column(db.Integer, primary_key=True)
+    child_id = db.Column(db.Integer, db.ForeignKey('child.id'))  # NULL nếu khách
+    card_id = db.Column(db.Integer, db.ForeignKey('card.id'), nullable=False)
+    ease_level = db.Column(db.Integer, default=0)  # 0=new, 1=hard, 2=good, 3=easy
+    repetitions = db.Column(db.Integer, default=0)  # Số lần ôn
+    next_review = db.Column(db.DateTime)  # Thời điểm ôn lại
+    last_reviewed = db.Column(db.DateTime)  # Lần ôn gần nhất
+    interval_days = db.Column(db.Integer, default=1)  # Khoảng cách ôn (ngày)
+    
+    child = db.relationship('Child', backref=db.backref('card_progress', lazy=True))
+    
+    __table_args__ = (db.UniqueConstraint('child_id', 'card_id', name='unique_child_card'),)
+    
+    def __repr__(self):
+        return f'<CardProgress child={self.child_id} card={self.card_id} ease={self.ease_level}>'
+
+class DeckProgress(db.Model):
+    """Tiến độ tổng thể của học sinh cho từng bộ thẻ"""
+    id = db.Column(db.Integer, primary_key=True)
+    child_id = db.Column(db.Integer, db.ForeignKey('child.id'))
+    deck_id = db.Column(db.Integer, db.ForeignKey('deck.id'), nullable=False)
+    learned_cards = db.Column(db.Integer, default=0)  # Số thẻ đã học
+    total_score = db.Column(db.Integer, default=0)  # Tổng điểm
+    stars = db.Column(db.Integer, default=0)  # Số sao kiếm được
+    last_studied = db.Column(db.DateTime)  # Lần học gần nhất
+    completion_date = db.Column(db.DateTime)  # Ngày hoàn thành bộ thẻ
+    streak_days = db.Column(db.Integer, default=0)  # Số ngày học liên tục
+    
+    child = db.relationship('Child', backref=db.backref('deck_progress', lazy=True))
+    deck = db.relationship('Deck', backref=db.backref('progress', lazy=True))
+    
+    __table_args__ = (db.UniqueConstraint('child_id', 'deck_id', name='unique_child_deck'),)
+    
+    def __repr__(self):
+        return f'<DeckProgress child={self.child_id} deck={self.deck_id} learned={self.learned_cards}>'

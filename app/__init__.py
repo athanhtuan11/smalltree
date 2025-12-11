@@ -158,6 +158,10 @@ def create_app():
     from app.routes import main
     app.register_blueprint(main)
     
+    # Register Flashcard Blueprint
+    from app.flashcard import flashcard_bp
+    app.register_blueprint(flashcard_bp)
+    
     # Enhanced Session Security
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'

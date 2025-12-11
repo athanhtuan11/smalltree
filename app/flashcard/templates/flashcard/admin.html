@@ -1,0 +1,82 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Quản lý Flashcard{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 40px 20px; max-width: 1200px; margin: 0 auto;">
+    <div style="background: white; border-radius: 25px; padding: 30px; box-shadow: 0 8px 20px var(--shadow); margin-bottom: 30px;">
+        <h1 style="text-align: center; font-size: 2.5rem; margin-bottom: 10px;">📚 Quản lý Flashcard</h1>
+        <p style="text-align: center; color: #666; font-size: 1.1rem;">Dành cho giáo viên</p>
+    </div>
+    
+    <div style="text-align: center; margin-bottom: 40px;">
+        <a href="{{ url_for('flashcard.create_deck') }}" class="btn-control btn-next" style="display: inline-block;">
+            ➕ Tạo bộ thẻ mới
+        </a>
+        <a href="{{ url_for('flashcard.index') }}" class="btn-control btn-prev" style="display: inline-block;">
+            👁️ Xem giao diện học sinh
+        </a>
+    </div>
+    
+    {% if decks %}
+    <div style="display: grid; gap: 20px;">
+        {% for age in ['1-3', '3-5', '5-7'] %}
+        {% set age_decks = decks|selectattr('age_group', 'equalto', age)|list %}
+        {% if age_decks %}
+        <div style="background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 10px var(--shadow);">
+            <h2 style="font-size: 1.8rem; margin-bottom: 20px;">
+                {% if age == '1-3' %}👶 1-3 tuổi
+                {% elif age == '3-5' %}🧒 3-5 tuổi
+                {% elif age == '5-7' %}👦 5-7 tuổi
+                {% endif %}
+            </h2>
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Bộ thẻ</th>
+                            <th>Mô tả</th>
+                            <th>Số thẻ</th>
+                            <th>Trạng thái</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for deck in age_decks %}
+                        <tr>
+                            <td><strong>{{ deck.title }}</strong></td>
+                            <td>{{ deck.description or '-' }}</td>
+                            <td>{{ deck.cards|length }} thẻ</td>
+                            <td>
+                                {% if deck.is_active %}
+                                <span style="color: green;">✅ Hiện</span>
+                                {% else %}
+                                <span style="color: red;">❌ Ẩn</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('flashcard.manage_cards', deck_id=deck.id) }}" class="btn btn-sm btn-primary">📝 Quản lý thẻ</a>
+                                <a href="{{ url_for('flashcard.edit_deck', deck_id=deck.id) }}" class="btn btn-sm btn-warning">✏️ Sửa</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 60px 20px; background: white; border-radius: 20px; box-shadow: 0 4px 10px var(--shadow);">
+        <div style="font-size: 5rem; margin-bottom: 20px;">📚</div>
+        <h2>Chưa có bộ thẻ nào</h2>
+        <p style="font-size: 1.2rem; color: #666; margin-bottom: 30px;">Hãy tạo bộ thẻ đầu tiên!</p>
+        <a href="{{ url_for('flashcard.create_deck') }}" class="btn-control btn-next" style="display: inline-block;">
+            ➕ Tạo bộ thẻ mới
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

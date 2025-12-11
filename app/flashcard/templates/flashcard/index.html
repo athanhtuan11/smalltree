@@ -1,0 +1,55 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Flashcard - Chọn độ tuổi{% endblock %}
+
+{% block content %}
+<div class="age-selection">
+    <div class="mb-3 d-flex gap-2">
+        <a href="/" class="btn btn-outline-success">
+            <i class="bi bi-house-door-fill me-2"></i>Trang chủ
+        </a>
+        {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('flashcard.admin') }}" class="btn btn-danger">
+            <i class="bi bi-gear-fill me-2"></i>Quản lý Admin
+        </a>
+        {% endif %}
+    </div>
+    <h1>📚 Flashcard Học Vui</h1>
+    <p class="subtitle">Chọn độ tuổi của bé</p>
+    
+    <div class="age-cards">
+        <a href="{{ url_for('flashcard.deck_list', age_group='1-3') }}" class="age-card age-1-3">
+            <div class="icon">👶</div>
+            <h2>1-3 tuổi</h2>
+            <p>Từ đơn giản, hình ảnh to</p>
+            <p>🎨 Màu sắc, hình khối, con vật</p>
+        </a>
+        
+        <a href="{{ url_for('flashcard.deck_list', age_group='3-5') }}" class="age-card age-3-5">
+            <div class="icon">🧒</div>
+            <h2>3-5 tuổi</h2>
+            <p>Từ vừa phải, đa dạng</p>
+            <p>🍎 Trái cây, số đếm, chữ cái</p>
+        </a>
+        
+        <a href="{{ url_for('flashcard.deck_list', age_group='5-7') }}" class="age-card age-5-7">
+            <div class="icon">👦</div>
+            <h2>5-7 tuổi</h2>
+            <p>Từ phức tạp hơn</p>
+            <p>✍️ Ghép vần, tính toán, câu chuyện</p>
+        </a>
+    </div>
+</div>
+
+<script>
+// Animation khi load trang
+anime({
+    targets: '.age-card',
+    translateY: [50, 0],
+    opacity: [0, 1],
+    delay: anime.stagger(200),
+    duration: 800,
+    easing: 'easeOutElastic(1, .8)'
+});
+</script>
+{% endblock %}

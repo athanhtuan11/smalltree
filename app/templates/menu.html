@@ -121,12 +121,14 @@
             <!-- Import Section -->
             <form action="/menu/import" method="post" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="file" name="excel_file" accept=".xlsx" required style="width:160px;" class="form-control form-control-sm">
+                <input type="file" name="excel_file" accept=".xlsx" required style="width:180px;" class="form-control form-control-sm">
                 <div class="d-flex flex-column">
                     <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:70px;" title="Tuần" class="form-control form-control-sm">
                     <small id="import-week-range" class="text-info text-nowrap" style="font-size:0.7em;"></small>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Import</button>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-upload me-1"></i> Tải lên
+                </button>
             </form>
             
             <!-- Divider -->
@@ -134,18 +136,20 @@
             
             <!-- Action Buttons -->
             <div class="d-flex gap-2">
-                <a href="/menu/export" class="btn btn-success btn-sm">Export Excel</a>
+                <a href="/menu/export" class="btn btn-success btn-sm">
+                    <i class="bi bi-download me-1"></i> Xuất file
+                </a>
                 <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-list"></i> Món ăn
+                    <i class="bi bi-card-list me-1"></i> Món ăn
                 </a>
                 <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm">
-                    <i class="bi bi-truck"></i> Nhà cung cấp
+                    <i class="bi bi-truck me-1"></i> Nhà cung cấp
                 </a>
                 <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm">
-                    <i class="fas fa-robot"></i> AI Thực đơn
+                    <i class="bi bi-robot me-1"></i> AI Thực đơn
                 </a>
                 <a href="{{ url_for('main.new_menu') }}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus"></i> Thêm Thực đơn
+                    <i class="bi bi-plus-circle me-1"></i> Thêm mới
                 </a>
             </div>
         </div>

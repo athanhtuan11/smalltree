@@ -1,0 +1,101 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Sửa thẻ - {{ deck.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 40px 20px; max-width: 800px; margin: 0 auto;">
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('flashcard.manage_cards', deck_id=deck.id) }}" class="btn btn-outline-success">
+            <i class="bi bi-arrow-left me-2"></i>Quay lại Quản lý thẻ
+        </a>
+    </div>
+    
+    <div style="background: white; border-radius: 25px; padding: 40px; box-shadow: 0 8px 20px var(--shadow);">
+        <h1 style="text-align: center; font-size: 2.5rem; margin-bottom: 10px;">✏️ Sửa thẻ</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">Bộ: {{ deck.title }}</p>
+        
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Từ/Cụm từ chính *</label>
+                <input type="text" name="front_text" class="form-control form-control-lg" value="{{ card.front_text }}" required>
+                <small class="text-muted">Từ này sẽ được hiển thị và đọc cho trẻ nghe</small>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Giải thích thêm (tùy chọn)</label>
+                <input type="text" name="back_text" class="form-control" value="{{ card.back_text or '' }}">
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Hình ảnh hiện tại</label>
+                <div style="margin-bottom: 10px;">
+                    <img src="{{ url_for('static', filename=card.image_url) }}" style="max-width: 300px; border-radius: 10px;">
+                </div>
+                <label class="form-label">Thay đổi hình ảnh (tùy chọn)</label>
+                <input type="file" name="image" class="form-control" accept="image/*" id="imageInput">
+                <small class="text-muted">Để trống nếu không muốn thay đổi</small>
+                <div id="imagePreview" style="margin-top: 15px;"></div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Audio hiện tại</label>
+                {% if card.audio_url %}
+                <div style="margin-bottom: 10px;">
+                    <button type="button" onclick="playAudio('{{ card.audio_url }}')" class="btn btn-sm btn-info">
+                        🔊 Nghe audio hiện tại
+                    </button>
+                </div>
+                {% else %}
+                <p style="color: #999;">Chưa có audio</p>
+                {% endif %}
+                <label class="form-label">Thay đổi audio (tùy chọn)</label>
+                <input type="file" name="audio" class="form-control" accept="audio/*" id="audioInput">
+                <small class="text-muted">Để trống nếu không muốn thay đổi. Nếu không có, hệ thống dùng TTS</small>
+                <div id="audioPreview" style="margin-top: 10px;"></div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <button type="submit" class="btn-control btn-finish" style="font-size: 1.3rem; padding: 15px 50px;">
+                    ✅ Cập nhật thẻ
+                </button>
+                <a href="{{ url_for('flashcard.manage_cards', deck_id=deck.id) }}" class="btn-control btn-prev" style="font-size: 1.3rem; padding: 15px 50px;">
+                    ❌ Hủy
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Preview hình ảnh khi chọn file mới
+document.getElementById('imageInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('imagePreview').innerHTML = `
+                <div style="margin-top: 15px;">
+                    <strong>Hình mới:</strong><br>
+                    <img src="${e.target.result}" style="max-width: 300px; border-radius: 10px; margin-top: 10px;">
+                </div>
+            `;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Preview audio khi chọn file mới
+document.getElementById('audioInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        document.getElementById('audioPreview').innerHTML = `
+            <div style="margin-top: 10px;">
+                <strong>Audio mới:</strong> ${file.name}
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}

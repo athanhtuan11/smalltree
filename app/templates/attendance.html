@@ -54,15 +54,25 @@
     </h2>
     <div class="d-flex flex-column flex-md-row gap-2 mb-3 attendance-btn-group-mobile">
         {% if session.get('role') in ['admin', 'teacher'] %}
-        <a href="/classes/new" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">Tạo Lớp mới</a>
-        <a href="/attendance/new" class="btn btn-primary {% if mobile %}attendance-btn-mobile{% endif %}">Tạo học sinh mới</a>
-        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">Xem lịch sử điểm danh / Xuất hóa đơn</a>
-        <a href="/students" class="btn btn-secondary {% if mobile %}attendance-btn-mobile{% endif %}">Danh sách học sinh</a>
-        <a href="/bmi-index" class="btn btn-warning text-dark {% if mobile %}attendance-btn-mobile{% endif %}">Chỉ Số BMI</a>
+        <a href="/classes/new" class="btn btn-success {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-plus-circle me-1"></i> Tạo lớp mới
+        </a>
+        <a href="/attendance/new" class="btn btn-primary {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-person-plus me-1"></i> Thêm học sinh
+        </a>
+        <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-clock-history me-1"></i> Lịch sử & Hóa đơn
+        </a>
+        <a href="/students" class="btn btn-secondary {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-people me-1"></i> Danh sách
+        </a>
+        <a href="/bmi-index" class="btn btn-warning text-dark {% if mobile %}attendance-btn-mobile{% endif %}">
+            <i class="bi bi-heart-pulse me-1"></i> BMI
+        </a>
         {% endif %}
         {% if session.get('role') == 'parent' %}
         <a href="/bmi-index" class="btn btn-warning text-dark {% if mobile %}attendance-btn-mobile{% endif %}">
-            <i class="bi bi-heart-pulse-fill me-1"></i> Chỉ Số BMI của con
+            <i class="bi bi-heart-pulse-fill me-1"></i> Chỉ số BMI của con
         </a>
         <a href="/attendance/history" class="btn btn-info {% if mobile %}attendance-btn-mobile{% endif %}">
             <i class="bi bi-calendar3 me-1"></i> Xem lịch sử tháng

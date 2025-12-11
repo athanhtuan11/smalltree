@@ -1,0 +1,36 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Audio Mode - {{ deck.title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 20px 20px 0 20px; position: relative; z-index: 100;">
+    <a href="{{ url_for('flashcard.deck_detail', deck_id=deck.id) }}" class="btn btn-success">
+        <i class="bi bi-arrow-left me-2"></i>Quay lại
+    </a>
+</div>
+
+<div class="flashcard-container">
+    <div class="flashcard-header">
+        <div class="card-counter">1 / {{ cards|length }}</div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: 0%;"></div>
+        </div>
+        <div style="font-size: 1.2rem; font-weight: bold;">🎧 Audio Mode</div>
+    </div>
+    
+    <div id="audio-content">
+        <!-- JavaScript sẽ render câu hỏi audio ở đây -->
+    </div>
+</div>
+
+<script>
+const cardsData = {{ cards|tojson }};
+const childId = {{ child_id if child_id else 'null' }};
+
+let audioMode;
+
+window.addEventListener('DOMContentLoaded', () => {
+    audioMode = new AudioMode(cardsData, childId);
+});
+</script>
+{% endblock %}

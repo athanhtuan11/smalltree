@@ -1,0 +1,57 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Tạo bộ thẻ mới{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 40px 20px; max-width: 800px; margin: 0 auto;">
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('flashcard.admin') }}" class="btn btn-outline-success">
+            <i class="bi bi-arrow-left me-2"></i>Quay lại Admin
+        </a>
+    </div>
+    
+    <div style="background: white; border-radius: 25px; padding: 40px; box-shadow: 0 8px 20px var(--shadow);">
+        <h1 style="text-align: center; font-size: 2.5rem; margin-bottom: 30px;">➥ Tạo bộ thẻ mới</h1>
+        
+        <!-- DEBUG: CSRF Token = {{ csrf_token() }} -->
+        
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Tên bộ thẻ *</label>
+                <input type="text" name="title" class="form-control form-control-lg" placeholder="VD: Con vật, Màu sắc..." required>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Mô tả</label>
+                <textarea name="description" class="form-control" rows="3" placeholder="Học về các con vật..."></textarea>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Độ tuổi *</label>
+                <select name="age_group" class="form-select form-select-lg" required>
+                    <option value="">-- Chọn độ tuổi --</option>
+                    <option value="1-3">👶 1-3 tuổi</option>
+                    <option value="3-5">🧒 3-5 tuổi</option>
+                    <option value="5-7">👦 5-7 tuổi</option>
+                </select>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label" style="font-size: 1.2rem; font-weight: bold;">Hình bìa (tùy chọn)</label>
+                <input type="file" name="cover_image" class="form-control" accept="image/*">
+                <small class="text-muted">Định dạng: JPG, PNG, WEBP</small>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <button type="submit" class="btn-control btn-finish" style="font-size: 1.3rem; padding: 15px 50px;">
+                    ✅ Tạo bộ thẻ
+                </button>
+                <a href="{{ url_for('flashcard.admin') }}" class="btn-control btn-prev" style="font-size: 1.3rem; padding: 15px 50px;">
+                    ❌ Hủy
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

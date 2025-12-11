@@ -1,0 +1,92 @@
+{% extends "flashcard/base.html" %}
+
+{% block title %}Phần thưởng!{% endblock %}
+
+{% block content %}
+<div class="rewards-container">
+    <div class="rewards-animation">🎉</div>
+    <h1>Tuyệt vời!</h1>
+    
+    <div class="rewards-card">
+        <div class="reward-item" style="background: linear-gradient(135deg, var(--pastel-yellow), white);">
+            <div class="icon">⭐</div>
+            <div class="label">Sao kiếm được</div>
+            <div class="value">+{{ stars }}</div>
+        </div>
+        
+        {% if progress %}
+        <div class="reward-item" style="background: linear-gradient(135deg, var(--pastel-pink), white);">
+            <div class="icon">🏆</div>
+            <div class="label">Tổng số sao</div>
+            <div class="value">{{ progress.stars }}</div>
+        </div>
+        
+        <div class="reward-item" style="background: linear-gradient(135deg, var(--pastel-blue), white);">
+            <div class="icon">🔥</div>
+            <div class="label">Streak</div>
+            <div class="value">{{ progress.streak_days }} ngày</div>
+        </div>
+        
+        {% if progress.completion_date %}
+        <div class="reward-item" style="background: linear-gradient(135deg, var(--pastel-green), white);">
+            <div class="icon">🎁</div>
+            <div class="label">Hoàn thành bộ thẻ!</div>
+            <div class="value">✅</div>
+        </div>
+        {% endif %}
+        {% endif %}
+    </div>
+    
+    <a href="{{ url_for('flashcard.index') }}" class="btn-control btn-finish" style="display: inline-block; margin-top: 30px;">
+        🏠 Về trang chủ
+    </a>
+    
+    {% if deck %}
+    <a href="{{ url_for('flashcard.deck_detail', deck_id=deck.id) }}" class="btn-control btn-next" style="display: inline-block; margin-top: 20px;">
+        🔄 Học lại
+    </a>
+    {% endif %}
+</div>
+
+<script>
+// Pháo hoa khi load trang
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        confetti({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.5 }
+        });
+    }, 300);
+    
+    setTimeout(() => {
+        confetti({
+            particleCount: 150,
+            spread: 90,
+            origin: { y: 0.5 }
+        });
+    }, 1000);
+    
+    // Text-to-speech
+    tts.speak('Tuyệt vời! Bé học giỏi quá!');
+    
+    // Animation
+    anime({
+        targets: '.rewards-card',
+        scale: [0.8, 1],
+        opacity: [0, 1],
+        duration: 800,
+        easing: 'easeOutElastic(1, .6)'
+    });
+    
+    anime({
+        targets: '.reward-item',
+        translateX: [-50, 0],
+        opacity: [0, 1],
+        delay: anime.stagger(100, {start: 400}),
+        duration: 600,
+        easing: 'easeOutQuad'
+    });
+});
+</script>
+{% endblock %}
