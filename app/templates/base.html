@@ -19,6 +19,45 @@
     
     <!-- Preload key resources for better performance -->
     <link rel="preload" href="{{ url_for('static', filename='images/logo.jpg') }}" as="image">
+    
+    <style>
+        /* Mobile dropdown optimization */
+        @media (max-width: 991px) {
+            .navbar-nav .dropdown-menu {
+                border: none;
+                box-shadow: none;
+                background-color: #f8f9fa;
+                padding-left: 1rem;
+            }
+            .navbar-nav .dropdown-item {
+                min-height: 44px;
+                padding: 0.75rem 1rem;
+                border-radius: 8px;
+                margin-bottom: 4px;
+            }
+            .navbar-nav .dropdown-item:hover,
+            .navbar-nav .dropdown-item:focus {
+                background-color: #e8f5e9;
+            }
+            .navbar-nav .dropdown-toggle::after {
+                float: right;
+                margin-top: 0.5rem;
+            }
+        }
+        
+        /* Desktop dropdown */
+        @media (min-width: 992px) {
+            .navbar-nav .dropdown-menu {
+                min-width: 200px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                border-radius: 8px;
+            }
+            .navbar-nav .dropdown-item {
+                min-height: 44px;
+                padding: 0.5rem 1rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Mobile-optimized navigation -->
@@ -45,11 +84,11 @@
                     
                     <!-- Dropdown Học tập -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarLearning" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-height: 44px;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarLearning" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" style="min-height: 44px;">
                             <i class="bi bi-book-fill me-2" style="color:#43a047; font-size:1.1em;"></i> 
                             <span>Học tập</span>
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarLearning">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarLearning">
                             <li>
                                 <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('main.curriculum') }}">
                                     <i class="bi bi-journal-bookmark-fill me-2" style="color:#43a047;"></i> 
@@ -67,11 +106,11 @@
                     
                     <!-- Dropdown App -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarApps" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-height: 44px;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarApps" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" style="min-height: 44px;">
                             <i class="bi bi-grid-3x3-gap-fill me-2" style="color:#43a047; font-size:1.1em;"></i> 
                             <span>App</span>
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarApps">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarApps">
                             <li>
                                 <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('flashcard.index') }}">
                                     <i class="bi bi-card-text me-2" style="color:#43a047;"></i> 
@@ -83,11 +122,11 @@
                     
                     <!-- Dropdown Quản lý -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarManagement" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-height: 44px;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarManagement" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" style="min-height: 44px;">
                             <i class="bi bi-grid-fill me-2" style="color:#43a047; font-size:1.1em;"></i> 
                             <span>Quản lý</span>
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarManagement">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarManagement">
                             <li>
                                 <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('main.menu') }}">
                                     <i class="bi bi-list-ul me-2" style="color:#43a047;"></i> 
@@ -130,11 +169,11 @@
                     {% if session.get('role') %}
                     <!-- Dropdown Tài khoản -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarAccount" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="min-height: 44px;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="#" id="navbarAccount" role="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" style="min-height: 44px;">
                             <i class="bi bi-person-circle me-2" style="color:#43a047; font-size:1.1em;"></i> 
                             <span>Tài khoản</span>
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarAccount">
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarAccount">
                             <li>
                                 <a class="dropdown-item d-flex align-items-center py-2" href="/profile">
                                     <i class="bi bi-person-fill me-2" style="color:#43a047;"></i> 
@@ -210,6 +249,46 @@
             <span style="color:#388e3c; font-size:0.9em;">Ngôi nhà thứ hai của bé - Mầm non xanh, an toàn và sáng tạo!</span>
         </div>
     </footer>
+    
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Mobile Dropdown Optimization -->
+    <script>
+        // Đảm bảo dropdown đóng khi click item trên mobile
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropdownItems = document.querySelectorAll('.navbar-nav .dropdown-item');
+            const navbarCollapse = document.querySelector('.navbar-collapse');
+            
+            dropdownItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // Đóng dropdown
+                    const dropdown = bootstrap.Dropdown.getInstance(this.closest('.dropdown').querySelector('[data-bs-toggle="dropdown"]'));
+                    if (dropdown) {
+                        dropdown.hide();
+                    }
+                    
+                    // Đóng navbar collapse trên mobile
+                    if (window.innerWidth < 992 && navbarCollapse) {
+                        const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                        if (bsCollapse) {
+                            bsCollapse.hide();
+                        }
+                    }
+                });
+            });
+            
+            // Tối ưu touch cho dropdown toggle
+            const dropdownToggles = document.querySelectorAll('.navbar-nav .dropdown-toggle');
+            dropdownToggles.forEach(toggle => {
+                toggle.addEventListener('touchstart', function(e) {
+                    // Ngăn double-tap zoom trên mobile
+                    e.preventDefault();
+                    this.click();
+                }, { passive: false });
+            });
+        });
+    </script>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     
