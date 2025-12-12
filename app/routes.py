@@ -810,6 +810,8 @@ def new_activity():
             ext = os.path.splitext(background_file.filename)[1].lower()
             safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
             if ext not in allowed_ext:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'error': 'Chỉ cho phép file ảnh'}), 400
                 flash('Chỉ cho phép tải lên các file ảnh có đuôi: .jpg, .jpeg, .png, .gif, .jfif!', 'danger')
                 return render_template('new_activity.html', form=form, title='Đăng bài viết mới', mobile=is_mobile(), classes=classes)
             filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
@@ -945,6 +947,11 @@ def new_activity():
         else:
             print(f"[DEBUG] No files to process")
             flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
+        
+        # Nếu là AJAX request, trả về JSON
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
+            return jsonify({'success': True, 'activity_id': new_post.id})
+        
         return redirect(url_for('main.activities'))
     else:
         print(f"[DEBUG] Form validation FAILED")
@@ -960,6 +967,7 @@ def new_activity():
 
 # Route riêng để upload batch ảnh (từ client-side compression)
 @main.route('/activities/upload-batch', methods=['POST'])
+@main.route('/upload_activity_images', methods=['POST'])
 def upload_batch_images():
     if session.get('role') not in ['admin', 'teacher']:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
@@ -968,7 +976,11 @@ def upload_batch_images():
     if not activity_id:
         return jsonify({'success': False, 'error': 'No activity ID'}), 400
     
-    files = request.files.getlist('batch_images')
+    # Lấy files từ request (hỗ trợ cả 'images' và 'batch_images')
+    files = request.files.getlist('images') or request.files.getlist('batch_images')
+    if not files or len(files) == 0:
+        return jsonify({'success': False, 'error': 'No files uploaded'}), 400
+    
     activity_dir = os.path.join('app', 'static', 'images', 'activities', str(activity_id))
     os.makedirs(activity_dir, exist_ok=True)
     
@@ -976,13 +988,43 @@ def upload_batch_images():
     for file in files:
         if file and file.filename:
             try:
-                # File đã được nén client-side, chỉ cần lưu
-                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
-                img_filename = datetime.now().strftime('%Y%m%d%H%M%S%f') + '_' + safe_filename
-                img_path = os.path.join(activity_dir, img_filename)
-                file.save(img_path)
+                # Tự động tối ưu ảnh
+                is_readable, processed_stream = verify_and_repair_image(file.stream)
+                if not is_readable:
+                    print(f"[WARNING] Ảnh {file.filename} không đọc được, bỏ qua")
+                    continue
                 
-                rel_path = f'images/activities/{activity_id}/{img_filename}'
+                optimized_data, img_format = optimize_image(processed_stream, max_size=(1200, 900), quality=80)
+                optimized_data.seek(0)
+                image_data = optimized_data.read()
+                
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', file.filename)
+                base_name = os.path.splitext(safe_filename)[0] if safe_filename else 'image'
+                img_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S%f')}_{base_name}.jpg"
+                img_path = os.path.join(activity_dir, img_filename)
+                
+                # Upload lên R2 (nếu có)
+                r2_url = None
+                if R2_ENABLED:
+                    try:
+                        r2 = get_r2_storage()
+                        if r2.enabled:
+                            from io import BytesIO
+                            r2_stream = BytesIO(image_data)
+                            r2_url = r2.upload_file(r2_stream, img_filename, folder='activities')
+                            if r2_url:
+                                print(f"✅ Đã upload lên R2: {img_filename}")
+                    except Exception as e:
+                        print(f"⚠️  Lỗi upload R2: {e}")
+                
+                # Fallback: Lưu local nếu R2 không thành công
+                if not r2_url:
+                    with open(img_path, 'wb') as f:
+                        f.write(image_data)
+                    rel_path = f'images/activities/{activity_id}/{img_filename}'
+                else:
+                    rel_path = r2_url
+                
                 db.session.add(ActivityImage(
                     filename=img_filename,
                     filepath=rel_path,
@@ -991,12 +1033,17 @@ def upload_batch_images():
                 ))
                 success_count += 1
             except Exception as e:
-                print(f"[ERROR] Upload batch error: {e}")
+                print(f"[ERROR] Upload batch error for {file.filename}: {e}")
                 continue
     
-    db.session.commit()
-    print(f"[INFO] Uploaded {success_count} images to activity {activity_id}")
-    return jsonify({'success': True, 'uploaded': success_count})
+    try:
+        db.session.commit()
+        print(f"[INFO] Uploaded {success_count}/{len(files)} images to activity {activity_id}")
+        return jsonify({'success': True, 'uploaded': success_count, 'total': len(files)})
+    except Exception as e:
+        db.session.rollback()
+        print(f"[ERROR] Database commit error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # Test route để kiểm tra upload ảnh
 @main.route('/test-activity-images/<int:activity_id>')

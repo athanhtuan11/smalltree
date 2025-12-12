@@ -42,28 +42,39 @@
             <input type="date" class="form-control" id="date" name="date" required value="{{ form.date.data if form and form.date.data else current_date_iso }}">
         </div>
         <div class="mb-3">
-            <label for="images" class="form-label">Ảnh hoạt động (có thể chọn nhiều)</label>
-            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple onchange="debugFiles()">
-            <!-- Debug info để test -->
-            <div id="debug-info" class="mt-2" style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: none;">
-                <small><strong>Debug:</strong> <span id="debug-text">Chưa chọn file nào</span></small>
+            <label for="images" class="form-label">Ảnh hoạt động (không giới hạn số lượng - tự động chia batch)</label>
+            <input type="file" class="form-control" id="images" name="images" accept="image/*" multiple onchange="showFileInfo()">
+            
+            <!-- Thông tin file -->
+            <div id="file-info" class="mt-2" style="background: #e8f5e9; padding: 10px; border-radius: 5px; display: none;">
+                <small>
+                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                    <strong>Đã chọn:</strong> <span id="file-count">0</span> ảnh 
+                    (<span id="total-size">0 MB</span>)
+                    <br>
+                    <i class="bi bi-info-circle-fill text-info me-1"></i>
+                    Hệ thống sẽ tự động chia thành <span id="batch-count">1</span> lần upload
+                </small>
             </div>
-            <div id="compress-progress" class="mt-2" style="display:none;">
-                <div class="progress mb-2">
-                    <div class="progress-bar bg-info" role="progressbar" style="width: 0%" id="compress-bar"></div>
+            
+            <!-- Progress bar upload batch -->
+            <div id="batch-progress" class="mt-2" style="display:none;">
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                         role="progressbar" style="width: 0%" id="batch-bar">
+                        <span id="batch-text">0%</span>
+                    </div>
                 </div>
-                <small class="text-muted">Đang nén ảnh: <span id="compress-text">0/0</span></small>
-            </div>
-            <div id="upload-progress" class="mt-2" style="display:none;">
-                <div class="progress">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
-                </div>
-                <small class="text-muted mt-1 d-block">Đang upload: <span id="progress-text">0/0</span></small>
+                <small class="text-muted">
+                    <i class="bi bi-cloud-upload-fill me-1"></i>
+                    Đang upload batch <span id="current-batch">0</span>/<span id="total-batch">0</span> 
+                    - <span id="uploaded-count">0</span>/<span id="total-files">0</span> ảnh
+                </small>
             </div>
         </div>
-        <button type="submit" class="btn btn-success" id="submit-btn" onclick="document.getElementById('description').value = quill.root.innerHTML;">
+        <button type="button" class="btn btn-success" id="submit-btn" onclick="handleSubmit(event)">
             <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-            Đăng bài
+            <span id="btn-text">Đăng bài</span>
         </button>
         <a href="/activities" class="btn btn-outline-secondary ms-2">Quay lại</a>
     </form>
@@ -85,7 +96,178 @@ var quill = new Quill('#quillEditor', {
         ]
     }
 });
-// Debug function để test file selection
+
+// Hiển thị thông tin file đã chọn
+function showFileInfo() {
+    const fileInput = document.getElementById('images');
+    const files = Array.from(fileInput.files);
+    const fileInfo = document.getElementById('file-info');
+    
+    if (files.length === 0) {
+        fileInfo.style.display = 'none';
+        return;
+    }
+    
+    // Tính tổng dung lượng
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    const totalMB = (totalBytes / (1024 * 1024)).toFixed(2);
+    
+    // Tính số batch (mỗi batch 20 ảnh hoặc 30MB)
+    const BATCH_SIZE = 20;
+    const MAX_BATCH_MB = 30;
+    const batchCount = Math.ceil(files.length / BATCH_SIZE);
+    
+    // Hiển thị thông tin
+    document.getElementById('file-count').textContent = files.length;
+    document.getElementById('total-size').textContent = totalMB;
+    document.getElementById('batch-count').textContent = batchCount;
+    fileInfo.style.display = 'block';
+    
+    console.log(`Đã chọn ${files.length} ảnh (${totalMB}MB), sẽ chia thành ${batchCount} batch`);
+}
+
+// Xử lý submit với batch upload
+async function handleSubmit(event) {
+    if (event) event.preventDefault();
+    
+    // Lấy nội dung Quill
+    document.getElementById('description').value = quill.root.innerHTML;
+    
+    const fileInput = document.getElementById('images');
+    const files = Array.from(fileInput.files);
+    const submitBtn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    const spinner = submitBtn.querySelector('.spinner-border');
+    
+    // Validate form
+    const title = document.getElementById('title').value.trim();
+    const description = document.getElementById('description').value.trim();
+    
+    if (!title || !description) {
+        alert('Vui lòng nhập đầy đủ tiêu đề và nội dung!');
+        return;
+    }
+    
+    // Disable button
+    submitBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    
+    try {
+        // Bước 1: Tạo activity (không có ảnh)
+        btnText.textContent = 'Đang tạo bài viết...';
+        const activityId = await createActivity();
+        
+        if (!activityId) {
+            throw new Error('Không thể tạo bài viết');
+        }
+        
+        // Bước 2: Upload ảnh theo batch (nếu có)
+        if (files.length > 0) {
+            btnText.textContent = `Đang upload ${files.length} ảnh...`;
+            await uploadImagesBatch(activityId, files);
+        }
+        
+        // Thành công
+        alert(`Đã đăng bài viết thành công${files.length > 0 ? ` với ${files.length} ảnh` : ''}!`);
+        window.location.href = '/activities';
+        
+    } catch (error) {
+        console.error('Lỗi:', error);
+        alert('Có lỗi xảy ra: ' + error.message);
+        submitBtn.disabled = false;
+        spinner.classList.add('d-none');
+        btnText.textContent = 'Đăng bài';
+    }
+}
+
+// Tạo activity (không upload ảnh)
+async function createActivity() {
+    const formData = new FormData();
+    formData.append('csrf_token', document.querySelector('[name="csrf_token"]').value);
+    formData.append('title', document.getElementById('title').value);
+    formData.append('description', document.getElementById('description').value);
+    formData.append('date', document.getElementById('date').value);
+    formData.append('class_id', document.getElementById('class_id').value);
+    
+    // Background image (nếu có)
+    const bgFile = document.getElementById('background').files[0];
+    if (bgFile) {
+        formData.append('background', bgFile);
+    }
+    
+    const response = await fetch('/new_activity', {
+        method: 'POST',
+        body: formData
+    });
+    
+    if (!response.ok) {
+        throw new Error('Tạo bài viết thất bại');
+    }
+    
+    const result = await response.json();
+    return result.activity_id;
+}
+
+// Upload ảnh theo batch
+async function uploadImagesBatch(activityId, files) {
+    const BATCH_SIZE = 20; // 20 ảnh mỗi batch
+    const totalBatches = Math.ceil(files.length / BATCH_SIZE);
+    
+    const batchProgress = document.getElementById('batch-progress');
+    const batchBar = document.getElementById('batch-bar');
+    const batchText = document.getElementById('batch-text');
+    const currentBatchEl = document.getElementById('current-batch');
+    const totalBatchEl = document.getElementById('total-batch');
+    const uploadedCountEl = document.getElementById('uploaded-count');
+    const totalFilesEl = document.getElementById('total-files');
+    
+    batchProgress.style.display = 'block';
+    totalBatchEl.textContent = totalBatches;
+    totalFilesEl.textContent = files.length;
+    
+    let uploadedCount = 0;
+    
+    for (let i = 0; i < totalBatches; i++) {
+        const start = i * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, files.length);
+        const batch = files.slice(start, end);
+        
+        currentBatchEl.textContent = i + 1;
+        
+        // Upload batch này
+        const formData = new FormData();
+        formData.append('csrf_token', document.querySelector('[name="csrf_token"]').value);
+        formData.append('activity_id', activityId);
+        
+        batch.forEach(file => {
+            formData.append('images', file);
+        });
+        
+        const response = await fetch('/upload_activity_images', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Upload batch ${i + 1} thất bại`);
+        }
+        
+        uploadedCount += batch.length;
+        uploadedCountEl.textContent = uploadedCount;
+        
+        // Update progress bar
+        const percent = ((i + 1) / totalBatches) * 100;
+        batchBar.style.width = percent + '%';
+        batchText.textContent = Math.round(percent) + '%';
+        
+        // Delay ngắn giữa các batch
+        if (i < totalBatches - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+}
+
+// Debug function (giữ lại cho tương thích)
 function debugFiles() {
     const fileInput = document.getElementById('images');
     const files = Array.from(fileInput.files);
