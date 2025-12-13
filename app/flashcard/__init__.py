@@ -8,6 +8,15 @@ from werkzeug.utils import secure_filename
 import os
 from functools import wraps
 
+# Cloudflare R2 Storage
+try:
+    from r2_storage import get_r2_storage
+    R2_ENABLED = True
+    r2 = get_r2_storage()
+except ImportError:
+    R2_ENABLED = False
+    print("⚠️  R2 Storage không khả dụng cho Flashcard. Ảnh sẽ lưu local.")
+
 flashcard_bp = Blueprint('flashcard', __name__, url_prefix='/flashcards', template_folder='templates')
 
 UPLOAD_FOLDER = 'app/static/flashcard'
@@ -235,8 +244,25 @@ def create_deck():
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
                 filename = f"{timestamp}_{filename}"
-                file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
-                cover_image = f"flashcard/images/{filename}"
+                
+                # Upload to R2 hoặc local fallback
+                if R2_ENABLED:
+                    try:
+                        r2_path = f"flashcard/covers/{filename}"
+                        file.seek(0)
+                        r2.upload_file(file, r2_path)
+                        cover_image = f"{r2.public_url}/{r2_path}"
+                        print(f"✅ Uploaded cover to R2: {cover_image}")
+                    except Exception as e:
+                        print(f"⚠️  R2 upload failed, saving local: {e}")
+                        os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                        file.seek(0)
+                        file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                        cover_image = f"flashcard/images/{filename}"
+                else:
+                    os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                    file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                    cover_image = f"flashcard/images/{filename}"
         
         deck = Deck(
             title=title,
@@ -308,9 +334,25 @@ def create_card(deck_id):
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
                 filename = f"{timestamp}_{filename}"
-                os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
-                file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
-                image_url = f"flashcard/images/{filename}"
+                
+                # Upload to R2 hoặc local fallback
+                if R2_ENABLED:
+                    try:
+                        r2_path = f"flashcard/cards/{filename}"
+                        file.seek(0)
+                        r2.upload_file(file, r2_path)
+                        image_url = f"{r2.public_url}/{r2_path}"
+                        print(f"✅ Uploaded card image to R2: {image_url}")
+                    except Exception as e:
+                        print(f"⚠️  R2 upload failed, saving local: {e}")
+                        os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                        file.seek(0)
+                        file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                        image_url = f"flashcard/images/{filename}"
+                else:
+                    os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                    file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                    image_url = f"flashcard/images/{filename}"
         
         # Upload audio
         audio_url = None
@@ -320,8 +362,25 @@ def create_card(deck_id):
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
                 filename = f"{timestamp}_{filename}"
-                file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
-                audio_url = f"flashcard/audio/{filename}"
+                
+                # Upload to R2 hoặc local fallback
+                if R2_ENABLED:
+                    try:
+                        r2_path = f"flashcard/audio/{filename}"
+                        file.seek(0)
+                        r2.upload_file(file, r2_path)
+                        audio_url = f"{r2.public_url}/{r2_path}"
+                        print(f"✅ Uploaded audio to R2: {audio_url}")
+                    except Exception as e:
+                        print(f"⚠️  R2 upload failed, saving local: {e}")
+                        os.makedirs(os.path.join(UPLOAD_FOLDER, 'audio'), exist_ok=True)
+                        file.seek(0)
+                        file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
+                        audio_url = f"flashcard/audio/{filename}"
+                else:
+                    os.makedirs(os.path.join(UPLOAD_FOLDER, 'audio'), exist_ok=True)
+                    file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
+                    audio_url = f"flashcard/audio/{filename}"
         
         # Lấy order cao nhất
         max_order = db.session.query(db.func.max(Card.order)).filter_by(deck_id=deck_id).scalar() or 0
@@ -361,8 +420,25 @@ def edit_card(card_id):
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
                 filename = f"{timestamp}_{filename}"
-                file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
-                card.image_url = f"flashcard/images/{filename}"
+                
+                # Upload to R2 hoặc local fallback
+                if R2_ENABLED:
+                    try:
+                        r2_path = f"flashcard/cards/{filename}"
+                        file.seek(0)
+                        r2.upload_file(file, r2_path)
+                        card.image_url = f"{r2.public_url}/{r2_path}"
+                        print(f"✅ Updated card image on R2: {card.image_url}")
+                    except Exception as e:
+                        print(f"⚠️  R2 upload failed, saving local: {e}")
+                        os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                        file.seek(0)
+                        file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                        card.image_url = f"flashcard/images/{filename}"
+                else:
+                    os.makedirs(os.path.join(UPLOAD_FOLDER, 'images'), exist_ok=True)
+                    file.save(os.path.join(UPLOAD_FOLDER, 'images', filename))
+                    card.image_url = f"flashcard/images/{filename}"
         
         # Upload audio mới nếu có
         if 'audio' in request.files:
@@ -371,8 +447,25 @@ def edit_card(card_id):
                 filename = secure_filename(file.filename)
                 timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
                 filename = f"{timestamp}_{filename}"
-                file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
-                card.audio_url = f"flashcard/audio/{filename}"
+                
+                # Upload to R2 hoặc local fallback
+                if R2_ENABLED:
+                    try:
+                        r2_path = f"flashcard/audio/{filename}"
+                        file.seek(0)
+                        r2.upload_file(file, r2_path)
+                        card.audio_url = f"{r2.public_url}/{r2_path}"
+                        print(f"✅ Updated audio on R2: {card.audio_url}")
+                    except Exception as e:
+                        print(f"⚠️  R2 upload failed, saving local: {e}")
+                        os.makedirs(os.path.join(UPLOAD_FOLDER, 'audio'), exist_ok=True)
+                        file.seek(0)
+                        file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
+                        card.audio_url = f"flashcard/audio/{filename}"
+                else:
+                    os.makedirs(os.path.join(UPLOAD_FOLDER, 'audio'), exist_ok=True)
+                    file.save(os.path.join(UPLOAD_FOLDER, 'audio', filename))
+                    card.audio_url = f"flashcard/audio/{filename}"
         
         db.session.commit()
         flash(f'Đã cập nhật thẻ "{card.front_text}"', 'success')
