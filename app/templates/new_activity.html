@@ -195,16 +195,24 @@ async function createActivity() {
         formData.append('background', bgFile);
     }
     
-    const response = await fetch('/new_activity', {
+    const response = await fetch('/new_activity?api=1', {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'Accept': 'application/json'
+        }
     });
     
     if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server response:', errorText);
         throw new Error('Tạo bài viết thất bại');
     }
     
     const result = await response.json();
+    if (!result.success || !result.activity_id) {
+        throw new Error('Không nhận được activity_id từ server');
+    }
     return result.activity_id;
 }
 

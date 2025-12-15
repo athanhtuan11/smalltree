@@ -948,10 +948,14 @@ def new_activity():
             print(f"[DEBUG] No files to process")
             flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
         
-        # Nếu là AJAX request, trả về JSON
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.accept_json:
+        # Nếu là AJAX request (fetch từ JavaScript), trả về JSON
+        # Fetch API không tự set X-Requested-With, nên check bằng cách khác
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+           request.accept_mimetypes.accept_json or \
+           request.args.get('api') == '1':
             return jsonify({'success': True, 'activity_id': new_post.id})
         
+        # Nếu submit thông thường (form HTML), redirect
         return redirect(url_for('main.activities'))
     else:
         print(f"[DEBUG] Form validation FAILED")
