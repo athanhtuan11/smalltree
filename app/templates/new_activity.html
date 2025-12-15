@@ -205,29 +205,17 @@ async function createActivity() {
         has_background: !!bgFile
     });
     
-    const response = await fetch('/new_activity?api=1', {
+    const response = await fetch('/activities/new?api=1', {
         method: 'POST',
         body: formData,
         headers: {
-            'Accept': 'application/json'
+            'X-Requested-With': 'XMLHttpRequest'
         }
     });
     
     if (!response.ok) {
-        let errorMsg = 'Tạo bài viết thất bại';
-        try {
-            const errorData = await response.json();
-            console.error('[ERROR] Server response:', errorData);
-            if (errorData.errors && errorData.errors.length > 0) {
-                errorMsg = errorData.errors.join('\n');
-            } else if (errorData.error) {
-                errorMsg = errorData.error;
-            }
-        } catch (e) {
-            const errorText = await response.text();
-            console.error('[ERROR] Server response (text):', errorText);
-        }
-        throw new Error(errorMsg);
+        const error = await response.json();
+        throw new Error(error.error || 'Tạo bài viết thất bại');
     }
     
     const result = await response.json();

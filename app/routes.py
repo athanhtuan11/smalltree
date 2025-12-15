@@ -772,18 +772,21 @@ def new_activity():
         return redirect_no_permission()
     classes = Class.query.order_by(Class.name).all()
     class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
-    
-    # Kiểm tra nếu là API request thì bypass form validation, xử lý manual
-    is_api_request = request.args.get('api') == '1' or \
-                     request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
-                     request.accept_mimetypes.accept_json
-    
-    form = ActivityCreateForm(meta={'csrf': not is_api_request})  # Tắt CSRF cho API request
+    form = ActivityCreateForm()
     form.class_id.choices = class_choices
 
+    # Kiểm tra API request (chỉ cho POST)
+    is_api = False
     if request.method == 'POST':
+        is_api = request.args.get('api') == '1' or \
+                 request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
+        print(f"[DEBUG] is_api: {is_api}, args: {dict(request.args)}")
 
         # Debug file uploads - BOTH from form and request
+        print(f"[DEBUG] POST data: {dict(request.form)}")
+        print(f"[DEBUG] CSRF token: {request.form.get('csrf_token', 'MISSING')}")
+        
         files = request.files.getlist('images')
 
         # Also try direct access to form field
@@ -804,59 +807,70 @@ def new_activity():
             else:
                 print(f"[DEBUG] File {i}: Empty or no filename")
     
-    # Validate form - cho cả API và HTML form
-    is_valid = False
-    validation_errors = []
+    print(f"[DEBUG] About to validate form...")
+    print(f"[DEBUG] Form data: title={form.title.data}, date={form.date.data}")
     
-    if is_api_request:
-        # API request: validate manual (không dùng WTForms validate_on_submit)
+    # API request: Bỏ qua WTForms validation, validate manual
+    if request.method == 'POST' and is_api:
+        print(f"[DEBUG] API mode: Manual validation")
+        
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
         date_str = request.form.get('date', '').strip()
+        class_id = int(request.form.get('class_id', 0))
         
+        errors = {}
         if not title:
-            validation_errors.append('title: Tiêu đề là bắt buộc')
+            errors['title'] = ['Tiêu đề là bắt buộc']
         if not description:
-            validation_errors.append('description: Nội dung là bắt buộc')
+            errors['description'] = ['Nội dung là bắt buộc']
         if not date_str:
-            validation_errors.append('date: Ngày đăng là bắt buộc')
+            errors['date'] = ['Ngày đăng là bắt buộc']
         
-        is_valid = len(validation_errors) == 0
-        
-        if not is_valid:
-            print(f"[DEBUG] Manual validation FAILED: {validation_errors}")
+        if errors:
+            print(f"[DEBUG] API validation FAILED: {errors}")
             return jsonify({
                 'success': False,
                 'error': 'Validation failed',
-                'errors': validation_errors
+                'errors': errors
             }), 400
-    else:
-        # HTML form: dùng WTForms validation
-        is_valid = form.validate_on_submit()
-        if not is_valid:
-            print(f"[DEBUG] Form validation FAILED: {form.errors}")
-            for field, errors in form.errors.items():
-                for error in errors:
-                    validation_errors.append(f'{field}: {error}')
+        
+        # API validation success - tạo activity
+        print(f"[DEBUG] API validation SUCCESS")
+        date_val = datetime.strptime(date_str, '%Y-%m-%d')
+        background_file = request.files.get('background')
+        
+        image_url = ''
+        if background_file and background_file.filename:
+            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.jfif'}
+            ext = os.path.splitext(background_file.filename)[1].lower()
+            safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', background_file.filename)
+            if ext not in allowed_ext:
+                return jsonify({'success': False, 'error': 'Chỉ cho phép file ảnh'}), 400
+            filename = 'bg_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
+            save_path = os.path.join('app', 'static', 'images', filename)
+            img = Image.open(background_file)
+            img.thumbnail((1200, 800))
+            img.save(save_path)
+            image_url = url_for('static', filename=f'images/{filename}')
+        
+        class_id = class_id if class_id != 0 else None
+        new_post = Activity(title=title, description=description, date=date_val, image=image_url, class_id=class_id)
+        db.session.add(new_post)
+        db.session.commit()
+        
+        log_activity('create', 'activity', new_post.id, f'Tạo hoạt động: {title}')
+        
+        return jsonify({'success': True, 'activity_id': new_post.id})
     
-    if is_valid or (is_api_request and len(validation_errors) == 0):
+    # HTML form submission: Dùng WTForms validation
+    if form.validate_on_submit():
         print(f"[DEBUG] Form validation SUCCESS - proceeding to process")
-        
-        # Lấy data từ form hoặc request.form tùy theo loại request
-        if is_api_request:
-            title = request.form.get('title', '').strip()
-            content = request.form.get('description', '').strip()
-            date_str = request.form.get('date', '').strip()
-            class_id = int(request.form.get('class_id', 0))
-            background_file = request.files.get('background')
-        else:
-            title = form.title.data
-            content = form.description.data
-            date_str = form.date.data
-            class_id = form.class_id.data
-            background_file = form.background.data
-        
-        date_val = datetime.strptime(date_str, '%Y-%m-%d') if date_str else date.today()
+        title = form.title.data
+        content = form.description.data
+        date_val = datetime.strptime(form.date.data, '%Y-%m-%d') if form.date.data else datetime.now().date()
+        class_id = form.class_id.data
+        background_file = form.background.data
         image_url = ''
         if background_file and background_file.filename:
             allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.jfif'}
@@ -1003,34 +1017,32 @@ def new_activity():
             print(f"[DEBUG] No files to process")
             flash('Đã tạo bài viết! Hệ thống sẽ xử lý ảnh trong giây lát...', 'success')
         
-        # Nếu là AJAX request (fetch từ JavaScript), trả về JSON
-        # Fetch API không tự set X-Requested-With, nên check bằng cách khác
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
-           request.accept_mimetypes.accept_json or \
-           request.args.get('api') == '1':
+        # Nếu là AJAX request, trả về JSON
+        is_api = request.args.get('api') == '1' or \
+                 request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        
+        if is_api:
             return jsonify({'success': True, 'activity_id': new_post.id})
         
-        # Nếu submit thông thường (form HTML), redirect
         return redirect(url_for('main.activities'))
     else:
-        # Validation failed
-        print(f"[DEBUG] Validation FAILED")
+        print(f"[DEBUG] Form validation FAILED")
+        print(f"[DEBUG] Validation errors: {form.errors}")
         
-        # Nếu là API request, trả JSON với lỗi chi tiết
-        if is_api_request:
-            print(f"[DEBUG] API validation errors: {validation_errors}")
+        # Nếu API request và validation fail, trả JSON error
+        if is_api:
             return jsonify({
-                'success': False, 
-                'error': 'Form validation failed',
-                'errors': validation_errors
+                'success': False,
+                'error': 'Validation failed',
+                'errors': form.errors
             }), 400
         
-        # HTML form validation failed
-        print(f"[DEBUG] Form validation errors: {form.errors}")
+        # HTML form: Hiển thị form validation errors to user
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f'{field}: {error}', 'danger')
     
+    # GET request hoặc validation failed: Hiển thị form
     mobile = is_mobile()
     from datetime import date
     current_date_iso = date.today().isoformat()
