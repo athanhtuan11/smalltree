@@ -25,8 +25,8 @@ class ActivityCreateForm(FlaskForm):
     description = TextAreaField('Nội dung', validators=[DataRequired()])
     date = StringField('Ngày', validators=[DataRequired()])
     class_id = SelectField('Đăng cho lớp', coerce=int, validators=[Optional()])  # 0 = khách vãng lai
-    background = FileField('Ảnh nền', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'])])
-    images = MultipleFileField('Ảnh hoạt động', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif','jfif'], 'Chỉ cho phép file ảnh!'), Optional()])
+    background = FileField('Ảnh nền', validators=[Optional()])  # Bỏ FileAllowed - check manual trong route
+    images = MultipleFileField('Ảnh hoạt động', validators=[Optional()])  # Bỏ FileAllowed - check manual trong route
     submit = SubmitField('Đăng bài')
 
 class ActivityEditForm(FlaskForm):

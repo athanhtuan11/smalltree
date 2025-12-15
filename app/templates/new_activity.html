@@ -180,12 +180,12 @@ async function handleSubmit(event) {
     }
 }
 
-// Tạo activity (không upload ảnh)
+// Tạo activity (KHÔNG upload ảnh - chỉ metadata)
 async function createActivity() {
     const formData = new FormData();
     formData.append('csrf_token', document.querySelector('[name="csrf_token"]').value);
-    formData.append('title', document.getElementById('title').value);
-    formData.append('description', document.getElementById('description').value);
+    formData.append('title', document.getElementById('title').value.trim());
+    formData.append('description', document.getElementById('description').value.trim());
     formData.append('date', document.getElementById('date').value);
     formData.append('class_id', document.getElementById('class_id').value);
     
@@ -194,6 +194,16 @@ async function createActivity() {
     if (bgFile) {
         formData.append('background', bgFile);
     }
+    
+    // KHÔNG gửi images field - sẽ upload riêng sau
+    
+    console.log('[DEBUG] Creating activity with data:', {
+        title: formData.get('title'),
+        description: formData.get('description'),
+        date: formData.get('date'),
+        class_id: formData.get('class_id'),
+        has_background: !!bgFile
+    });
     
     const response = await fetch('/new_activity?api=1', {
         method: 'POST',
@@ -204,12 +214,25 @@ async function createActivity() {
     });
     
     if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server response:', errorText);
-        throw new Error('Tạo bài viết thất bại');
+        let errorMsg = 'Tạo bài viết thất bại';
+        try {
+            const errorData = await response.json();
+            console.error('[ERROR] Server response:', errorData);
+            if (errorData.errors && errorData.errors.length > 0) {
+                errorMsg = errorData.errors.join('\n');
+            } else if (errorData.error) {
+                errorMsg = errorData.error;
+            }
+        } catch (e) {
+            const errorText = await response.text();
+            console.error('[ERROR] Server response (text):', errorText);
+        }
+        throw new Error(errorMsg);
     }
     
     const result = await response.json();
+    console.log('[DEBUG] Create activity result:', result);
+    
     if (!result.success || !result.activity_id) {
         throw new Error('Không nhận được activity_id từ server');
     }

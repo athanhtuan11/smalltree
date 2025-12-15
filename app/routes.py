@@ -960,10 +960,26 @@ def new_activity():
     else:
         print(f"[DEBUG] Form validation FAILED")
         print(f"[DEBUG] Validation errors: {form.errors}")
-        # Hiển thị form validation errors to user
+        
+        # Nếu là API request, trả JSON với lỗi chi tiết
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+           request.accept_mimetypes.accept_json or \
+           request.args.get('api') == '1':
+            error_messages = []
+            for field, errors in form.errors.items():
+                for error in errors:
+                    error_messages.append(f'{field}: {error}')
+            return jsonify({
+                'success': False, 
+                'error': 'Form validation failed',
+                'errors': error_messages
+            }), 400
+        
+        # Hiển thị form validation errors to user (non-API request)
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f'{field}: {error}', 'danger')
+    
     mobile = is_mobile()
     from datetime import date
     current_date_iso = date.today().isoformat()
