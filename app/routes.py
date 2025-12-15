@@ -772,7 +772,13 @@ def new_activity():
         return redirect_no_permission()
     classes = Class.query.order_by(Class.name).all()
     class_choices = [(0, 'Tất cả khách vãng lai')] + [(c.id, c.name) for c in classes]
-    form = ActivityCreateForm()
+    
+    # Kiểm tra nếu là API request thì bypass form validation, xử lý manual
+    is_api_request = request.args.get('api') == '1' or \
+                     request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
+                     request.accept_mimetypes.accept_json
+    
+    form = ActivityCreateForm(meta={'csrf': not is_api_request})  # Tắt CSRF cho API request
     form.class_id.choices = class_choices
 
     if request.method == 'POST':
@@ -798,12 +804,59 @@ def new_activity():
             else:
                 print(f"[DEBUG] File {i}: Empty or no filename")
     
-    if form.validate_on_submit():
+    # Validate form - cho cả API và HTML form
+    is_valid = False
+    validation_errors = []
+    
+    if is_api_request:
+        # API request: validate manual (không dùng WTForms validate_on_submit)
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        date_str = request.form.get('date', '').strip()
+        
+        if not title:
+            validation_errors.append('title: Tiêu đề là bắt buộc')
+        if not description:
+            validation_errors.append('description: Nội dung là bắt buộc')
+        if not date_str:
+            validation_errors.append('date: Ngày đăng là bắt buộc')
+        
+        is_valid = len(validation_errors) == 0
+        
+        if not is_valid:
+            print(f"[DEBUG] Manual validation FAILED: {validation_errors}")
+            return jsonify({
+                'success': False,
+                'error': 'Validation failed',
+                'errors': validation_errors
+            }), 400
+    else:
+        # HTML form: dùng WTForms validation
+        is_valid = form.validate_on_submit()
+        if not is_valid:
+            print(f"[DEBUG] Form validation FAILED: {form.errors}")
+            for field, errors in form.errors.items():
+                for error in errors:
+                    validation_errors.append(f'{field}: {error}')
+    
+    if is_valid or (is_api_request and len(validation_errors) == 0):
         print(f"[DEBUG] Form validation SUCCESS - proceeding to process")
-        title = form.title.data
-        content = form.description.data
-        date_val = datetime.strptime(form.date.data, '%Y-%m-%d') if form.date.data else date.today()
-        background_file = form.background.data
+        
+        # Lấy data từ form hoặc request.form tùy theo loại request
+        if is_api_request:
+            title = request.form.get('title', '').strip()
+            content = request.form.get('description', '').strip()
+            date_str = request.form.get('date', '').strip()
+            class_id = int(request.form.get('class_id', 0))
+            background_file = request.files.get('background')
+        else:
+            title = form.title.data
+            content = form.description.data
+            date_str = form.date.data
+            class_id = form.class_id.data
+            background_file = form.background.data
+        
+        date_val = datetime.strptime(date_str, '%Y-%m-%d') if date_str else date.today()
         image_url = ''
         if background_file and background_file.filename:
             allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.jfif'}
@@ -821,7 +874,9 @@ def new_activity():
             img.thumbnail((1200, 800))
             img.save(save_path)
             image_url = url_for('static', filename=f'images/{filename}')
-        class_id = form.class_id.data if form.class_id.data != 0 else None
+        
+        # Class ID processing
+        class_id = class_id if class_id != 0 else None
         new_post = Activity(title=title, description=content, date=date_val, image=image_url, class_id=class_id)
         db.session.add(new_post)
         db.session.commit()
@@ -958,24 +1013,20 @@ def new_activity():
         # Nếu submit thông thường (form HTML), redirect
         return redirect(url_for('main.activities'))
     else:
-        print(f"[DEBUG] Form validation FAILED")
-        print(f"[DEBUG] Validation errors: {form.errors}")
+        # Validation failed
+        print(f"[DEBUG] Validation FAILED")
         
         # Nếu là API request, trả JSON với lỗi chi tiết
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or \
-           request.accept_mimetypes.accept_json or \
-           request.args.get('api') == '1':
-            error_messages = []
-            for field, errors in form.errors.items():
-                for error in errors:
-                    error_messages.append(f'{field}: {error}')
+        if is_api_request:
+            print(f"[DEBUG] API validation errors: {validation_errors}")
             return jsonify({
                 'success': False, 
                 'error': 'Form validation failed',
-                'errors': error_messages
+                'errors': validation_errors
             }), 400
         
-        # Hiển thị form validation errors to user (non-API request)
+        # HTML form validation failed
+        print(f"[DEBUG] Form validation errors: {form.errors}")
         for field, errors in form.errors.items():
             for error in errors:
                 flash(f'{field}: {error}', 'danger')
