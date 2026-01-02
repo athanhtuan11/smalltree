@@ -1701,6 +1701,11 @@ def save_monthly_service():
 
 @main.route('/invoice', methods=['GET', 'POST'])
 def invoice():
+    # Chỉ admin mới được truy cập trang xuất hóa đơn
+    if session.get('role') != 'admin':
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.index'))
+    
     month = request.args.get('month')
     if month:
         year, m = map(int, month.split('-'))
@@ -1782,6 +1787,11 @@ def invoice():
         except Exception as e:
             db.session.rollback()
             print(f"[ERROR] Lỗi cập nhật dịch vụ từ form: {e}")
+        
+        # Nếu chỉ lưu thay đổi (không xuất Word)
+        if request.form.get('save_changes'):
+            flash(f'Đã lưu thay đổi dịch vụ cho tháng {month}!', 'success')
+            return redirect(url_for('main.invoice', month=month))
         
         if request.form.get('export_word'):
             zip_buffer = io.BytesIO()
@@ -2026,11 +2036,10 @@ def invoice():
                         
                         # Right cell với font size nhỏ                      
                         now = datetime.now()
-                        # Extract month number and year from month string (format: "YYYY-MM")
-                        month_year, month_num = month.split('-')
+                        # Sử dụng fee_month và fee_year để đồng bộ với tiêu đề học phí
                         right_para1 = right_payment_cell.paragraphs[0]
                         right_para1.alignment = 1
-                        right_run1 = right_para1.add_run(f'Ngày 1 tháng {month_num} năm {month_year}')
+                        right_run1 = right_para1.add_run(f'Ngày 1 tháng {fee_month:02d} năm {fee_year}')
                         right_run1.font.size = Pt(7)
 
                         right_para2 = right_payment_cell.add_paragraph('Chủ Trường')
@@ -2241,6 +2250,8 @@ def accounts():
             'student_code': getattr(u, 'student_code', None),
             'class_name': getattr(u, 'class_name', None),
             'parent_contact': getattr(u, 'parent_contact', None),
+            'father_name': getattr(u, 'father_name', None),
+            'mother_name': getattr(u, 'mother_name', None),
             'position': getattr(u, 'position', None),
         }
     masked_parents = [mask_user(p) for p in parents]
@@ -2521,12 +2532,23 @@ def edit_curriculum(week_number):
                 curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
             for slot in afternoon_slots:
                 curriculum_data[day][slot] = request.form.get(f'{day}_{slot}')
-        class_id = request.form.get('class_id')
-        week.class_id = class_id
+        
+        new_week_number = request.form.get('week_number', type=int)
+        new_class_id = request.form.get('class_id', type=int)
+        
+        # Check for duplicate if week_number or class_id changed
+        if new_week_number != week.week_number or new_class_id != week.class_id:
+            existing = Curriculum.query.filter_by(week_number=new_week_number, class_id=new_class_id).filter(Curriculum.id != week.id).first()
+            if existing:
+                flash(f'Đã tồn tại chương trình học tuần {new_week_number} cho lớp này, không thể đổi!', 'danger')
+                return redirect(url_for('main.edit_curriculum', week_number=week.week_number, class_id=week.class_id))
+            week.week_number = new_week_number
+            week.class_id = new_class_id
+        
         week.content = json.dumps(curriculum_data, ensure_ascii=False)
         db.session.commit()
-        log_activity('edit', 'curriculum', week_number, f'Cập nhật chương trình tuần {week_number}')
-        flash(f'Đã cập nhật chương trình học tuần {week_number}!', 'success')
+        log_activity('edit', 'curriculum', week.week_number, f'Cập nhật chương trình tuần {week.week_number}')
+        flash(f'Đã cập nhật chương trình học tuần {week.week_number}!', 'success')
         return redirect(url_for('main.curriculum'))
     data = json.loads(week.content)
     mobile = is_mobile()
@@ -3693,10 +3715,13 @@ def edit_menu(week_number):
         
         # Check for duplicate week number if changed
         if new_week_number != menu_item.week_number:
-            existing = Menu.query.filter_by(week_number=new_week_number, year=2025).first()
+            existing = Menu.query.filter_by(week_number=new_week_number, year=2025).filter(Menu.id != menu_item.id).first()
             if existing:
                 flash(f'Đã tồn tại thực đơn tuần {new_week_number}, không thể đổi!', 'danger')
                 return redirect(url_for('main.edit_menu', week_number=menu_item.week_number))
+            menu_item.week_number = new_week_number
+        else:
+            # Update week_number even if same (ensure consistency)
             menu_item.week_number = new_week_number
             
         db.session.commit()

@@ -29,6 +29,7 @@
     </div>
     <h2 class="fw-bold text-center mb-3" style="color:#43a047; font-size:1.1em;">Hóa đơn thanh toán tháng {{ selected_month }}</h2>
     
+    {% if session['role'] == 'admin' %}
     <!-- Quick control buttons -->
     <div class="row mb-2">
         <div class="col-md-6">
@@ -36,6 +37,7 @@
             <button type="button" class="btn btn-sm btn-outline-info ms-2" onclick="toggleAllSteamax()">Toggle STEAMAX tất cả</button>
         </div>
     </div>
+    {% endif %}
     
     <form method="post">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -43,7 +45,7 @@
             <table class="table table-bordered align-middle {% if mobile %}invoice-table-mobile{% else %}invoice-table-desktop{% endif %}">
                 <thead class="table-success">
                     <tr>
-                        <th></th>
+                        {% if session['role'] == 'admin' %}<th></th>{% endif %}
                         <th>Họ và tên</th>
                         <th>Ngày sinh</th>
                         <th>Số ngày có mặt</th>
@@ -59,7 +61,9 @@
                 <tbody>
                     {% for student in students %}
                     <tr>
+                        {% if session['role'] == 'admin' %}
                         <td><input type="checkbox" name="student_ids" value="{{ student.id }}" checked></td>
+                        {% endif %}
                         <td>{{ student.name }}</td>
                         <td>{% if student.birth_date %}{{ student.birth_date | datetimeformat('d/m/Y') }}{% else %}-{% endif %}</td>
                         <td>{{ attendance_days[student.id] }}</td>
@@ -70,16 +74,32 @@
                             {{ "{:,}".format(meal_cost) }}đ
                         </td>
                         <td>
+                            {% if session['role'] == 'admin' %}
                             <input type="checkbox" name="english_{{ student.id }}" value="1" 
                                    {% if services_dict.get(student.id) and services_dict[student.id].has_english %}checked{% endif %}
                                    class="form-check-input english-checkbox" 
                                    data-student-id="{{ student.id }}">
+                            {% else %}
+                                {% if services_dict.get(student.id) and services_dict[student.id].has_english %}
+                                <span class="badge bg-success">✓</span>
+                                {% else %}
+                                <span class="badge bg-secondary">✗</span>
+                                {% endif %}
+                            {% endif %}
                         </td>
                         <td>
+                            {% if session['role'] == 'admin' %}
                             <input type="checkbox" name="steamax_{{ student.id }}" value="1" 
                                    {% if services_dict.get(student.id) and services_dict[student.id].has_steamax %}checked{% endif %}
                                    class="form-check-input steamax-checkbox" 
                                    data-student-id="{{ student.id }}">
+                            {% else %}
+                                {% if services_dict.get(student.id) and services_dict[student.id].has_steamax %}
+                                <span class="badge bg-success">✓</span>
+                                {% else %}
+                                <span class="badge bg-secondary">✗</span>
+                                {% endif %}
+                            {% endif %}
                         </td>
                         <td>
                             {% set age = student_ages[student.id] %}
@@ -110,9 +130,24 @@
                     </tr>
                     {% endfor %}
                 </tbody>
+                <tfoot class="table-info">
+                    <tr>
+                        <th colspan="{% if session['role'] == 'admin' %}10{% else %}9{% endif %}" class="text-end fw-bold">Tổng cộng (học sinh được chọn):</th>
+                        <th class="fw-bold" id="grand-total">0đ</th>
+                    </tr>
+                </tfoot>
             </table>
         </div>
-        <button type="submit" name="export_word" value="1" class="btn btn-primary {% if mobile %}invoice-btn-mobile{% endif %}">Xuất Word cho học sinh đã chọn</button>
+        {% if session['role'] == 'admin' %}
+        <div class="d-flex gap-2 {% if mobile %}flex-column{% endif %}">
+            <button type="submit" name="save_changes" value="1" class="btn btn-success {% if mobile %}invoice-btn-mobile{% endif %}">
+                <i class="bi bi-save"></i> Lưu thay đổi
+            </button>
+            <button type="submit" name="export_word" value="1" class="btn btn-primary {% if mobile %}invoice-btn-mobile{% endif %}">
+                <i class="bi bi-file-earmark-word"></i> Xuất Word cho học sinh đã chọn
+            </button>
+        </div>
+        {% endif %}
     </form>
     {% if invoices %}
     <h3 class="mt-4">Kết quả hóa đơn</h3>
@@ -146,6 +181,28 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Format số với dấu phẩy
             totalSpan.textContent = newTotal.toLocaleString('vi-VN') + 'đ';
+        }
+        
+        // Cập nhật tổng cộng
+        calculateGrandTotal();
+    }
+    
+    function calculateGrandTotal() {
+        const studentCheckboxes = document.querySelectorAll('input[name="student_ids"]:checked');
+        let grandTotal = 0;
+        
+        studentCheckboxes.forEach(checkbox => {
+            const studentId = checkbox.value;
+            const totalSpan = document.querySelector(`[data-student-id="${studentId}"].total-amount`);
+            if (totalSpan) {
+                const totalText = totalSpan.textContent.replace(/[^0-9]/g, '');
+                grandTotal += parseInt(totalText) || 0;
+            }
+        });
+        
+        const grandTotalElement = document.getElementById('grand-total');
+        if (grandTotalElement) {
+            grandTotalElement.textContent = grandTotal.toLocaleString('vi-VN') + 'đ';
         }
     }
     
@@ -196,6 +253,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Gắn event listener cho checkbox chọn học sinh
+    const studentCheckboxes = document.querySelectorAll('input[name="student_ids"]');
+    studentCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            calculateGrandTotal();
+        });
+    });
+    
     // Tính tổng ban đầu cho tất cả học sinh khi trang load
     const allStudentIds = new Set();
     englishCheckboxes.forEach(cb => allStudentIds.add(cb.dataset.studentId));
@@ -204,6 +269,9 @@ document.addEventListener('DOMContentLoaded', function() {
     allStudentIds.forEach(studentId => {
         updateTotal(studentId);
     });
+    
+    // Tính tổng cộng ban đầu
+    calculateGrandTotal();
 });
 
 // Toggle functions cho quick controls

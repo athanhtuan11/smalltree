@@ -67,7 +67,17 @@
                 {% for child in parents %}
                 <tr>
                     <td>{{ child.name }}</td>
-                    <td>{{ child.parent_contact }}</td>
+                    <td>
+                        {% if child.father_name and child.mother_name %}
+                            {{ child.father_name }}, {{ child.mother_name }}
+                        {% elif child.father_name %}
+                            {{ child.father_name }}
+                        {% elif child.mother_name %}
+                            {{ child.mother_name }}
+                        {% else %}
+                            {{ child.parent_contact or 'Liên hệ phụ huynh' }}
+                        {% endif %}
+                    </td>
                     <td>{{ child.email }}</td>
                     <td>{{ child.phone }}</td>
                     <td>{{ child.class }}</td>
