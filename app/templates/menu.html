@@ -137,39 +137,39 @@
         </div>
     <!-- Action Buttons Section - Desktop -->
     {% if session.get('role') in ['admin', 'teacher'] %}
-        <div class="d-none d-md-flex align-items-center gap-3 mb-3 p-3 bg-light rounded">
+        <div class="d-none d-md-flex align-items-center gap-3 mb-3 p-2 bg-light rounded shadow-sm">
             <!-- Import Section -->
             <form action="/menu/import" method="post" enctype="multipart/form-data" class="d-flex align-items-center gap-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="file" name="excel_file" accept=".xlsx" required style="width:180px;" class="form-control form-control-sm">
+                <input type="file" name="excel_file" accept=".xlsx" required style="width:160px;" class="form-control form-control-sm">
                 <div class="d-flex flex-column">
-                    <input type="number" name="week_number" id="import-week-number" min="1" max="53" required placeholder="Tuần" style="width:70px;" title="Tuần" class="form-control form-control-sm">
-                    <small id="import-week-range" class="text-info text-nowrap" style="font-size:0.7em;"></small>
+                    <input type="number" name="week_number" id="import-week-number" min="1" required placeholder="Tuần" style="width:65px;" title="Tuần" class="form-control form-control-sm">
+                    <small id="import-week-range" class="text-info text-nowrap" style="font-size:0.65em;"></small>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">
-                    <i class="bi bi-upload me-1"></i> Tải lên
+                    <i class="bi bi-upload"></i> Tải lên
                 </button>
             </form>
             
             <!-- Divider -->
-            <div class="vr" style="height:40px;"></div>
+            <div class="vr" style="height:35px;"></div>
             
             <!-- Action Buttons -->
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
                 <a href="/menu/export" class="btn btn-success btn-sm">
-                    <i class="bi bi-download me-1"></i> Xuất file
+                    <i class="bi bi-download"></i> Xuất file
                 </a>
                 <a href="{{ url_for('main.dish_list') }}" class="btn btn-secondary btn-sm">
-                    <i class="bi bi-card-list me-1"></i> Món ăn
+                    <i class="bi bi-card-list"></i> Món ăn
                 </a>
                 <a href="{{ url_for('main.suppliers') }}" class="btn btn-warning btn-sm">
-                    <i class="bi bi-truck me-1"></i> Nhà cung cấp
+                    <i class="bi bi-truck"></i> NCC
                 </a>
                 <a href="{{ url_for('main.ai_dashboard') }}?tab=menu" class="btn btn-info btn-sm">
-                    <i class="bi bi-robot me-1"></i> AI Thực đơn
+                    <i class="bi bi-robot"></i> AI
                 </a>
                 <a href="{{ url_for('main.new_menu') }}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-circle me-1"></i> Thêm mới
+                    <i class="bi bi-plus-circle"></i> Thêm
                 </a>
             </div>
         </div>
@@ -182,7 +182,7 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="row g-2">
                     <div class="col-6">
-                        <input type="number" name="week_number" id="import-week-number-mobile" min="1" max="53" required placeholder="Tuần" class="form-control form-control-sm">
+                        <input type="number" name="week_number" id="import-week-number-mobile" min="1" required placeholder="Tuần" class="form-control form-control-sm">
                         <small id="import-week-range-mobile" class="text-info" style="font-size:0.7em;"></small>
                     </div>
                     <div class="col-6">
@@ -372,7 +372,7 @@
         </div>
         <div class="card-body">
             {% if mobile %}
-            <div class="menu-scroll-hint">Vuốt ngang để xem đủ các trường trong bảng &rarr;</div>
+            <div class="menu-scroll-hint"><i class="bi bi-arrow-left-right"></i> Vuốt ngang để xem đủ các trường trong bảng</div>
             {% endif %}
             <div class="table-responsive menu-table-wrapper">
                 <table class="table table-bordered align-middle bg-light mt-3 {% if mobile %}menu-table-mobile{% else %}menu-table-desktop{% endif %}">
