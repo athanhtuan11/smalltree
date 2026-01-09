@@ -6706,3 +6706,391 @@ def debug_process_upload():
     <pre>{json.dumps(results, indent=2)}</pre>
     <p><a href="/debug-upload-test">← Back to test</a></p>
     '''
+
+# ==================== COURSES MODULE ====================
+@main.route('/courses')
+def courses():
+    """Danh sách khóa học - Udemy style"""
+    if not session.get('user_id'):
+        flash('Vui lòng đăng nhập để xem khóa học!', 'warning')
+        return redirect(url_for('main.login'))
+    
+    mobile = is_mobile()
+    user_role = session.get('role')
+    
+    # Query courses from database
+    from app.models_courses import Course
+    
+    if user_role == 'admin':
+        # Admin sees all courses
+        courses_query = Course.query
+    elif user_role == 'teacher':
+        # Teacher sees only their courses
+        staff_id = session.get('staff_id')
+        courses_query = Course.query.filter_by(instructor_id=staff_id)
+    else:
+        # Students see only published courses
+        courses_query = Course.query.filter_by(status='published')
+    
+    courses_list = courses_query.order_by(Course.created_at.desc()).all()
+    
+    return render_template('courses/index.html', 
+                         courses=courses_list,
+                         user_role=user_role,
+                         title='Khóa học',
+                         mobile=mobile)
+
+@main.route('/courses/create', methods=['GET', 'POST'])
+def course_create():
+    """Tạo khóa học mới - chỉ admin và teacher"""
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền tạo khóa học!', 'danger')
+        return redirect(url_for('main.courses'))
+    
+    if request.method == 'POST':
+        from app.models_courses import Course
+        from datetime import datetime
+        
+        # Get instructor_id (staff_id from session)
+        instructor_id = session.get('staff_id')
+        if not instructor_id:
+            flash('Không tìm thấy thông tin giảng viên!', 'danger')
+            return redirect(url_for('main.courses'))
+        
+        # Create slug from title - simple version without unidecode
+        title = request.form.get('title')
+        slug = title.lower().replace(' ', '-')
+        slug = ''.join(c for c in slug if c.isalnum() or c == '-')
+        
+        # Check if slug exists
+        existing = Course.query.filter_by(slug=slug).first()
+        if existing:
+            slug = f"{slug}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        
+        # Create new course
+        new_course = Course(
+            title=title,
+            slug=slug,
+            short_description=request.form.get('subtitle'),
+            description=request.form.get('description'),
+            instructor_id=instructor_id,
+            category=request.form.get('category'),
+            level=request.form.get('level'),
+            language=request.form.get('language', 'Vietnamese'),
+            price=float(request.form.get('price', 0)),
+            status=request.form.get('status', 'draft'),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        db.session.add(new_course)
+        db.session.commit()
+        
+        flash(f'Khóa học "{title}" đã được tạo thành công!', 'success')
+        return redirect(url_for('main.course_detail', course_id=new_course.id))
+    
+    mobile = is_mobile()
+    return render_template('courses/create.html', 
+                         title='Tạo khóa học mới',
+                         mobile=mobile)
+
+@main.route('/courses/<int:course_id>')
+def course_detail(course_id):
+    """Chi tiết khóa học - Landing page như Udemy"""
+    if not session.get('user_id'):
+        flash('Vui lòng đăng nhập để xem chi tiết khóa học!', 'warning')
+        return redirect(url_for('main.login'))
+    
+    mobile = is_mobile()
+    user_role = session.get('role')
+    
+    # Get course from database
+    from app.models_courses import Course, CourseSection, Enrollment, CourseReview
+    from app.models import Staff
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check enrollment status
+    user_id = session.get('user_id')
+    is_enrolled = Enrollment.query.filter_by(
+        course_id=course_id,
+        student_id=user_id  # Assuming students are from child table
+    ).first() is not None
+    
+    # Get instructor details
+    instructor = Staff.query.get(course.instructor_id) if course.instructor_id else None
+    
+    # Get sections and lessons
+    sections = CourseSection.query.filter_by(course_id=course_id).order_by(CourseSection.order).all()
+    
+    # Get reviews
+    reviews = CourseReview.query.filter_by(course_id=course_id).order_by(CourseReview.created_at.desc()).limit(10).all()
+    
+    # Parse what_you_learn and requirements from TEXT fields (stored as JSON or newline-separated)
+    what_you_learn = []
+    requirements = []
+    if course.what_you_learn:
+        try:
+            import json
+            what_you_learn = json.loads(course.what_you_learn)
+        except:
+            what_you_learn = course.what_you_learn.split('\n')
+    
+    if course.requirements:
+        try:
+            import json
+            requirements = json.loads(course.requirements)
+        except:
+            requirements = course.requirements.split('\n')
+    
+    return render_template('courses/detail.html', 
+                         course=course,
+                         instructor=instructor,
+                         sections=sections,
+                         reviews=reviews,
+                         what_you_learn=what_you_learn,
+                         requirements=requirements,
+                         is_enrolled=is_enrolled,
+                         user_role=user_role,
+                         title=course.title,
+                         mobile=mobile)
+
+@main.route('/courses/<int:course_id>/learn')
+def course_learn(course_id):
+    """Course player - Video player interface như Udemy"""
+    if not session.get('user_id'):
+        flash('Vui lòng đăng nhập!', 'warning')
+        return redirect(url_for('main.login'))
+    
+    mobile = is_mobile()
+    user_id = session.get('user_id')
+    
+    # Get course from database
+    from app.models_courses import Course, CourseSection, Lesson, Enrollment, LessonProgress
+    
+    # Check if user is enrolled
+    enrollment = Enrollment.query.filter_by(
+        course_id=course_id,
+        student_id=user_id
+    ).first()
+    
+    if not enrollment and session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn chưa đăng ký khóa học này!', 'warning')
+        return redirect(url_for('main.course_detail', course_id=course_id))
+    
+    course = Course.query.get_or_404(course_id)
+    sections = CourseSection.query.filter_by(course_id=course_id).order_by(CourseSection.order).all()
+    
+    # Get current lesson (first incomplete or first lesson)
+    current_lesson = None
+    if enrollment:
+        for section in sections:
+            for lesson in section.lessons:
+                progress = LessonProgress.query.filter_by(
+                    lesson_id=lesson.id,
+                    enrollment_id=enrollment.id
+                ).first()
+                if not progress or not progress.is_completed:
+                    current_lesson = lesson
+                    break
+            if current_lesson:
+                break
+    
+    # If all completed or no enrollment, show first lesson
+    if not current_lesson and sections and sections[0].lessons:
+        current_lesson = sections[0].lessons[0]
+    
+    return render_template('courses/learn.html', 
+                         course=course,
+                         sections=sections,
+                         current_lesson=current_lesson,
+                         title=f'Learn: {course.title}',
+                         mobile=mobile)
+
+# ==================== TASK TRACKING MODULE ====================
+@main.route('/tasks')
+def tasks():
+    """Danh sách projects và tasks"""
+    if not session.get('user_id'):
+        flash('Vui lòng đăng nhập để xem tasks!', 'warning')
+        return redirect(url_for('main.login'))
+    
+    # Chỉ admin và teacher được xem tasks
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.index'))
+    
+    mobile = is_mobile()
+    
+    # TODO: Query projects from database
+    # Tạm thời dùng mock data để demo UI
+    projects_list = [
+        {
+            'id': 1,
+            'key': 'COURSE',
+            'name': 'Course Development',
+            'description': 'Phát triển các khóa học mới',
+            'color': '#43a047',
+            'status': 'active',
+            'task_count': 12
+        },
+        {
+            'id': 2,
+            'key': 'CONTENT',
+            'name': 'Content Creation',
+            'description': 'Tạo nội dung bài giảng và tài liệu',
+            'color': '#2196F3',
+            'status': 'active',
+            'task_count': 8
+        }
+    ]
+    
+    return render_template('tasks/index.html', 
+                         projects=projects_list,
+                         title='Task Tracking',
+                         mobile=mobile)
+
+@main.route('/tasks/project/create', methods=['GET', 'POST'])
+def task_project_create():
+    """Tạo project mới"""
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        # TODO: Handle project creation
+        project_name = request.form.get('name')
+        project_key = request.form.get('key')
+        flash(f'Project "{project_name}" ({project_key}) đã được tạo!', 'success')
+        return redirect(url_for('main.tasks'))
+    
+    mobile = is_mobile()
+    return render_template('tasks/create_project.html', 
+                         title='Tạo Project mới',
+                         mobile=mobile)
+
+@main.route('/tasks/<project_key>')
+def tasks_board(project_key):
+    """Kanban board cho project"""
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.index'))
+    
+    mobile = is_mobile()
+    
+    # Mock data for demo
+    project = {
+        'key': project_key,
+        'name': 'Course Development' if project_key == 'COURSE' else 'Content Creation',
+        'color': '#43a047'
+    }
+    
+    # Mock tasks data - grouped by status
+    tasks_by_status = {
+        'todo': [
+            {
+                'id': 1,
+                'key': f'{project_key}-12',
+                'title': 'Tạo video bài 1: Giới thiệu',
+                'type': 'story',
+                'priority': 'high',
+                'assignee': 'John Doe',
+                'assignee_avatar': None,
+                'story_points': 5
+            },
+            {
+                'id': 2,
+                'key': f'{project_key}-13',
+                'title': 'Viết outline khóa học',
+                'type': 'task',
+                'priority': 'medium',
+                'assignee': 'Jane Smith',
+                'assignee_avatar': None,
+                'story_points': 3
+            }
+        ],
+        'in_progress': [
+            {
+                'id': 3,
+                'key': f'{project_key}-8',
+                'title': 'Implement video player',
+                'type': 'story',
+                'priority': 'high',
+                'assignee': 'John Doe',
+                'assignee_avatar': None,
+                'story_points': 8
+            }
+        ],
+        'review': [
+            {
+                'id': 4,
+                'key': f'{project_key}-5',
+                'title': 'Fix video upload bug',
+                'type': 'bug',
+                'priority': 'urgent',
+                'assignee': 'Jane Smith',
+                'assignee_avatar': None,
+                'story_points': 2
+            }
+        ],
+        'done': [
+            {
+                'id': 5,
+                'key': f'{project_key}-3',
+                'title': 'Setup project structure',
+                'type': 'task',
+                'priority': 'medium',
+                'assignee': 'John Doe',
+                'assignee_avatar': None,
+                'story_points': 3
+            }
+        ]
+    }
+    
+    return render_template('tasks/board.html', 
+                         project=project,
+                         tasks_by_status=tasks_by_status,
+                         title=f'Board - {project_key}',
+                         mobile=mobile)
+
+@main.route('/tasks/<project_key>/<task_key>')
+def task_detail(project_key, task_key):
+    """Chi tiết task"""
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        return redirect(url_for('main.index'))
+    
+    mobile = is_mobile()
+    
+    # Mock task detail
+    task = {
+        'key': task_key,
+        'title': 'Implement video player',
+        'description': 'As an instructor, I want to upload videos so that students can watch my lectures.\n\nAcceptance Criteria:\n- Support MP4, MOV formats\n- Max file size 2GB\n- Show upload progress',
+        'type': 'story',
+        'priority': 'high',
+        'status': 'in_progress',
+        'assignee': 'John Doe',
+        'reporter': 'Jane Smith',
+        'story_points': 8,
+        'created_at': '2026-01-05',
+        'updated_at': '2026-01-09',
+        'comments': [
+            {
+                'id': 1,
+                'author': 'Jane Smith',
+                'content': 'Started working on the upload endpoint',
+                'created_at': '2 hours ago'
+            }
+        ],
+        'attachments': [
+            {'filename': 'wireframe.png', 'size': '250 KB'},
+            {'filename': 'requirements.pdf', 'size': '1.2 MB'}
+        ]
+    }
+    
+    return render_template('tasks/detail.html', 
+                         project_key=project_key,
+                         task=task,
+                         title=f'{task_key}',
+                         mobile=mobile)

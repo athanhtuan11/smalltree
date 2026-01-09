@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .permission-editor {
+        background: #fff;
+        border-radius: 8px;
+        padding: 2rem;
+    }
+    
+    .role-selector {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .role-option {
+        cursor: pointer;
+        padding: 1rem;
+        border: 2px solid #dee2e6;
+        border-radius: 6px;
+        transition: all 0.3s;
+        text-align: center;
+    }
+    
+    .role-option:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    
+    .role-option.active {
+        border-color: #0d6efd;
+        background: #0d6efd;
+        color: white;
+    }
+    
+    .permission-group {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .permission-item {
+        padding: 0.75rem;
+        background: white;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #dee2e6;
+    }
+    
+    .permission-item.has-permission {
+        background: #d1e7dd;
+        border-color: #badbcc;
+    }
+    
+    .user-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- User Header -->
+    <div class="user-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-3" 
+                         style="width: 70px; height: 70px; font-size: 2rem;">
+                        {{ user.full_name[0].upper() }}
+                    </div>
+                    <div>
+                        <h2 class="mb-1">{{ user.full_name }}</h2>
+                        <p class="mb-0 opacity-75">
+                            <i class="bi bi-envelope"></i> {{ user.email }} | 
+                            <i class="bi bi-person-badge"></i> @{{ user.username }}
+                        </p>
+                        <p class="mb-0 mt-2">
+                            <span class="badge bg-white text-dark">
+                                Current Role: <strong>{{ user.role }}</strong>
+                            </span>
+                            <span class="badge bg-{{ 'success' if user.is_active else 'danger' }}">
+                                {{ 'Active' if user.is_active else 'Inactive' }}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <a href="{{ url_for('rbac_mgmt.list_users') }}" class="btn btn-light">
+                    <i class="bi bi-arrow-left"></i> Back to User List
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Role Selector -->
+    <div class="role-selector">
+        <h4 class="mb-3"><i class="bi bi-shield-check"></i> Quick Role Change</h4>
+        <p class="text-muted mb-3">Chọn role để tự động cấp permissions tương ứng</p>
+        
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="change_role">
+            <div class="row g-3">
+                {% for role_name, permissions_list in role_permissions.items() %}
+                <div class="col-md-2">
+                    <div class="role-option {% if user.role == role_name %}active{% endif %}" 
+                         onclick="selectRole('{{ role_name }}', this)">
+                        <div class="mb-2">
+                            {% if role_name == 'admin' %}
+                                <i class="bi bi-shield-fill-check" style="font-size: 2rem;"></i>
+                            {% elif role_name == 'teacher' %}
+                                <i class="bi bi-person-workspace" style="font-size: 2rem;"></i>
+                            {% elif role_name == 'parent' %}
+                                <i class="bi bi-people-fill" style="font-size: 2rem;"></i>
+                            {% elif role_name == 'student' %}
+                                <i class="bi bi-mortarboard-fill" style="font-size: 2rem;"></i>
+                            {% else %}
+                                <i class="bi bi-person-check-fill" style="font-size: 2rem;"></i>
+                            {% endif %}
+                        </div>
+                        <h6>{{ role_name.replace('_', ' ').title() }}</h6>
+                        <small class="d-block">{{ permissions_list|length }} permissions</small>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <input type="hidden" name="new_role" id="selected_role" value="{{ user.role }}">
+            <button type="submit" class="btn btn-primary mt-3" id="change_role_btn" disabled>
+                <i class="bi bi-arrow-repeat"></i> Apply Role Change
+            </button>
+        </form>
+    </div>
+
+    <!-- Current Permissions Overview -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-list-check"></i> Current Permissions ({{ current_permissions|length }})
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for perm in current_permissions %}
+                <div class="col-md-4 mb-2">
+                    <div class="alert alert-success py-2 mb-0">
+                        <i class="bi bi-check-circle-fill"></i> {{ perm }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- All Permissions by Category -->
+    <div class="permission-editor">
+        <h4 class="mb-4"><i class="bi bi-grid-3x3-gap"></i> All Available Permissions</h4>
+        
+        {% for group_name, group_perms in permission_groups.items() %}
+        {% if group_perms %}
+        <div class="permission-group">
+            <h5 class="mb-3">
+                {% if group_name == 'Admin' %}
+                    <i class="bi bi-shield-lock text-danger"></i>
+                {% elif group_name == 'Content Management' %}
+                    <i class="bi bi-pencil-square text-primary"></i>
+                {% elif group_name == 'View Access' %}
+                    <i class="bi bi-eye text-info"></i>
+                {% else %}
+                    <i class="bi bi-lightning text-warning"></i>
+                {% endif %}
+                {{ group_name }}
+            </h5>
+            
+            <div class="row">
+                {% for perm in group_perms %}
+                <div class="col-md-6">
+                    <div class="permission-item {% if perm in current_permissions %}has-permission{% endif %}">
+                        <div>
+                            <i class="bi bi-{{ 'check-circle-fill text-success' if perm in current_permissions else 'circle text-muted' }}"></i>
+                            <strong>{{ perm }}</strong>
+                        </div>
+                        <div>
+                            {% if perm in current_permissions %}
+                                <span class="badge bg-success">Granted</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Not Granted</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <!-- Account Actions -->
+    <div class="card mt-4">
+        <div class="card-header bg-warning">
+            <h5 class="mb-0"><i class="bi bi-gear"></i> Account Actions</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" value="toggle_active">
+                <button type="submit" class="btn btn-{{ 'danger' if user.is_active else 'success' }}">
+                    <i class="bi bi-toggle-{{ 'off' if user.is_active else 'on' }}"></i>
+                    {{ 'Deactivate Account' if user.is_active else 'Activate Account' }}
+                </button>
+            </form>
+            
+            <button class="btn btn-outline-primary" onclick="showRoleComparison()">
+                <i class="bi bi-table"></i> Compare Roles
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Role Comparison Modal -->
+<div class="modal fade" id="roleComparisonModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Role Permissions Comparison</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Permission</th>
+                            {% for role_name in role_permissions.keys() %}
+                            <th class="text-center">{{ role_name.replace('_', ' ').title() }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perm in all_permissions %}
+                        <tr>
+                            <td><strong>{{ perm }}</strong></td>
+                            {% for role_name, perms_list in role_permissions.items() %}
+                            <td class="text-center">
+                                {% if perm in perms_list %}
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                {% else %}
+                                    <i class="bi bi-x-circle text-muted"></i>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentRole = '{{ user.role }}';
+
+function selectRole(roleName, element) {
+    // Update UI
+    document.querySelectorAll('.role-option').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    
+    // Update hidden input
+    document.getElementById('selected_role').value = roleName;
+    
+    // Enable button if role changed
+    const changeBtn = document.getElementById('change_role_btn');
+    if (roleName !== currentRole) {
+        changeBtn.disabled = false;
+        changeBtn.classList.add('btn-warning');
+        changeBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Change Role to ' + roleName.replace('_', ' ').toUpperCase();
+    } else {
+        changeBtn.disabled = true;
+        changeBtn.classList.remove('btn-warning');
+        changeBtn.innerHTML = '<i class="bi bi-check"></i> Current Role';
+    }
+}
+
+function showRoleComparison() {
+    const modal = new bootstrap.Modal(document.getElementById('roleComparisonModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

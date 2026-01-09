@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid mt-4 mb-4">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold" style="color:#43a047;">
+                <i class="bi bi-kanban me-2"></i>
+                Task Tracking
+            </h2>
+            <p class="text-muted">Quản lý công việc và dự án phát triển khóa học</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                <i class="bi bi-plus-circle me-2"></i>Tạo Project
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if projects %}
+            {% for project in projects %}
+            <div class="col-md-4 col-sm-6 mb-4">
+                <div class="card h-100 shadow-sm project-card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="project-avatar me-3" style="background-color: {{ project.color }};">
+                                {{ project.key[:2] }}
+                            </div>
+                            <div>
+                                <h5 class="card-title mb-1">{{ project.name }}</h5>
+                                <small class="text-muted">{{ project.key }}</small>
+                            </div>
+                        </div>
+                        <p class="card-text text-muted">{{ project.description }}</p>
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <span class="badge bg-primary">{{ project.task_count }} tasks</span>
+                            <span class="badge bg-success">{{ project.status }}</span>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a href="{{ url_for('main.tasks_board', project_key=project.key) }}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-kanban me-2"></i>Mở Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="bi bi-folder-x" style="font-size: 4rem; color: #6c757d;"></i>
+                <h4 class="mt-3">Chưa có project nào</h4>
+                <p class="text-muted">Tạo project đầu tiên để bắt đầu tracking công việc</p>
+                <button class="btn btn-success mt-3" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                    <i class="bi bi-plus-circle me-2"></i>Tạo Project đầu tiên
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-folder-plus me-2"></i>Tạo Project mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('main.task_project_create') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tên Project <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" required 
+                               placeholder="VD: Course Development">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project Key <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="key" required 
+                               placeholder="VD: COURSE" pattern="[A-Z]+" 
+                               title="Chỉ sử dụng chữ hoa, không dấu">
+                        <small class="text-muted">Viết hoa, không dấu (VD: COURSE, CONTENT)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mô tả</label>
+                        <textarea class="form-control" name="description" rows="3" 
+                                  placeholder="Mô tả ngắn về project..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Màu sắc</label>
+                        <input type="color" class="form-control form-control-color w-100" 
+                               name="color" value="#43a047">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-success">Tạo Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.project-card {
+    transition: all 0.3s ease;
+    border: 1px solid #dee2e6;
+}
+
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.project-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    text-transform: uppercase;
+}
+</style>
+{% endblock %}

@@ -38,6 +38,26 @@
                 min-height: 44px;
                 padding: 0.5rem 1rem;
             }
+            
+            /* Submenu styling */
+            .dropdown-submenu {
+                position: relative;
+            }
+            
+            .dropdown-submenu .dropdown-menu {
+                top: 0;
+                left: 100%;
+                margin-top: -1px;
+                display: none;
+            }
+            
+            .dropdown-submenu:hover > .dropdown-menu {
+                display: block;
+            }
+            
+            .dropdown-submenu > .dropdown-item {
+                position: relative;
+            }
         }
         
         /* Mobile dropdown - hiển thị dưới dạng list trong collapsed navbar */
@@ -69,6 +89,11 @@
             
             .navbar-collapse .dropdown-item i {
                 width: 20px;
+            }
+            
+            /* Submenu mobile */
+            .dropdown-submenu .dropdown-menu {
+                padding-left: 1.5rem;
             }
         }
             }
@@ -134,18 +159,40 @@
                         </ul>
                     </li>
                     
-                    <!-- Dropdown App -->
+                    <!-- Dropdown Courses and Apps -->
                     <li class="nav-item dropdown dropdown-hover">
                         <a class="nav-link dropdown-toggle d-flex align-items-center py-2" href="javascript:void(0);" id="navbarApps" role="button" aria-expanded="false" style="min-height: 44px;">
                             <i class="bi bi-grid-3x3-gap-fill me-2" style="color:#43a047; font-size:1.1em;"></i> 
-                            <span>App</span>
+                            <span>Courses and Apps</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarApps">
                             <li>
-                                <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('flashcard.index') }}">
-                                    <i class="bi bi-card-text me-2" style="color:#43a047;"></i> 
-                                    Flashcard
+                                <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('main.courses') }}">
+                                    <i class="bi bi-mortarboard me-2" style="color:#43a047;"></i> 
+                                    Khóa học
                                 </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('main.tasks') }}">
+                                    <i class="bi bi-kanban me-2" style="color:#43a047;"></i> 
+                                    Task Tracking
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="dropdown-submenu">
+                                <a class="dropdown-item d-flex align-items-center py-2" href="javascript:void(0);">
+                                    <i class="bi bi-grid me-2" style="color:#43a047;"></i> 
+                                    Apps
+                                    <i class="bi bi-chevron-right ms-auto"></i>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center py-2" href="{{ url_for('flashcard.index') }}">
+                                            <i class="bi bi-card-text me-2" style="color:#43a047;"></i> 
+                                            Flashcards
+                                        </a>
+                                    </li>
+                                </ul>
                             </li>
                         </ul>
                     </li>

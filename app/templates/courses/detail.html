@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+{% block content %}
+<!-- Hero Section -->
+<div class="bg-dark text-white py-4">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb bg-transparent mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('main.courses') }}" class="text-white-50">Khóa học</a></li>
+                <li class="breadcrumb-item"><a href="#" class="text-white-50">{{ course.category }}</a></li>
+                <li class="breadcrumb-item active text-white">{{ course.title }}</li>
+            </ol>
+        </nav>
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <span class="badge bg-warning text-dark mb-2">Bestseller</span>
+                <h1 class="mb-2">{{ course.title }}</h1>
+                <p class="lead">{{ course.subtitle }}</p>
+                
+                <div class="d-flex align-items-center mb-3 flex-wrap gap-3">
+                    <div class="d-flex align-items-center">
+                        <span class="text-warning me-1"><strong>{{ course.rating }}</strong></span>
+                        {% for i in range(5) %}
+                            {% if i < course.rating|int %}
+                            <i class="bi bi-star-fill text-warning"></i>
+                            {% else %}
+                            <i class="bi bi-star text-warning"></i>
+                            {% endif %}
+                        {% endfor %}
+                        <span class="ms-2">({{ course.review_count }} ratings)</span>
+                    </div>
+                    <div>
+                        <i class="bi bi-people me-1"></i>{{ course.student_count }} students
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <span>Created by </span>
+                    <a href="#" class="text-white text-decoration-underline">{{ course.instructor.name }}</a>
+                </div>
+                
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div><i class="bi bi-exclamation-circle me-1"></i>Last updated {{ course.last_updated }}</div>
+                    <div><i class="bi bi-globe me-1"></i>{{ course.language }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container my-4">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- What you'll learn -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h4 class="mb-3">What you'll learn</h4>
+                    <div class="row">
+                        {% for item in course.what_you_learn %}
+                        <div class="col-md-6 mb-2">
+                            <i class="bi bi-check2 text-success me-2"></i>{{ item }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Course content -->
+            <div class="mb-4">
+                <h4 class="mb-3">Course content</h4>
+                <p class="text-muted">
+                    {{ course.lecture_count }} lectures • {{ course.duration }} total length
+                </p>
+                
+                <div class="accordion" id="curriculumAccordion">
+                    {% for section in course.curriculum %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#section{{ section.section_id }}">
+                                <strong>{{ section.title }}</strong>
+                                <span class="ms-auto me-2 text-muted small">
+                                    {{ section.lecture_count }} lectures • {{ section.duration }}
+                                </span>
+                            </button>
+                        </h2>
+                        <div id="section{{ section.section_id }}" 
+                             class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                             data-bs-parent="#curriculumAccordion">
+                            <div class="accordion-body p-0">
+                                <ul class="list-group list-group-flush">
+                                    {% for lecture in section.lectures %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            {% if lecture.type == 'video' %}
+                                            <i class="bi bi-play-circle me-2"></i>
+                                            {% elif lecture.type == 'quiz' %}
+                                            <i class="bi bi-question-circle me-2"></i>
+                                            {% elif lecture.type == 'article' %}
+                                            <i class="bi bi-file-text me-2"></i>
+                                            {% endif %}
+                                            {{ lecture.title }}
+                                            {% if lecture.is_preview %}
+                                            <span class="badge bg-info ms-2">Preview</span>
+                                            {% endif %}
+                                        </div>
+                                        <span class="text-muted small">{{ lecture.duration }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Requirements -->
+            <div class="mb-4">
+                <h4 class="mb-3">Requirements</h4>
+                <ul>
+                    {% for req in course.requirements %}
+                    <li>{{ req }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            
+            <!-- Description -->
+            <div class="mb-4">
+                <h4 class="mb-3">Description</h4>
+                <div style="white-space: pre-wrap;">{{ course.description }}</div>
+            </div>
+            
+            <!-- Instructor -->
+            <div class="mb-4">
+                <h4 class="mb-3">Instructor</h4>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start">
+                            <div class="instructor-avatar me-3">
+                                {% if course.instructor.avatar %}
+                                <img src="{{ course.instructor.avatar }}" alt="{{ course.instructor.name }}" class="rounded-circle" width="80" height="80">
+                                {% else %}
+                                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" 
+                                     style="width: 80px; height: 80px; font-size: 2rem;">
+                                    {{ course.instructor.name[0] }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <h5 class="mb-1">{{ course.instructor.name }}</h5>
+                                <p class="text-muted mb-2">{{ course.instructor.title }}</p>
+                                <div class="d-flex gap-3 small text-muted">
+                                    <div><i class="bi bi-star-fill me-1"></i>{{ course.instructor.rating }} Instructor Rating</div>
+                                    <div><i class="bi bi-people me-1"></i>{{ course.instructor.students }} Students</div>
+                                    <div><i class="bi bi-play-circle me-1"></i>{{ course.instructor.courses }} Courses</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Student feedback -->
+            <div class="mb-4">
+                <h4 class="mb-3">Student feedback</h4>
+                <div class="row align-items-center mb-4">
+                    <div class="col-md-3 text-center">
+                        <div class="display-3 fw-bold text-warning">{{ course.rating }}</div>
+                        <div class="text-warning mb-2">
+                            {% for i in range(5) %}
+                                {% if i < course.rating|int %}
+                                <i class="bi bi-star-fill"></i>
+                                {% else %}
+                                <i class="bi bi-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="text-muted">Course Rating</div>
+                    </div>
+                    <div class="col-md-9">
+                        {% for stars in [5, 4, 3, 2, 1] %}
+                        <div class="d-flex align-items-center mb-2">
+                            <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                <div class="progress-bar bg-warning" style="width: {{ (100 - stars * 10) }}%"></div>
+                            </div>
+                            <span class="text-warning">
+                                {% for i in range(stars) %}<i class="bi bi-star-fill small"></i>{% endfor %}
+                            </span>
+                            <span class="ms-2 text-muted small">{{ 100 - stars * 10 }}%</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Reviews -->
+                {% for review in course.reviews %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" 
+                                     style="width: 40px; height: 40px;">
+                                    {{ review.student[0] }}
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">{{ review.student }}</h6>
+                                    <small class="text-muted">{{ review.date }}</small>
+                                </div>
+                                <div class="text-warning mb-2">
+                                    {% for i in range(review.rating) %}
+                                    <i class="bi bi-star-fill small"></i>
+                                    {% endfor %}
+                                </div>
+                                <p class="mb-0">{{ review.comment }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Sidebar - Purchase Card -->
+        <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 1rem;">
+                <div class="position-relative">
+                    {% if course.video_preview %}
+                    <video class="w-100" controls poster="{{ course.thumbnail }}">
+                        <source src="{{ course.video_preview }}" type="video/mp4">
+                    </video>
+                    {% elif course.thumbnail %}
+                    <img src="{{ course.thumbnail }}" class="card-img-top" alt="{{ course.title }}">
+                    {% else %}
+                    <div class="bg-light d-flex align-items-center justify-content-center" style="height: 250px;">
+                        <i class="bi bi-play-circle" style="font-size: 4rem; color: #43a047;"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h3 class="mb-0 text-success">{{ "{:,.0f}".format(course.price) }}đ</h3>
+                        {% if course.original_price > course.price %}
+                        <div>
+                            <span class="text-muted text-decoration-line-through">
+                                {{ "{:,.0f}".format(course.original_price) }}đ
+                            </span>
+                            <span class="badge bg-danger ms-2">{{ course.discount_percent }}% OFF</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if course.is_enrolled %}
+                    <a href="{{ url_for('main.course_learn', course_id=course.id) }}" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-play-circle me-2"></i>Tiếp tục học
+                    </a>
+                    {% else %}
+                    <button class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-cart-plus me-2"></i>Add to cart
+                    </button>
+                    <button class="btn btn-outline-dark w-100 mb-3">
+                        Buy now
+                    </button>
+                    {% endif %}
+                    
+                    <div class="text-center mb-3">
+                        <small class="text-muted">30-Day Money-Back Guarantee</small>
+                    </div>
+                    
+                    <div class="mb-2">
+                        <strong>This course includes:</strong>
+                    </div>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><i class="bi bi-play-circle me-2"></i>{{ course.duration }} on-demand video</li>
+                        <li class="mb-2"><i class="bi bi-file-earmark me-2"></i>{{ course.article_count }} articles</li>
+                        <li class="mb-2"><i class="bi bi-download me-2"></i>{{ course.resource_count }} downloadable resources</li>
+                        <li class="mb-2"><i class="bi bi-infinity me-2"></i>Full lifetime access</li>
+                        <li class="mb-2"><i class="bi bi-phone me-2"></i>Access on mobile and TV</li>
+                        {% if course.has_certificate %}
+                        <li class="mb-2"><i class="bi bi-award me-2"></i>Certificate of completion</li>
+                        {% endif %}
+                    </ul>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="#" class="text-decoration-none">
+                            <i class="bi bi-heart me-1"></i>Wishlist
+                        </a>
+                        <a href="#" class="text-decoration-none">
+                            <i class="bi bi-share me-1"></i>Share
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.accordion-button:not(.collapsed) {
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+.sticky-top {
+    top: 1rem !important;
+}
+
+@media (max-width: 991.98px) {
+    .sticky-top {
+        position: static !important;
+    }
+}
+</style>
+
+<script>
+// Handle preview lectures
+document.querySelectorAll('.list-group-item').forEach(item => {
+    const previewBadge = item.querySelector('.badge.bg-info');
+    if (previewBadge) {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', function() {
+            alert('Preview functionality will be implemented');
+        });
+    }
+});
+</script>
+{% endblock %}

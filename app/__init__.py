@@ -7,6 +7,13 @@ from dotenv import load_dotenv
 import json
 from datetime import datetime, date
 
+# Import course and task models to register with SQLAlchemy
+from app.models_courses import Course, CourseSection, Lesson, Enrollment, LessonProgress, CourseReview
+from app.models_tasks import Project, ProjectMember, Task, Sprint, TaskComment, TaskAttachment, TaskHistory, TaskLink
+
+# Import new user system models (RBAC) - will create tables alongside old ones
+from app.models_users import User, TeacherProfile, StudentProfile, ParentProfile
+
 class CustomJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle SQLAlchemy objects"""
     def default(self, obj):
@@ -161,6 +168,14 @@ def create_app():
     # Register Flashcard Blueprint
     from app.flashcard import flashcard_bp
     app.register_blueprint(flashcard_bp)
+    
+    # Register Test RBAC Blueprint (for testing new permission system)
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    
+    # Register RBAC Management Blueprint (for admin to manage user permissions)
+    from app.routes_rbac_management import rbac_mgmt
+    app.register_blueprint(rbac_mgmt)
     
     # Enhanced Session Security
     app.config['SESSION_COOKIE_HTTPONLY'] = True

@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .role-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+    }
+    
+    .permission-checkbox {
+        padding: 1rem;
+        background: white;
+        border: 2px solid #dee2e6;
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .permission-checkbox:hover {
+        border-color: #0d6efd;
+        background: #f8f9fa;
+    }
+    
+    .permission-checkbox.selected {
+        border-color: #198754;
+        background: #d1e7dd;
+    }
+    
+    .permission-group {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .select-all-btn {
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .select-all-btn:hover {
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Role Header -->
+    <div class="role-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="mb-2">
+                    <i class="bi bi-pencil-square"></i> Edit Role: 
+                    <strong>{{ role_name.replace('_', ' ').title() }}</strong>
+                </h2>
+                <p class="mb-0 opacity-75">
+                    <i class="bi bi-people"></i> {{ user_count }} users có role này
+                </p>
+                <p class="mb-0 mt-2">
+                    <span class="badge bg-white text-dark">
+                        Current: {{ current_permissions|length }} permissions
+                    </span>
+                </p>
+            </div>
+            <div class="col-md-4 text-end">
+                <a href="{{ url_for('rbac_mgmt.list_roles') }}" class="btn btn-light">
+                    <i class="bi bi-arrow-left"></i> Back to Roles
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning -->
+    {% if user_count > 0 %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Cảnh báo:</strong> Có {{ user_count }} users đang sử dụng role này. 
+        Thay đổi permissions sẽ ảnh hưởng đến tất cả users.
+    </div>
+    {% endif %}
+
+    <!-- Edit Form -->
+    <form method="POST" id="editRoleForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4><i class="bi bi-list-check"></i> Select Permissions</h4>
+            <div>
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="selectAll()">
+                    <i class="bi bi-check-all"></i> Select All
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="deselectAll()">
+                    <i class="bi bi-x-circle"></i> Deselect All
+                </button>
+            </div>
+        </div>
+
+        <!-- Permission Groups -->
+        {% for group_name, group_perms in permission_groups.items() %}
+        {% if group_perms %}
+        <div class="permission-group">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>
+                    {% if group_name == 'Admin' %}
+                        <i class="bi bi-shield-lock text-danger"></i>
+                    {% elif group_name == 'Content Management' %}
+                        <i class="bi bi-pencil-square text-primary"></i>
+                    {% elif group_name == 'View Access' %}
+                        <i class="bi bi-eye text-info"></i>
+                    {% else %}
+                        <i class="bi bi-lightning text-warning"></i>
+                    {% endif %}
+                    {{ group_name }} ({{ group_perms|length }})
+                </h5>
+                <button type="button" class="btn btn-sm btn-outline-primary select-all-btn" 
+                        onclick="selectGroup('{{ group_name }}')">
+                    <i class="bi bi-check-square"></i> Select Group
+                </button>
+            </div>
+            
+            <div class="row">
+                {% for perm in group_perms %}
+                <div class="col-md-6">
+                    <label class="permission-checkbox {% if perm in current_permissions %}selected{% endif %}" 
+                           data-group="{{ group_name }}">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   name="permissions" 
+                                   value="{{ perm }}" 
+                                   id="perm_{{ loop.index }}"
+                                   {% if perm in current_permissions %}checked{% endif %}
+                                   onchange="updateCheckboxStyle(this)">
+                            <label class="form-check-label w-100" for="perm_{{ loop.index }}">
+                                <strong>{{ perm }}</strong>
+                            </label>
+                        </div>
+                    </label>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <!-- Summary -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h5>Selected Permissions: <span id="selectedCount">{{ current_permissions|length }}</span></h5>
+                        <p class="text-muted mb-0">Total Available: {{ all_permissions|length }}</p>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-save"></i> Save Changes
+                        </button>
+                        <a href="{{ url_for('rbac_mgmt.list_roles') }}" class="btn btn-outline-secondary btn-lg">
+                            Cancel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Preview Changes -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="bi bi-eye"></i> Permission Changes Preview</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-success">Will be Added:</h6>
+                    <div id="addedPerms" class="text-muted">No changes yet...</div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-danger">Will be Removed:</h6>
+                    <div id="removedPerms" class="text-muted">No changes yet...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const originalPerms = {{ current_permissions|tojson }};
+
+function updateCheckboxStyle(checkbox) {
+    const label = checkbox.closest('.permission-checkbox');
+    if (checkbox.checked) {
+        label.classList.add('selected');
+    } else {
+        label.classList.remove('selected');
+    }
+    updateCount();
+    updatePreview();
+}
+
+function updateCount() {
+    const checked = document.querySelectorAll('input[name="permissions"]:checked').length;
+    document.getElementById('selectedCount').textContent = checked;
+}
+
+function selectAll() {
+    document.querySelectorAll('input[name="permissions"]').forEach(cb => {
+        cb.checked = true;
+        updateCheckboxStyle(cb);
+    });
+}
+
+function deselectAll() {
+    document.querySelectorAll('input[name="permissions"]').forEach(cb => {
+        cb.checked = false;
+        updateCheckboxStyle(cb);
+    });
+}
+
+function selectGroup(groupName) {
+    document.querySelectorAll(`.permission-checkbox[data-group="${groupName}"] input`).forEach(cb => {
+        cb.checked = true;
+        updateCheckboxStyle(cb);
+    });
+}
+
+function updatePreview() {
+    const currentSelected = Array.from(document.querySelectorAll('input[name="permissions"]:checked'))
+                                  .map(cb => cb.value);
+    
+    const added = currentSelected.filter(p => !originalPerms.includes(p));
+    const removed = originalPerms.filter(p => !currentSelected.includes(p));
+    
+    const addedDiv = document.getElementById('addedPerms');
+    const removedDiv = document.getElementById('removedPerms');
+    
+    if (added.length === 0) {
+        addedDiv.innerHTML = '<span class="text-muted">No permissions added</span>';
+    } else {
+        addedDiv.innerHTML = added.map(p => `<span class="badge bg-success me-1 mb-1">+ ${p}</span>`).join('');
+    }
+    
+    if (removed.length === 0) {
+        removedDiv.innerHTML = '<span class="text-muted">No permissions removed</span>';
+    } else {
+        removedDiv.innerHTML = removed.map(p => `<span class="badge bg-danger me-1 mb-1">- ${p}</span>`).join('');
+    }
+}
+
+// Initialize preview on load
+document.addEventListener('DOMContentLoaded', updatePreview);
+</script>
+{% endblock %}

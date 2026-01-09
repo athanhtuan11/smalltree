@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.courses') }}">Khóa học</a></li>
+                    <li class="breadcrumb-item active">Tạo khóa học mới</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold" style="color:#43a047;">
+                <i class="bi bi-plus-circle me-2"></i>
+                Tạo khóa học mới
+            </h2>
+            <p class="text-muted">Điền thông tin cơ bản để tạo khóa học</p>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+        <div class="row">
+            <!-- Main Form -->
+            <div class="col-lg-8">
+                <!-- Basic Info -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Thông tin cơ bản</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Tên khóa học <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="title" required 
+                                   placeholder="VD: Complete Python Bootcamp">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Subtitle</label>
+                            <input type="text" class="form-control" name="subtitle" 
+                                   placeholder="VD: From Zero to Hero in Python 3">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả ngắn <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required
+                                      placeholder="Mô tả ngắn gọn về khóa học (hiển thị trên card)"></textarea>
+                            <small class="text-muted">Tối đa 200 ký tự</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Mô tả chi tiết</label>
+                            <textarea class="form-control" name="full_description" rows="8"
+                                      placeholder="Mô tả đầy đủ về khóa học, đối tượng học viên, nội dung..."></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Danh mục <span class="text-danger">*</span></label>
+                                <select class="form-select" name="category" required>
+                                    <option value="">Chọn danh mục</option>
+                                    <option value="Programming">Programming</option>
+                                    <option value="Web Development">Web Development</option>
+                                    <option value="Data Science">Data Science</option>
+                                    <option value="Mobile Development">Mobile Development</option>
+                                    <option value="Design">Design</option>
+                                    <option value="Business">Business</option>
+                                    <option value="Marketing">Marketing</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Level <span class="text-danger">*</span></label>
+                                <select class="form-select" name="level" required>
+                                    <option value="">Chọn level</option>
+                                    <option value="Beginner">Beginner</option>
+                                    <option value="Intermediate">Intermediate</option>
+                                    <option value="Advanced">Advanced</option>
+                                    <option value="All Levels">All Levels</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Ngôn ngữ</label>
+                                <select class="form-select" name="language">
+                                    <option value="Vietnamese" selected>Vietnamese</option>
+                                    <option value="English">English</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Thời lượng ước tính</label>
+                                <input type="text" class="form-control" name="duration" 
+                                       placeholder="VD: 42 hours">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pricing -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Giá khóa học</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Giá bán (VNĐ) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" name="price" required 
+                                       placeholder="399000" min="0">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Giá gốc (VNĐ)</label>
+                                <input type="number" class="form-control" name="original_price" 
+                                       placeholder="1999000" min="0">
+                                <small class="text-muted">Để trống nếu không có giảm giá</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Media -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Media</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Thumbnail <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" name="thumbnail" accept="image/*" required>
+                            <small class="text-muted">Kích thước khuyến nghị: 1280x720px (16:9)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Video Preview (Optional)</label>
+                            <input type="file" class="form-control" name="preview_video" accept="video/*">
+                            <small class="text-muted">Video giới thiệu ngắn về khóa học</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- What you'll learn -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">What you'll learn</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="learningOutcomes">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" name="outcomes[]" 
+                                       placeholder="VD: Học Python 3 từ cơ bản đến nâng cao">
+                                <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOutcome()">
+                            <i class="bi bi-plus"></i> Thêm outcome
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Requirements -->
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Requirements</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="requirements">
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" name="requirements[]" 
+                                       placeholder="VD: Không cần kinh nghiệm lập trình trước đó">
+                                <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRequirement()">
+                            <i class="bi bi-plus"></i> Thêm requirement
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <div class="card sticky-top" style="top: 1rem;">
+                    <div class="card-body">
+                        <h6 class="mb-3">Publish Settings</h6>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_published" id="publishSwitch">
+                                <label class="form-check-label" for="publishSwitch">
+                                    Publish immediately
+                                </label>
+                            </div>
+                            <small class="text-muted">Khóa học sẽ hiển thị công khai</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="has_certificate" id="certSwitch">
+                                <label class="form-check-label" for="certSwitch">
+                                    Có certificate
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle me-2"></i>Tạo khóa học
+                            </button>
+                            <a href="{{ url_for('main.courses') }}" class="btn btn-outline-secondary">
+                                Hủy
+                            </a>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="alert alert-info small mb-0">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Sau khi tạo, bạn có thể thêm curriculum và upload videos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function addOutcome() {
+    const container = document.getElementById('learningOutcomes');
+    const div = document.createElement('div');
+    div.className = 'input-group mb-2';
+    div.innerHTML = `
+        <input type="text" class="form-control" name="outcomes[]" placeholder="VD: Xây dựng được các ứng dụng thực tế">
+        <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
+            <i class="bi bi-x"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+
+function addRequirement() {
+    const container = document.getElementById('requirements');
+    const div = document.createElement('div');
+    div.className = 'input-group mb-2';
+    div.innerHTML = `
+        <input type="text" class="form-control" name="requirements[]" placeholder="VD: Máy tính Windows/Mac/Linux">
+        <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
+            <i class="bi bi-x"></i>
+        </button>
+    `;
+    container.appendChild(div);
+}
+</script>
+
+<style>
+.sticky-top {
+    top: 1rem !important;
+}
+
+@media (max-width: 991.98px) {
+    .sticky-top {
+        position: static !important;
+    }
+}
+</style>
+{% endblock %}

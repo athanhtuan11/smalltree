@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .role-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+        height: 100%;
+    }
+    .role-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    .permission-badge {
+        font-size: 0.85rem;
+        margin: 0.2rem;
+        padding: 0.4rem 0.6rem;
+    }
+    .role-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-shield-check"></i> Roles & Permissions Overview</h2>
+            <p class="text-muted mb-0">Tổng quan về tất cả roles và quyền tương ứng</p>
+        </div>
+        <div>
+            <a href="{{ url_for('rbac_mgmt.manage_permissions') }}" class="btn btn-success me-2">
+                <i class="bi bi-gear"></i> Manage Permissions
+            </a>
+            <a href="{{ url_for('rbac_mgmt.list_users') }}" class="btn btn-primary">
+                <i class="bi bi-arrow-left"></i> Back to Users
+            </a>
+        </div>
+    </div>
+
+    <!-- Roles Grid -->
+    <div class="row">
+        {% for role_name, permissions in role_permissions.items() %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card role-card border-{{ 'danger' if role_name == 'admin' else 'success' if role_name == 'teacher' else 'warning' if role_name == 'parent' else 'info' if role_name == 'student' else 'secondary' }}">
+                <div class="card-header bg-{{ 'danger' if role_name == 'admin' else 'success' if role_name == 'teacher' else 'warning' if role_name == 'parent' else 'info' if role_name == 'student' else 'secondary' }} text-white text-center">
+                    <div class="role-icon">
+                        {% if role_name == 'admin' %}
+                            <i class="bi bi-shield-fill-check"></i>
+                        {% elif role_name == 'teacher' %}
+                            <i class="bi bi-person-workspace"></i>
+                        {% elif role_name == 'parent' %}
+                            <i class="bi bi-people-fill"></i>
+                        {% elif role_name == 'student' %}
+                            <i class="bi bi-mortarboard-fill"></i>
+                        {% else %}
+                            <i class="bi bi-person-check-fill"></i>
+                        {% endif %}
+                    </div>
+                    <h3 class="mb-1">{{ role_name.replace('_', ' ').title() }}</h3>
+                    <p class="mb-0">{{ role_counts.get(role_name, 0) }} users</p>
+                </div>
+                <div class="card-body">
+                    <h5 class="mb-3">
+                        <i class="bi bi-list-check"></i> Permissions ({{ permissions|length }})
+                    </h5>
+                    
+                    <div class="d-flex flex-wrap">
+                        {% for perm in permissions %}
+                        <span class="badge bg-secondary permission-badge">
+                            <i class="bi bi-check"></i> {{ perm }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            {% if role_name == 'admin' %}
+                                Full system access & management
+                            {% elif role_name == 'teacher' %}
+                                Manage courses, view students, create content
+                            {% elif role_name == 'parent' %}
+                                View children info, pay tuition, enroll courses
+                            {% elif role_name == 'student' %}
+                                Access courses, submit assignments, view grades
+                            {% elif role_name == 'public_student' %}
+                                Purchase & access enrolled courses
+                            {% endif %}
+                        </small>
+                        <a href="{{ url_for('rbac_mgmt.edit_role', role_name=role_name) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Permission Matrix -->
+    <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0"><i class="bi bi-table"></i> Permission Matrix</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 250px;">Permission</th>
+                            {% for role_name in role_permissions.keys() %}
+                            <th class="text-center" style="min-width: 100px;">
+                                {{ role_name.replace('_', ' ').title() }}
+                                <br>
+                                <small class="text-muted">({{ role_counts.get(role_name, 0) }})</small>
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set all_perms = [] %}
+                        {% for perms in role_permissions.values() %}
+                            {% for perm in perms %}
+                                {% if perm not in all_perms %}
+                                    {% set _ = all_perms.append(perm) %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                        
+                        {% for perm in all_perms|sort %}
+                        <tr>
+                            <td>
+                                <strong>{{ perm }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {% if 'manage' in perm or 'delete' in perm %}
+                                        <i class="bi bi-shield-lock text-danger"></i> Admin Action
+                                    {% elif 'create' in perm or 'edit' in perm %}
+                                        <i class="bi bi-pencil text-primary"></i> Content Management
+                                    {% elif 'view' in perm %}
+                                        <i class="bi bi-eye text-info"></i> View Access
+                                    {% else %}
+                                        <i class="bi bi-lightning text-warning"></i> Action
+                                    {% endif %}
+                                </small>
+                            </td>
+                            {% for role_name, perms_list in role_permissions.items() %}
+                            <td class="text-center {% if perm in perms_list %}table-success{% endif %}">
+                                {% if perm in perms_list %}
+                                    <i class="bi bi-check-circle-fill text-success" style="font-size: 1.5rem;"></i>
+                                {% else %}
+                                    <i class="bi bi-dash-circle text-muted"></i>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h2 class="text-primary">{{ role_permissions|length }}</h2>
+                    <p class="mb-0">Total Roles</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h2 class="text-success">{{ all_perms|length }}</h2>
+                    <p class="mb-0">Unique Permissions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h2 class="text-warning">{{ role_counts.values()|sum }}</h2>
+                    <p class="mb-0">Total Users</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h2 class="text-info">{{ role_permissions['admin']|length }}</h2>
+                    <p class="mb-0">Max Permissions (Admin)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

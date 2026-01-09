@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid mt-4 mb-4">
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.tasks') }}">Projects</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.tasks_board', project_key=project_key) }}">{{ project_key }}</a></li>
+                    <li class="breadcrumb-item active">{{ task.key }}</li>
+                </ol>
+            </nav>
+            
+            <!-- Task Header -->
+            <div class="d-flex align-items-start mb-4">
+                {% if task.type == 'story' %}
+                <i class="bi bi-book text-success fs-3 me-3"></i>
+                {% elif task.type == 'task' %}
+                <i class="bi bi-check2-square text-primary fs-3 me-3"></i>
+                {% elif task.type == 'bug' %}
+                <i class="bi bi-bug text-danger fs-3 me-3"></i>
+                {% elif task.type == 'epic' %}
+                <i class="bi bi-lightning text-warning fs-3 me-3"></i>
+                {% endif %}
+                <div class="flex-grow-1">
+                    <small class="text-muted">{{ task.key }}</small>
+                    <h2 class="mb-0">{{ task.title }}</h2>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#details">Chi tiết</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#comments">
+                        Comments <span class="badge bg-secondary">{{ task.comments|length }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#attachments">
+                        Attachments <span class="badge bg-secondary">{{ task.attachments|length }}</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#history">Activity</a>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Details Tab -->
+                <div class="tab-pane fade show active" id="details">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5>Mô tả</h5>
+                            <div class="task-description">
+                                {{ task.description|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comments Tab -->
+                <div class="tab-pane fade" id="comments">
+                    {% for comment in task.comments %}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="assignee-avatar me-2">{{ comment.author[0] }}</div>
+                                <div>
+                                    <strong>{{ comment.author }}</strong>
+                                    <small class="text-muted ms-2">{{ comment.created_at }}</small>
+                                </div>
+                            </div>
+                            <p class="mb-0">{{ comment.content }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Add Comment -->
+                    <div class="card">
+                        <div class="card-body">
+                            <form method="POST">
+                                <textarea class="form-control mb-2" rows="3" name="comment" placeholder="Thêm comment..."></textarea>
+                                <button type="submit" class="btn btn-success">Gửi</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Attachments Tab -->
+                <div class="tab-pane fade" id="attachments">
+                    <div class="list-group">
+                        {% for attachment in task.attachments %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-file-earmark me-2"></i>
+                                <strong>{{ attachment.filename }}</strong>
+                                <small class="text-muted ms-2">{{ attachment.size }}</small>
+                            </div>
+                            <a href="#" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-download"></i>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Upload -->
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <input type="file" class="form-control" multiple>
+                            <button class="btn btn-success mt-2">Upload</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- History Tab -->
+                <div class="tab-pane fade" id="history">
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-info"></div>
+                            <div class="timeline-content">
+                                <small class="text-muted">2 hours ago</small>
+                                <p class="mb-0"><strong>Jane Smith</strong> changed status from <span class="badge bg-secondary">To Do</span> to <span class="badge bg-info">In Progress</span></p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-success"></div>
+                            <div class="timeline-content">
+                                <small class="text-muted">4 days ago</small>
+                                <p class="mb-0"><strong>John Doe</strong> created this task</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 1rem;">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Chi tiết</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted small mb-1">Status</label>
+                        <select class="form-select form-select-sm" id="taskStatus">
+                            <option {% if task.status == 'todo' %}selected{% endif %} value="todo">To Do</option>
+                            <option {% if task.status == 'in_progress' %}selected{% endif %} value="in_progress">In Progress</option>
+                            <option {% if task.status == 'review' %}selected{% endif %} value="review">Review</option>
+                            <option {% if task.status == 'done' %}selected{% endif %} value="done">Done</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="text-muted small mb-1">Priority</label>
+                        <select class="form-select form-select-sm" id="taskPriority">
+                            <option {% if task.priority == 'low' %}selected{% endif %} value="low">Low</option>
+                            <option {% if task.priority == 'medium' %}selected{% endif %} value="medium">Medium</option>
+                            <option {% if task.priority == 'high' %}selected{% endif %} value="high">High</option>
+                            <option {% if task.priority == 'urgent' %}selected{% endif %} value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="text-muted small mb-1">Assignee</label>
+                        <div class="d-flex align-items-center">
+                            <div class="assignee-avatar me-2">{{ task.assignee[0] }}</div>
+                            <span>{{ task.assignee }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="text-muted small mb-1">Reporter</label>
+                        <div>{{ task.reporter }}</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="text-muted small mb-1">Story Points</label>
+                        <div><span class="story-points">{{ task.story_points }}</span></div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="small text-muted">
+                        <div class="mb-2">
+                            <i class="bi bi-calendar-event me-2"></i>Created {{ task.created_at }}
+                        </div>
+                        <div>
+                            <i class="bi bi-pencil me-2"></i>Updated {{ task.updated_at }}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <button class="btn btn-danger btn-sm w-100" onclick="return confirm('Xác nhận xóa task này?')">
+                        <i class="bi bi-trash me-2"></i>Delete Task
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.task-description {
+    white-space: pre-wrap;
+    line-height: 1.8;
+}
+
+.assignee-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #6c5ce7;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.story-points {
+    background: #e9ecef;
+    color: #495057;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline-item {
+    position: relative;
+    padding-bottom: 2rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -2rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px currentColor;
+}
+
+.timeline-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: -1.44rem;
+    top: 12px;
+    bottom: -12px;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-content {
+    padding-left: 0.5rem;
+}
+</style>
+
+<script>
+// Auto-save when changing status or priority
+document.getElementById('taskStatus')?.addEventListener('change', function() {
+    console.log('Status changed to:', this.value);
+    // TODO: Send AJAX to update task
+});
+
+document.getElementById('taskPriority')?.addEventListener('change', function() {
+    console.log('Priority changed to:', this.value);
+    // TODO: Send AJAX to update task
+});
+</script>
+{% endblock %}

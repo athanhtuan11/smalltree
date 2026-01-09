@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .permission-card {
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    .permission-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .usage-badge {
+        font-size: 1.2rem;
+        padding: 0.5rem 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-gear"></i> Manage Permissions</h2>
+            <p class="text-muted mb-0">Quản lý tất cả permissions trong hệ thống</p>
+        </div>
+        <div>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPermModal">
+                <i class="bi bi-plus-circle"></i> Add New Permission
+            </button>
+            <a href="{{ url_for('rbac_mgmt.list_roles') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Roles
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ total_permissions }}</h3>
+                    <p class="mb-0">Total Permissions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-danger">{{ permission_groups['Admin']|length }}</h3>
+                    <p class="mb-0">Admin Permissions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">{{ permission_groups['Content Management']|length }}</h3>
+                    <p class="mb-0">Content Mgmt</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-info">{{ permission_groups['View Access']|length }}</h3>
+                    <p class="mb-0">View Access</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Permission Groups -->
+    {% for group_name, group_perms in permission_groups.items() %}
+    <div class="card mb-4">
+        <div class="card-header bg-{{ 'danger' if group_name == 'Admin' else 'primary' if group_name == 'Content Management' else 'info' if group_name == 'View Access' else 'warning' }} text-white">
+            <h5 class="mb-0">
+                {% if group_name == 'Admin' %}
+                    <i class="bi bi-shield-lock"></i>
+                {% elif group_name == 'Content Management' %}
+                    <i class="bi bi-pencil-square"></i>
+                {% elif group_name == 'View Access' %}
+                    <i class="bi bi-eye"></i>
+                {% else %}
+                    <i class="bi bi-lightning"></i>
+                {% endif %}
+                {{ group_name }} ({{ group_perms|length }})
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for perm in group_perms %}
+                <div class="col-md-4 mb-3">
+                    <div class="card permission-card border-secondary">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ perm }}</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge usage-badge bg-{{ 'success' if perm_usage[perm] > 3 else 'warning' if perm_usage[perm] > 0 else 'secondary' }}">
+                                    Used by {{ perm_usage[perm] }} role(s)
+                                </span>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="deletePermission('{{ perm }}')"
+                                            {% if perm_usage[perm] > 0 %}disabled title="Cannot delete - used by roles"{% endif %}>
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Permission Modal -->
+<div class="modal fade" id="addPermModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add New Permission</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_permission">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Permission Name *</label>
+                        <input type="text" name="permission_name" class="form-control" 
+                               placeholder="e.g., manage_reports" required>
+                        <small class="text-muted">Use lowercase with underscores (snake_case)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select name="category" class="form-select">
+                            <option value="Admin">Admin</option>
+                            <option value="Content Management">Content Management</option>
+                            <option value="View Access">View Access</option>
+                            <option value="Actions" selected>Actions</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> Permission này sẽ có thể được assign vào các roles.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus"></i> Add Permission
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function deletePermission(permName) {
+    if (confirm(`Are you sure you want to delete permission "${permName}"?`)) {
+        // TODO: Implement delete API
+        alert('Delete functionality coming soon!');
+    }
+}
+</script>
+{% endblock %}
