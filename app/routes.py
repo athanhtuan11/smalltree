@@ -7094,3 +7094,295 @@ def task_detail(project_key, task_key):
                          task=task,
                          title=f'{task_key}',
                          mobile=mobile)
+
+
+# ============================================================================
+# CURRICULUM BUILDER ROUTES (Course Content Management)
+# ============================================================================
+
+@main.route('/courses/<int:course_id>/curriculum')
+def course_curriculum(course_id):
+    """Curriculum builder page - Manage sections and lectures"""
+    if not session.get('user_id'):
+        flash('Vui lòng đăng nhập!', 'warning')
+        return redirect(url_for('main.login'))
+    
+    from app.models_courses import Course, CourseSection, Lesson
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check if user is instructor or admin
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        flash('Bạn không có quyền chỉnh sửa khóa học này!', 'danger')
+        return redirect(url_for('main.course_detail', course_id=course_id))
+    
+    sections = CourseSection.query.filter_by(course_id=course_id).order_by(CourseSection.order).all()
+    
+    # Calculate stats
+    total_lectures = sum(len(section.lectures) for section in sections)
+    total_duration = sum(
+        lecture.duration for section in sections 
+        for lecture in section.lectures
+    ) // 60  # Convert to minutes
+    
+    return render_template('courses/curriculum.html',
+                         course=course,
+                         total_lectures=total_lectures,
+                         total_duration=total_duration,
+                         title=f'Curriculum - {course.title}')
+
+
+# ============================================================================
+# SECTION API ENDPOINTS
+# ============================================================================
+
+@main.route('/api/courses/<int:course_id>/sections', methods=['POST'])
+def api_create_section(course_id):
+    """Create a new section"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course, CourseSection
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    
+    if not title:
+        return jsonify({'success': False, 'message': 'Title is required'}), 400
+    
+    # Get max order
+    max_order = db.session.query(db.func.max(CourseSection.order)).filter_by(course_id=course_id).scalar() or 0
+    
+    section = CourseSection(
+        course_id=course_id,
+        title=title,
+        description=description,
+        order=max_order + 1
+    )
+    
+    db.session.add(section)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Section created successfully',
+        'section_id': section.id
+    })
+
+
+@main.route('/api/courses/<int:course_id>/sections/<int:section_id>', methods=['PUT'])
+def api_update_section(course_id, section_id):
+    """Update a section"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course, CourseSection
+    
+    course = Course.query.get_or_404(course_id)
+    section = CourseSection.query.get_or_404(section_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    if section.course_id != course_id:
+        return jsonify({'success': False, 'message': 'Section does not belong to this course'}), 400
+    
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    
+    if title:
+        section.title = title
+    if description is not None:
+        section.description = description
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Section updated successfully'
+    })
+
+
+@main.route('/api/courses/<int:course_id>/sections/<int:section_id>', methods=['DELETE'])
+def api_delete_section(course_id, section_id):
+    """Delete a section and all its lectures"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course, CourseSection, Lesson
+    
+    course = Course.query.get_or_404(course_id)
+    section = CourseSection.query.get_or_404(section_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    if section.course_id != course_id:
+        return jsonify({'success': False, 'message': 'Section does not belong to this course'}), 400
+    
+    # Delete all lectures in this section
+    Lesson.query.filter_by(section_id=section_id).delete()
+    
+    # Delete section
+    db.session.delete(section)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Section and all lectures deleted successfully'
+    })
+
+
+# ============================================================================
+# LECTURE API ENDPOINTS
+# ============================================================================
+
+@main.route('/api/sections/<int:section_id>/lectures', methods=['POST'])
+def api_create_lecture(section_id):
+    """Create a new lecture"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import CourseSection, Lesson, Course
+    
+    section = CourseSection.query.get_or_404(section_id)
+    course = Course.query.get_or_404(section.course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    title = request.form.get('title')
+    lesson_type = request.form.get('lesson_type', 'video')
+    description = request.form.get('description', '')
+    video_url = request.form.get('video_url', '')
+    content = request.form.get('content', '')
+    duration = request.form.get('duration', 0, type=int)
+    is_preview = request.form.get('is_preview') == 'on'
+    
+    if not title:
+        return jsonify({'success': False, 'message': 'Title is required'}), 400
+    
+    # Get max order
+    max_order = db.session.query(db.func.max(Lesson.order)).filter_by(section_id=section_id).scalar() or 0
+    
+    lecture = Lesson(
+        section_id=section_id,
+        title=title,
+        lesson_type=lesson_type,
+        description=description,
+        video_url=video_url,
+        content=content,
+        duration=duration,
+        is_preview=is_preview,
+        order=max_order + 1
+    )
+    
+    db.session.add(lecture)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Lecture created successfully',
+        'lecture_id': lecture.id
+    })
+
+
+@main.route('/api/sections/<int:section_id>/lectures/<int:lecture_id>', methods=['PUT'])
+def api_update_lecture(section_id, lecture_id):
+    """Update a lecture"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import CourseSection, Lesson, Course
+    
+    section = CourseSection.query.get_or_404(section_id)
+    lecture = Lesson.query.get_or_404(lecture_id)
+    course = Course.query.get_or_404(section.course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    if lecture.section_id != section_id:
+        return jsonify({'success': False, 'message': 'Lecture does not belong to this section'}), 400
+    
+    # Update fields
+    if request.form.get('title'):
+        lecture.title = request.form.get('title')
+    if request.form.get('lesson_type'):
+        lecture.lesson_type = request.form.get('lesson_type')
+    if request.form.get('description') is not None:
+        lecture.description = request.form.get('description')
+    if request.form.get('video_url') is not None:
+        lecture.video_url = request.form.get('video_url')
+    if request.form.get('content') is not None:
+        lecture.content = request.form.get('content')
+    if request.form.get('duration') is not None:
+        lecture.duration = int(request.form.get('duration', 0))
+    
+    lecture.is_preview = request.form.get('is_preview') == 'on'
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Lecture updated successfully'
+    })
+
+
+@main.route('/api/lectures/<int:lecture_id>', methods=['DELETE'])
+def api_delete_lecture(lecture_id):
+    """Delete a lecture"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Lesson, CourseSection, Course
+    
+    lecture = Lesson.query.get_or_404(lecture_id)
+    section = CourseSection.query.get_or_404(lecture.section_id)
+    course = Course.query.get_or_404(section.course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    db.session.delete(lecture)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Lecture deleted successfully'
+    })
+
+
+@main.route('/api/courses/<int:course_id>/publish', methods=['POST'])
+def api_publish_course(course_id):
+    """Publish a course"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    course.status = 'published'
+    course.published_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Course published successfully'
+    })
