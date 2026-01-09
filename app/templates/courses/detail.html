@@ -13,34 +13,43 @@
         
         <div class="row">
             <div class="col-lg-8">
+                {% if user_role in ['admin', 'teacher'] and (not instructor or instructor.id == session.get('user_id') or instructor.id == session.get('staff_id')) %}
+                <div class="mb-3">
+                    <a href="{{ url_for('main.course_curriculum', course_id=course.id) }}" class="btn btn-warning btn-sm me-2">
+                        <i class="bi bi-list-ul me-1"></i>Manage Curriculum
+                    </a>
+                    <span class="badge bg-secondary">Instructor Tools</span>
+                </div>
+                {% endif %}
+                
                 <span class="badge bg-warning text-dark mb-2">Bestseller</span>
                 <h1 class="mb-2">{{ course.title }}</h1>
-                <p class="lead">{{ course.subtitle }}</p>
+                <p class="lead">{{ course.short_description }}</p>
                 
                 <div class="d-flex align-items-center mb-3 flex-wrap gap-3">
                     <div class="d-flex align-items-center">
-                        <span class="text-warning me-1"><strong>{{ course.rating }}</strong></span>
+                        <span class="text-warning me-1"><strong>{{ course.rating_avg }}</strong></span>
                         {% for i in range(5) %}
-                            {% if i < course.rating|int %}
+                            {% if i < course.rating_avg|int %}
                             <i class="bi bi-star-fill text-warning"></i>
                             {% else %}
                             <i class="bi bi-star text-warning"></i>
                             {% endif %}
                         {% endfor %}
-                        <span class="ms-2">({{ course.review_count }} ratings)</span>
+                        <span class="ms-2">({{ course.rating_count }} ratings)</span>
                     </div>
                     <div>
-                        <i class="bi bi-people me-1"></i>{{ course.student_count }} students
+                        <i class="bi bi-people me-1"></i>{{ course.enrolled_count }} students
                     </div>
                 </div>
                 
                 <div class="mb-3">
                     <span>Created by </span>
-                    <a href="#" class="text-white text-decoration-underline">{{ course.instructor.name }}</a>
+                    <a href="#" class="text-white text-decoration-underline">{{ instructor.name if instructor else 'Unknown' }}</a>
                 </div>
                 
                 <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <div><i class="bi bi-exclamation-circle me-1"></i>Last updated {{ course.last_updated }}</div>
+                    <div><i class="bi bi-exclamation-circle me-1"></i>Last updated {{ course.updated_at.strftime('%m/%Y') if course.updated_at else 'N/A' }}</div>
                     <div><i class="bi bi-globe me-1"></i>{{ course.language }}</div>
                 </div>
             </div>
@@ -53,11 +62,12 @@
         <!-- Main Content -->
         <div class="col-lg-8">
             <!-- What you'll learn -->
+            {% if what_you_learn %}
             <div class="card mb-4">
                 <div class="card-body">
                     <h4 class="mb-3">What you'll learn</h4>
                     <div class="row">
-                        {% for item in course.what_you_learn %}
+                        {% for item in what_you_learn %}
                         <div class="col-md-6 mb-2">
                             <i class="bi bi-check2 text-success me-2"></i>{{ item }}
                         </div>
@@ -65,39 +75,41 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
             
             <!-- Course content -->
             <div class="mb-4">
                 <h4 class="mb-3">Course content</h4>
                 <p class="text-muted">
-                    {{ course.lecture_count }} lectures • {{ course.duration }} total length
+                    {{ course.total_lessons }} lectures • {{ (course.total_duration / 60)|round|int }} hours total length
                 </p>
                 
+                {% if sections %}
                 <div class="accordion" id="curriculumAccordion">
-                    {% for section in course.curriculum %}
+                    {% for section in sections %}
                     <div class="accordion-item">
                         <h2 class="accordion-header">
                             <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" 
-                                    data-bs-toggle="collapse" data-bs-target="#section{{ section.section_id }}">
+                                    data-bs-toggle="collapse" data-bs-target="#section{{ section.id }}">
                                 <strong>{{ section.title }}</strong>
                                 <span class="ms-auto me-2 text-muted small">
-                                    {{ section.lecture_count }} lectures • {{ section.duration }}
+                                    {{ section.lessons|length }} lectures
                                 </span>
                             </button>
                         </h2>
-                        <div id="section{{ section.section_id }}" 
+                        <div id="section{{ section.id }}" 
                              class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
                              data-bs-parent="#curriculumAccordion">
                             <div class="accordion-body p-0">
                                 <ul class="list-group list-group-flush">
-                                    {% for lecture in section.lectures %}
+                                    {% for lecture in section.lessons %}
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         <div>
-                                            {% if lecture.type == 'video' %}
+                                            {% if lecture.lesson_type == 'video' %}
                                             <i class="bi bi-play-circle me-2"></i>
-                                            {% elif lecture.type == 'quiz' %}
+                                            {% elif lecture.lesson_type == 'quiz' %}
                                             <i class="bi bi-question-circle me-2"></i>
-                                            {% elif lecture.type == 'article' %}
+                                            {% elif lecture.lesson_type == 'text' %}
                                             <i class="bi bi-file-text me-2"></i>
                                             {% endif %}
                                             {{ lecture.title }}
@@ -105,7 +117,7 @@
                                             <span class="badge bg-info ms-2">Preview</span>
                                             {% endif %}
                                         </div>
-                                        <span class="text-muted small">{{ lecture.duration }}</span>
+                                        <span class="text-muted small">{{ (lecture.duration / 60)|round|int }} min</span>
                                     </li>
                                     {% endfor %}
                                 </ul>
@@ -114,17 +126,22 @@
                     </div>
                     {% endfor %}
                 </div>
+                {% else %}
+                <p class="text-muted">Chưa có nội dung.</p>
+                {% endif %}
             </div>
             
             <!-- Requirements -->
+            {% if requirements %}
             <div class="mb-4">
                 <h4 class="mb-3">Requirements</h4>
                 <ul>
-                    {% for req in course.requirements %}
+                    {% for req in requirements %}
                     <li>{{ req }}</li>
                     {% endfor %}
                 </ul>
             </div>
+            {% endif %}
             
             <!-- Description -->
             <div class="mb-4">
@@ -135,31 +152,32 @@
             <!-- Instructor -->
             <div class="mb-4">
                 <h4 class="mb-3">Instructor</h4>
+                {% if instructor %}
                 <div class="card">
                     <div class="card-body">
                         <div class="d-flex align-items-start">
                             <div class="instructor-avatar me-3">
-                                {% if course.instructor.avatar %}
-                                <img src="{{ course.instructor.avatar }}" alt="{{ course.instructor.name }}" class="rounded-circle" width="80" height="80">
+                                {% if instructor.avatar %}
+                                <img src="{{ instructor.avatar }}" alt="{{ instructor.name }}" class="rounded-circle" width="80" height="80">
                                 {% else %}
                                 <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" 
                                      style="width: 80px; height: 80px; font-size: 2rem;">
-                                    {{ course.instructor.name[0] }}
+                                    {{ instructor.name[0] }}
                                 </div>
                                 {% endif %}
                             </div>
                             <div>
-                                <h5 class="mb-1">{{ course.instructor.name }}</h5>
-                                <p class="text-muted mb-2">{{ course.instructor.title }}</p>
+                                <h5 class="mb-1">{{ instructor.name }}</h5>
+                                <p class="text-muted mb-2">{{ instructor.position if instructor.position else 'Instructor' }}</p>
                                 <div class="d-flex gap-3 small text-muted">
-                                    <div><i class="bi bi-star-fill me-1"></i>{{ course.instructor.rating }} Instructor Rating</div>
-                                    <div><i class="bi bi-people me-1"></i>{{ course.instructor.students }} Students</div>
-                                    <div><i class="bi bi-play-circle me-1"></i>{{ course.instructor.courses }} Courses</div>
+                                    <div><i class="bi bi-envelope me-1"></i>{{ instructor.email if instructor.email else 'N/A' }}</div>
+                                    <div><i class="bi bi-phone me-1"></i>{{ instructor.phone if instructor.phone else 'N/A' }}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+                {% endif %}
             </div>
             
             <!-- Student feedback -->
@@ -167,10 +185,10 @@
                 <h4 class="mb-3">Student feedback</h4>
                 <div class="row align-items-center mb-4">
                     <div class="col-md-3 text-center">
-                        <div class="display-3 fw-bold text-warning">{{ course.rating }}</div>
+                        <div class="display-3 fw-bold text-warning">{{ course.rating_avg }}</div>
                         <div class="text-warning mb-2">
                             {% for i in range(5) %}
-                                {% if i < course.rating|int %}
+                                {% if i < course.rating_avg|int %}
                                 <i class="bi bi-star-fill"></i>
                                 {% else %}
                                 <i class="bi bi-star"></i>
@@ -195,7 +213,8 @@
                 </div>
                 
                 <!-- Reviews -->
-                {% for review in course.reviews %}
+                {% if reviews %}
+                {% for review in reviews %}
                 <div class="card mb-3">
                     <div class="card-body">
                         <div class="d-flex align-items-start">
@@ -221,6 +240,9 @@
                     </div>
                 </div>
                 {% endfor %}
+                {% else %}
+                <p class="text-muted">Chưa có đánh giá nào.</p>
+                {% endif %}
             </div>
         </div>
         
@@ -242,18 +264,14 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
+                        {% if course.price == 0 %}
+                        <h3 class="mb-0 text-success">Miễn phí</h3>
+                        {% else %}
                         <h3 class="mb-0 text-success">{{ "{:,.0f}".format(course.price) }}đ</h3>
-                        {% if course.original_price > course.price %}
-                        <div>
-                            <span class="text-muted text-decoration-line-through">
-                                {{ "{:,.0f}".format(course.original_price) }}đ
-                            </span>
-                            <span class="badge bg-danger ms-2">{{ course.discount_percent }}% OFF</span>
-                        </div>
                         {% endif %}
                     </div>
                     
-                    {% if course.is_enrolled %}
+                    {% if is_enrolled %}
                     <a href="{{ url_for('main.course_learn', course_id=course.id) }}" class="btn btn-success w-100 mb-2">
                         <i class="bi bi-play-circle me-2"></i>Tiếp tục học
                     </a>
@@ -274,14 +292,11 @@
                         <strong>This course includes:</strong>
                     </div>
                     <ul class="list-unstyled small">
-                        <li class="mb-2"><i class="bi bi-play-circle me-2"></i>{{ course.duration }} on-demand video</li>
-                        <li class="mb-2"><i class="bi bi-file-earmark me-2"></i>{{ course.article_count }} articles</li>
-                        <li class="mb-2"><i class="bi bi-download me-2"></i>{{ course.resource_count }} downloadable resources</li>
+                        <li class="mb-2"><i class="bi bi-play-circle me-2"></i>{{ (course.total_duration / 60)|round|int }} hours on-demand video</li>
+                        <li class="mb-2"><i class="bi bi-file-earmark me-2"></i>{{ course.total_lessons }} lectures</li>
                         <li class="mb-2"><i class="bi bi-infinity me-2"></i>Full lifetime access</li>
                         <li class="mb-2"><i class="bi bi-phone me-2"></i>Access on mobile and TV</li>
-                        {% if course.has_certificate %}
                         <li class="mb-2"><i class="bi bi-award me-2"></i>Certificate of completion</li>
-                        {% endif %}
                     </ul>
                     
                     <div class="d-flex justify-content-between">

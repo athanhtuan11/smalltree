@@ -199,8 +199,8 @@
                     <div class="section-body">
                         <!-- Lectures List -->
                         <div class="lectures-container" data-section-id="{{ section.id }}">
-                            {% if section.lectures %}
-                                {% for lecture in section.lectures %}
+                            {% if section.lessons %}
+                                {% for lecture in section.lessons %}
                                 <div class="lecture-item" data-lecture-id="{{ lecture.id }}" draggable="true">
                                     <div class="lecture-info d-flex align-items-center">
                                         <i class="bi bi-grip-vertical me-3 text-muted"></i>

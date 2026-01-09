@@ -6751,8 +6751,8 @@ def course_create():
         from app.models_courses import Course
         from datetime import datetime
         
-        # Get instructor_id (staff_id from session)
-        instructor_id = session.get('staff_id')
+        # Get instructor_id (staff_id or user_id from session)
+        instructor_id = session.get('staff_id') or session.get('user_id')
         if not instructor_id:
             flash('Không tìm thấy thông tin giảng viên!', 'danger')
             return redirect(url_for('main.courses'))
@@ -7119,14 +7119,15 @@ def course_curriculum(course_id):
     sections = CourseSection.query.filter_by(course_id=course_id).order_by(CourseSection.order).all()
     
     # Calculate stats
-    total_lectures = sum(len(section.lectures) for section in sections)
+    total_lectures = sum(len(section.lessons) for section in sections)
     total_duration = sum(
         lecture.duration for section in sections 
-        for lecture in section.lectures
+        for lecture in section.lessons
     ) // 60  # Convert to minutes
     
     return render_template('courses/curriculum.html',
                          course=course,
+                         sections=sections,
                          total_lectures=total_lectures,
                          total_duration=total_duration,
                          title=f'Curriculum - {course.title}')
