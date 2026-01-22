@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4 mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Breadcrumb -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.tasks') }}">Projects</a></li>
+                    <li class="breadcrumb-item active">Tạo Project mới</li>
+                </ol>
+            </nav>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="bi bi-folder-plus me-2"></i>Tạo Project mới</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.task_project_create') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label class="form-label">Tên Project <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="name" required 
+                                           placeholder="VD: Course Development">
+                                    <small class="form-text text-muted">Tên đầy đủ của project</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Mô tả</label>
+                                    <textarea class="form-control" name="description" rows="4" 
+                                              placeholder="Mô tả ngắn gọn về mục đích của project..."></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Project Key <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control text-uppercase" name="key" required 
+                                           placeholder="VD: COURSE" maxlength="10" pattern="[A-Z]{2,10}">
+                                    <small class="form-text text-muted">2-10 ký tự viết hoa, không dấu</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Loại Project</label>
+                                    <select class="form-select" name="project_type">
+                                        <option value="kanban" selected>Kanban</option>
+                                        <option value="scrum">Scrum</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Màu sắc</label>
+                                    <input type="color" class="form-control form-control-color" name="color" 
+                                           value="#43a047" title="Chọn màu cho project">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('main.tasks') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Hủy
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle me-2"></i>Tạo Project
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Tips -->
+            <div class="alert alert-info mt-4">
+                <h6><i class="bi bi-lightbulb me-2"></i>Tips:</h6>
+                <ul class="mb-0">
+                    <li><strong>Project Key</strong> sẽ được dùng làm prefix cho tất cả tasks (VD: COURSE-1, COURSE-2...)</li>
+                    <li><strong>Kanban</strong>: Phù hợp với công việc liên tục, không có sprint cố định</li>
+                    <li><strong>Scrum</strong>: Phù hợp với công việc có kế hoạch sprint rõ ràng</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control-color {
+    width: 100%;
+    height: 40px;
+}
+</style>
+
+<script>
+// Auto uppercase the key input
+document.querySelector('input[name="key"]')?.addEventListener('input', function() {
+    this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '');
+});
+</script>
+{% endblock %}

@@ -119,7 +119,9 @@
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Tạo Task mới</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST">
+            <form method="POST" id="createTaskForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="project_id" value="{{ project.id }}">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-8">
@@ -155,8 +157,9 @@
                                 <label class="form-label">Assignee</label>
                                 <select class="form-select" name="assignee_id">
                                     <option value="">Chưa assign</option>
-                                    <option>John Doe</option>
-                                    <option>Jane Smith</option>
+                                    {% for staff in staff_list %}
+                                    <option value="{{ staff.id }}">{{ staff.name }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             <div class="mb-3">
@@ -320,12 +323,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 console.log(`Task ${taskKey} moved from ${oldStatus} to ${newStatus}`);
                 
-                // TODO: Send AJAX request to update task status in backend
-                // fetch('/api/tasks/update_status', {
-                //     method: 'POST',
-                //     headers: {'Content-Type': 'application/json'},
-                //     body: JSON.stringify({task_id: taskId, status: newStatus})
-                // });
+                // Update task status via API
+                fetch(`/api/tasks/${taskId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({status: newStatus})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        alert('Failed to update status: ' + data.message);
+                        // Revert the move
+                        evt.from.appendChild(evt.item);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error updating task status');
+                    evt.from.appendChild(evt.item);
+                });
                 
                 // Update badge counts
                 updateColumnCounts();
@@ -343,6 +362,47 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = `/tasks/{{ project.key }}/${taskKey}`;
         });
     });
+    
+    // Create task form submit
+    const createTaskForm = document.getElementById('createTaskForm');
+    if (createTaskForm) {
+        createTaskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {
+                project_id: parseInt(formData.get('project_id')),
+                title: formData.get('title'),
+                description: formData.get('description'),
+                type: formData.get('type'),
+                priority: formData.get('priority'),
+                assignee_id: formData.get('assignee_id') ? parseInt(formData.get('assignee_id')) : null,
+                story_points: formData.get('story_points') ? parseInt(formData.get('story_points')) : null
+            };
+            
+            fetch('/api/tasks/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrf_token')
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Task created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error creating task');
+            });
+        });
+    }
     
     function updateColumnCounts() {
         columns.forEach(column => {

@@ -2,6 +2,7 @@ from werkzeug.security import generate_password_hash
 from PIL import Image
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, session, jsonify, current_app
 from app.models import db, Activity, Curriculum, Child, AttendanceRecord, Staff, BmiRecord, ActivityImage, Supplier, Product, StudentAlbum, StudentPhoto, StudentProgress, Dish, Menu, Class, MonthlyService, UserActivity
+from app.models_tasks import Project, ProjectMember, Task, TaskComment, TaskAttachment, TaskHistory
 from app.forms import EditProfileForm, ActivityCreateForm, ActivityEditForm, SupplierForm, ProductForm
 from calendar import monthrange
 from datetime import datetime, date, timedelta
@@ -6922,28 +6923,22 @@ def tasks():
     
     mobile = is_mobile()
     
-    # TODO: Query projects from database
-    # Tạm thời dùng mock data để demo UI
-    projects_list = [
-        {
-            'id': 1,
-            'key': 'COURSE',
-            'name': 'Course Development',
-            'description': 'Phát triển các khóa học mới',
-            'color': '#43a047',
-            'status': 'active',
-            'task_count': 12
-        },
-        {
-            'id': 2,
-            'key': 'CONTENT',
-            'name': 'Content Creation',
-            'description': 'Tạo nội dung bài giảng và tài liệu',
-            'color': '#2196F3',
-            'status': 'active',
-            'task_count': 8
-        }
-    ]
+    # Query projects from database với task count
+    projects_list = []
+    projects = Project.query.filter_by(status='active').all()
+    
+    for project in projects:
+        task_count = Task.query.filter_by(project_id=project.id).count()
+        projects_list.append({
+            'id': project.id,
+            'key': project.key,
+            'name': project.name,
+            'description': project.description,
+            'color': project.color,
+            'status': project.status,
+            'task_count': task_count,
+            'owner': project.owner.name if project.owner else 'N/A'
+        })
     
     return render_template('tasks/index.html', 
                          projects=projects_list,
@@ -6958,9 +6953,37 @@ def task_project_create():
         return redirect(url_for('main.index'))
     
     if request.method == 'POST':
-        # TODO: Handle project creation
         project_name = request.form.get('name')
-        project_key = request.form.get('key')
+        project_key = request.form.get('key', '').upper()
+        project_description = request.form.get('description')
+        project_color = request.form.get('color', '#43a047')
+        project_type = request.form.get('project_type', 'kanban')
+        
+        # Validate
+        if not project_name or not project_key:
+            flash('Tên và Key là bắt buộc!', 'danger')
+            return redirect(url_for('main.task_project_create'))
+        
+        # Check if key exists
+        existing = Project.query.filter_by(key=project_key).first()
+        if existing:
+            flash(f'Project key "{project_key}" đã tồn tại!', 'danger')
+            return redirect(url_for('main.task_project_create'))
+        
+        # Create project
+        new_project = Project(
+            name=project_name,
+            key=project_key,
+            description=project_description,
+            color=project_color,
+            project_type=project_type,
+            owner_id=session.get('staff_id') or session.get('user_id'),
+            status='active'
+        )
+        
+        db.session.add(new_project)
+        db.session.commit()
+        
         flash(f'Project "{project_name}" ({project_key}) đã được tạo!', 'success')
         return redirect(url_for('main.tasks'))
     
@@ -6978,78 +7001,53 @@ def tasks_board(project_key):
     
     mobile = is_mobile()
     
-    # Mock data for demo
-    project = {
-        'key': project_key,
-        'name': 'Course Development' if project_key == 'COURSE' else 'Content Creation',
-        'color': '#43a047'
+    # Get project
+    project = Project.query.filter_by(key=project_key).first()
+    if not project:
+        flash('Project không tồn tại!', 'danger')
+        return redirect(url_for('main.tasks'))
+    
+    # Get tasks grouped by status
+    tasks_by_status = {
+        'todo': [],
+        'in_progress': [],
+        'review': [],
+        'done': []
     }
     
-    # Mock tasks data - grouped by status
-    tasks_by_status = {
-        'todo': [
-            {
-                'id': 1,
-                'key': f'{project_key}-12',
-                'title': 'Tạo video bài 1: Giới thiệu',
-                'type': 'story',
-                'priority': 'high',
-                'assignee': 'John Doe',
-                'assignee_avatar': None,
-                'story_points': 5
-            },
-            {
-                'id': 2,
-                'key': f'{project_key}-13',
-                'title': 'Viết outline khóa học',
-                'type': 'task',
-                'priority': 'medium',
-                'assignee': 'Jane Smith',
-                'assignee_avatar': None,
-                'story_points': 3
-            }
-        ],
-        'in_progress': [
-            {
-                'id': 3,
-                'key': f'{project_key}-8',
-                'title': 'Implement video player',
-                'type': 'story',
-                'priority': 'high',
-                'assignee': 'John Doe',
-                'assignee_avatar': None,
-                'story_points': 8
-            }
-        ],
-        'review': [
-            {
-                'id': 4,
-                'key': f'{project_key}-5',
-                'title': 'Fix video upload bug',
-                'type': 'bug',
-                'priority': 'urgent',
-                'assignee': 'Jane Smith',
-                'assignee_avatar': None,
-                'story_points': 2
-            }
-        ],
-        'done': [
-            {
-                'id': 5,
-                'key': f'{project_key}-3',
-                'title': 'Setup project structure',
-                'type': 'task',
-                'priority': 'medium',
-                'assignee': 'John Doe',
-                'assignee_avatar': None,
-                'story_points': 3
-            }
-        ]
+    tasks = Task.query.filter_by(project_id=project.id).order_by(Task.board_order).all()
+    
+    for task in tasks:
+        task_data = {
+            'id': task.id,
+            'key': task.task_key,
+            'title': task.title,
+            'type': task.task_type,
+            'priority': task.priority,
+            'assignee': task.assignee.name if task.assignee else 'Unassigned',
+            'assignee_avatar': None,
+            'story_points': task.story_points
+        }
+        
+        # Map status to board columns
+        status_key = task.status
+        if status_key in tasks_by_status:
+            tasks_by_status[status_key].append(task_data)
+    
+    project_data = {
+        'id': project.id,
+        'key': project.key,
+        'name': project.name,
+        'color': project.color
     }
+    
+    # Get staff list for assignee dropdown
+    staff_list = Staff.query.filter_by(is_active=True).all()
     
     return render_template('tasks/board.html', 
-                         project=project,
+                         project=project_data,
                          tasks_by_status=tasks_by_status,
+                         staff_list=staff_list,
                          title=f'Board - {project_key}',
                          mobile=mobile)
 
@@ -7062,38 +7060,295 @@ def task_detail(project_key, task_key):
     
     mobile = is_mobile()
     
-    # Mock task detail
-    task = {
-        'key': task_key,
-        'title': 'Implement video player',
-        'description': 'As an instructor, I want to upload videos so that students can watch my lectures.\n\nAcceptance Criteria:\n- Support MP4, MOV formats\n- Max file size 2GB\n- Show upload progress',
-        'type': 'story',
-        'priority': 'high',
-        'status': 'in_progress',
-        'assignee': 'John Doe',
-        'reporter': 'Jane Smith',
-        'story_points': 8,
-        'created_at': '2026-01-05',
-        'updated_at': '2026-01-09',
-        'comments': [
-            {
-                'id': 1,
-                'author': 'Jane Smith',
-                'content': 'Started working on the upload endpoint',
-                'created_at': '2 hours ago'
-            }
-        ],
-        'attachments': [
-            {'filename': 'wireframe.png', 'size': '250 KB'},
-            {'filename': 'requirements.pdf', 'size': '1.2 MB'}
-        ]
+    # Get task
+    task = Task.query.filter_by(task_key=task_key).first()
+    if not task:
+        flash('Task không tồn tại!', 'danger')
+        return redirect(url_for('main.tasks_board', project_key=project_key))
+    
+    # Get comments
+    comments = TaskComment.query.filter_by(task_id=task.id).order_by(TaskComment.created_at.desc()).all()
+    comments_list = []
+    for comment in comments:
+        comments_list.append({
+            'id': comment.id,
+            'author': comment.author.name if comment.author else 'Unknown',
+            'content': comment.content,
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M')
+        })
+    
+    # Get attachments
+    attachments = TaskAttachment.query.filter_by(task_id=task.id).all()
+    attachments_list = []
+    for att in attachments:
+        attachments_list.append({
+            'id': att.id,
+            'filename': att.filename,
+            'file_path': att.file_path,
+            'file_size': att.file_size,
+            'uploaded_by': att.uploaded_by.name if att.uploaded_by else 'Unknown'
+        })
+    
+    task_data = {
+        'id': task.id,
+        'key': task.task_key,
+        'title': task.title,
+        'description': task.description or '',
+        'type': task.task_type,
+        'priority': task.priority,
+        'status': task.status,
+        'assignee': task.assignee.name if task.assignee else 'Unassigned',
+        'reporter': task.reporter.name if task.reporter else 'Unknown',
+        'story_points': task.story_points,
+        'created_at': task.created_at.strftime('%Y-%m-%d'),
+        'updated_at': task.updated_at.strftime('%Y-%m-%d'),
+        'comments': comments_list,
+        'attachments': attachments_list
     }
     
     return render_template('tasks/detail.html', 
                          project_key=project_key,
-                         task=task,
+                         task=task_data,
                          title=f'{task_key}',
                          mobile=mobile)
+
+
+# ============================================================================
+# TASK API ENDPOINTS
+# ============================================================================
+
+@main.route('/api/tasks/create', methods=['POST'])
+def api_create_task():
+    """Tạo task mới"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    data = request.get_json()
+    project_id = data.get('project_id')
+    title = data.get('title')
+    task_type = data.get('type', 'task')
+    priority = data.get('priority', 'medium')
+    description = data.get('description', '')
+    assignee_id = data.get('assignee_id')
+    story_points = data.get('story_points')
+    
+    if not project_id or not title:
+        return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+    
+    # Get project
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    # Generate task key
+    task_count = Task.query.filter_by(project_id=project_id).count()
+    task_key = f"{project.key}-{task_count + 1}"
+    
+    # Create task
+    new_task = Task(
+        project_id=project_id,
+        task_key=task_key,
+        title=title,
+        description=description,
+        task_type=task_type,
+        priority=priority,
+        status='todo',
+        reporter_id=session.get('staff_id') or session.get('user_id'),
+        assignee_id=assignee_id,
+        story_points=story_points
+    )
+    
+    db.session.add(new_task)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Task created successfully',
+        'task': {
+            'id': new_task.id,
+            'key': new_task.task_key,
+            'title': new_task.title
+        }
+    })
+
+@main.route('/api/tasks/<int:task_id>', methods=['PUT'])
+def api_update_task(task_id):
+    """Cập nhật task"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    data = request.get_json()
+    
+    # Update fields
+    if 'title' in data:
+        task.title = data['title']
+    if 'description' in data:
+        task.description = data['description']
+    if 'type' in data:
+        task.task_type = data['type']
+    if 'priority' in data:
+        task.priority = data['priority']
+    if 'status' in data:
+        task.status = data['status']
+    if 'assignee_id' in data:
+        task.assignee_id = data['assignee_id']
+    if 'story_points' in data:
+        task.story_points = data['story_points']
+    
+    task.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Task updated successfully'
+    })
+
+@main.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_task(task_id):
+    """Xóa task"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    # Delete related data
+    TaskComment.query.filter_by(task_id=task_id).delete()
+    TaskAttachment.query.filter_by(task_id=task_id).delete()
+    TaskHistory.query.filter_by(task_id=task_id).delete()
+    
+    db.session.delete(task)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Task deleted successfully'
+    })
+
+@main.route('/api/tasks/<int:task_id>/status', methods=['PUT'])
+def api_update_task_status(task_id):
+    """Cập nhật status của task (cho drag & drop)"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    data = request.get_json()
+    new_status = data.get('status')
+    
+    if new_status not in ['todo', 'in_progress', 'review', 'done']:
+        return jsonify({'success': False, 'message': 'Invalid status'}), 400
+    
+    task.status = new_status
+    task.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Status updated successfully'
+    })
+
+@main.route('/api/tasks/<int:task_id>/comments', methods=['POST'])
+def api_add_comment(task_id):
+    """Thêm comment vào task"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    data = request.get_json()
+    content = data.get('content')
+    
+    if not content:
+        return jsonify({'success': False, 'message': 'Content is required'}), 400
+    
+    comment = TaskComment(
+        task_id=task_id,
+        author_id=session.get('staff_id') or session.get('user_id'),
+        content=content
+    )
+    
+    db.session.add(comment)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Comment added successfully',
+        'comment': {
+            'id': comment.id,
+            'author': comment.author.name if comment.author else 'Unknown',
+            'content': comment.content,
+            'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+    })
+
+@main.route('/api/projects/<int:project_id>', methods=['PUT'])
+def api_update_project(project_id):
+    """Cập nhật project"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    data = request.get_json()
+    
+    if 'name' in data:
+        project.name = data['name']
+    if 'description' in data:
+        project.description = data['description']
+    if 'color' in data:
+        project.color = data['color']
+    if 'status' in data:
+        project.status = data['status']
+    
+    project.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Project updated successfully'
+    })
+
+@main.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def api_delete_project(project_id):
+    """Xóa project và tất cả tasks"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Only admin can delete projects'}), 403
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    # Delete all tasks and related data
+    tasks = Task.query.filter_by(project_id=project_id).all()
+    for task in tasks:
+        TaskComment.query.filter_by(task_id=task.id).delete()
+        TaskAttachment.query.filter_by(task_id=task.id).delete()
+        TaskHistory.query.filter_by(task_id=task.id).delete()
+        db.session.delete(task)
+    
+    # Delete project members
+    ProjectMember.query.filter_by(project_id=project_id).delete()
+    
+    # Delete project
+    db.session.delete(project)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Project deleted successfully'
+    })
 
 
 # ============================================================================

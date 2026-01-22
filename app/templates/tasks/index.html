@@ -69,6 +69,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="{{ url_for('main.task_project_create') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Tên Project <span class="text-danger">*</span></label>

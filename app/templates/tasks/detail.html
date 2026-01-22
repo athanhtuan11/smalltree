@@ -84,8 +84,10 @@
                     <!-- Add Comment -->
                     <div class="card">
                         <div class="card-body">
-                            <form method="POST">
-                                <textarea class="form-control mb-2" rows="3" name="comment" placeholder="Thêm comment..."></textarea>
+                            <form id="addCommentForm">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="task_id" value="{{ task.id }}">
+                                <textarea class="form-control mb-2" rows="3" name="comment" placeholder="Thêm comment..." required></textarea>
                                 <button type="submit" class="btn btn-success">Gửi</button>
                             </form>
                         </div>
@@ -198,7 +200,7 @@
                     
                     <hr>
                     
-                    <button class="btn btn-danger btn-sm w-100" onclick="return confirm('Xác nhận xóa task này?')">
+                    <button class="btn btn-danger btn-sm w-100" id="deleteTaskBtn" data-task-id="{{ task.id }}">
                         <i class="bi bi-trash me-2"></i>Delete Task
                     </button>
                 </div>
@@ -272,15 +274,120 @@
 </style>
 
 <script>
-// Auto-save when changing status or priority
+const taskId = {{ task.id }};
+const csrfToken = '{{ csrf_token() }}';
+
+// Auto-save when changing status
 document.getElementById('taskStatus')?.addEventListener('change', function() {
-    console.log('Status changed to:', this.value);
-    // TODO: Send AJAX to update task
+    const newStatus = this.value;
+    console.log('Status changed to:', newStatus);
+    
+    fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ status: newStatus })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Status updated successfully');
+        } else {
+            alert('Error updating status: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating status');
+    });
 });
 
+// Auto-save when changing priority
 document.getElementById('taskPriority')?.addEventListener('change', function() {
-    console.log('Priority changed to:', this.value);
-    // TODO: Send AJAX to update task
+    const newPriority = this.value;
+    console.log('Priority changed to:', newPriority);
+    
+    fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({ priority: newPriority })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Priority updated successfully');
+        } else {
+            alert('Error updating priority: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating priority');
+    });
+});
+
+// Add comment
+document.getElementById('addCommentForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const content = formData.get('comment');
+    
+    fetch(`/api/tasks/${taskId}/comments`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': formData.get('csrf_token')
+        },
+        body: JSON.stringify({ content: content })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Comment added successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding comment');
+    });
+});
+
+// Delete task
+document.getElementById('deleteTaskBtn')?.addEventListener('click', function() {
+    if (!confirm('Bạn có chắc chắn muốn xóa task này không?')) {
+        return;
+    }
+    
+    const taskId = this.dataset.taskId;
+    
+    fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Task deleted successfully!');
+            window.location.href = '/tasks/{{ project_key }}';
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting task');
+    });
 });
 </script>
 {% endblock %}
