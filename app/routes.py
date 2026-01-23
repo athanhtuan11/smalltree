@@ -35,6 +35,9 @@ except ImportError:
 
 main = Blueprint('main', __name__)
 
+# Import CSRF for exempting API endpoints
+from app import csrf
+
 def get_who_bmi_median_sd(age_months, gender):
     """
     Lấy giá trị median (M) và SD (S) của BMI theo tuổi và giới tính
@@ -6720,18 +6723,32 @@ def courses():
     user_role = session.get('role')
     
     # Query courses from database
-    from app.models_courses import Course
+    from app.models_courses import Course, Enrollment
     
     if user_role == 'admin':
-        # Admin sees all courses
+        # Admin sees all courses (including archived)
         courses_query = Course.query
     elif user_role == 'teacher':
-        # Teacher sees only their courses
+        # Teacher sees only their courses (including archived)
         staff_id = session.get('staff_id')
         courses_query = Course.query.filter_by(instructor_id=staff_id)
     else:
-        # Students see only published courses
-        courses_query = Course.query.filter_by(status='published')
+        # Students see only published courses they are enrolled in
+        user_id = session.get('user_id')
+        enrolled_course_ids = db.session.query(Enrollment.course_id).filter_by(
+            student_id=user_id,
+            status='active'
+        ).all()
+        enrolled_ids = [c[0] for c in enrolled_course_ids]
+        
+        if enrolled_ids:
+            courses_query = Course.query.filter(
+                Course.id.in_(enrolled_ids),
+                Course.status == 'published'
+            )
+        else:
+            # No enrolled courses, show empty list
+            courses_query = Course.query.filter(Course.id == -1)  # Always false
     
     courses_list = courses_query.order_by(Course.created_at.desc()).all()
     
@@ -6751,6 +6768,9 @@ def course_create():
     if request.method == 'POST':
         from app.models_courses import Course
         from datetime import datetime
+        import os
+        import re
+        from PIL import Image
         
         # Get instructor_id (staff_id or user_id from session)
         instructor_id = session.get('staff_id') or session.get('user_id')
@@ -6768,6 +6788,21 @@ def course_create():
         if existing:
             slug = f"{slug}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
+        # Handle thumbnail upload
+        thumbnail_url = ''
+        thumbnail_file = request.files.get('thumbnail')
+        if thumbnail_file and thumbnail_file.filename:
+            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+            ext = os.path.splitext(thumbnail_file.filename)[1].lower()
+            if ext in allowed_ext:
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', thumbnail_file.filename)
+                filename = 'course_thumb_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
+                save_path = os.path.join('app', 'static', 'images', filename)
+                img = Image.open(thumbnail_file)
+                img.thumbnail((1280, 720))
+                img.save(save_path)
+                thumbnail_url = url_for('static', filename=f'images/{filename}')
+        
         # Create new course
         new_course = Course(
             title=title,
@@ -6780,6 +6815,7 @@ def course_create():
             language=request.form.get('language', 'Vietnamese'),
             price=float(request.form.get('price', 0)),
             status=request.form.get('status', 'draft'),
+            thumbnail=thumbnail_url if thumbnail_url else None,
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
@@ -6793,17 +6829,77 @@ def course_create():
     mobile = is_mobile()
     return render_template('courses/create.html', 
                          title='Tạo khóa học mới',
-                         mobile=mobile)
+                         mobile=mobile,
+                         course=None)
+
+
+@main.route('/courses/<int:course_id>/edit', methods=['GET', 'POST'])
+def course_edit(course_id):
+    """Edit existing course - admin and teacher only"""
+    if session.get('role') not in ['admin', 'teacher']:
+        flash('Bạn không có quyền chỉnh sửa khóa học!', 'danger')
+        return redirect(url_for('main.courses'))
+    
+    from app.models_courses import Course
+    from datetime import datetime
+    import os
+    import re
+    from PIL import Image
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        flash('Bạn không có quyền chỉnh sửa khóa học này!', 'danger')
+        return redirect(url_for('main.course_detail', course_id=course_id))
+    
+    if request.method == 'POST':
+        # Update course info
+        course.title = request.form.get('title')
+        course.short_description = request.form.get('subtitle')
+        course.description = request.form.get('description')
+        course.category = request.form.get('category')
+        course.level = request.form.get('level')
+        course.language = request.form.get('language', 'Vietnamese')
+        course.price = float(request.form.get('price', 0))
+        course.status = request.form.get('status', 'draft')
+        course.updated_at = datetime.now()
+        
+        # Handle thumbnail upload if new file provided
+        thumbnail_file = request.files.get('thumbnail')
+        if thumbnail_file and thumbnail_file.filename:
+            allowed_ext = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+            ext = os.path.splitext(thumbnail_file.filename)[1].lower()
+            if ext in allowed_ext:
+                safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '', thumbnail_file.filename)
+                filename = 'course_thumb_' + datetime.now().strftime('%Y%m%d%H%M%S') + '_' + safe_filename
+                save_path = os.path.join('app', 'static', 'images', filename)
+                img = Image.open(thumbnail_file)
+                img.thumbnail((1280, 720))
+                img.save(save_path)
+                course.thumbnail = url_for('static', filename=f'images/{filename}')
+        
+        db.session.commit()
+        
+        flash(f'Khóa học "{course.title}" đã được cập nhật!', 'success')
+        return redirect(url_for('main.course_detail', course_id=course.id))
+    
+    mobile = is_mobile()
+    return render_template('courses/create.html', 
+                         title=f'Chỉnh sửa: {course.title}',
+                         mobile=mobile,
+                         course=course,
+                         is_edit=True)
+
 
 @main.route('/courses/<int:course_id>')
 def course_detail(course_id):
     """Chi tiết khóa học - Landing page như Udemy"""
-    if not session.get('user_id'):
-        flash('Vui lòng đăng nhập để xem chi tiết khóa học!', 'warning')
-        return redirect(url_for('main.login'))
-    
+    # Allow guest access (không yêu cầu đăng nhập)
     mobile = is_mobile()
     user_role = session.get('role')
+    user_id = session.get('user_id')
+    user_logged_in = bool(user_id)
     
     # Get course from database
     from app.models_courses import Course, CourseSection, Enrollment, CourseReview
@@ -6811,12 +6907,13 @@ def course_detail(course_id):
     
     course = Course.query.get_or_404(course_id)
     
-    # Check enrollment status
-    user_id = session.get('user_id')
-    is_enrolled = Enrollment.query.filter_by(
-        course_id=course_id,
-        student_id=user_id  # Assuming students are from child table
-    ).first() is not None
+    # Check enrollment status (only if logged in)
+    is_enrolled = False
+    if user_id:
+        is_enrolled = Enrollment.query.filter_by(
+            course_id=course_id,
+            student_id=user_id
+        ).first() is not None
     
     # Get instructor details
     instructor = Staff.query.get(course.instructor_id) if course.instructor_id else None
@@ -6853,6 +6950,7 @@ def course_detail(course_id):
                          requirements=requirements,
                          is_enrolled=is_enrolled,
                          user_role=user_role,
+                         user_logged_in=user_logged_in,
                          title=course.title,
                          mobile=mobile)
 
@@ -6865,33 +6963,71 @@ def course_learn(course_id):
     
     mobile = is_mobile()
     user_id = session.get('user_id')
+    user_role = session.get('role')
     
     # Get course from database
     from app.models_courses import Course, CourseSection, Lesson, Enrollment, LessonProgress
     
-    # Check if user is enrolled
-    enrollment = Enrollment.query.filter_by(
-        course_id=course_id,
-        student_id=user_id
-    ).first()
-    
-    if not enrollment and session.get('role') not in ['admin', 'teacher']:
-        flash('Bạn chưa đăng ký khóa học này!', 'warning')
-        return redirect(url_for('main.course_detail', course_id=course_id))
+    # Admin and teacher can access all courses without enrollment
+    if user_role in ['admin', 'teacher']:
+        enrollment = None  # No enrollment needed for admin/teacher
+    else:
+        # Check if student is enrolled
+        enrollment = Enrollment.query.filter_by(
+            course_id=course_id,
+            student_id=user_id
+        ).first()
+        
+        if not enrollment:
+            flash('Bạn chưa được cấp phép vào khóa học này!', 'warning')
+            return redirect(url_for('main.course_detail', course_id=course_id))
     
     course = Course.query.get_or_404(course_id)
     sections = CourseSection.query.filter_by(course_id=course_id).order_by(CourseSection.order).all()
+    
+    # Build lesson progress map for template
+    lesson_progress_map = {}
+    total_lessons = 0
+    completed_lessons = 0
+    
+    if enrollment:
+        for section in sections:
+            for lesson in section.lessons:
+                total_lessons += 1
+                progress = LessonProgress.query.filter_by(
+                    lesson_id=lesson.id,
+                    enrollment_id=enrollment.id
+                ).first()
+                
+                if progress:
+                    lesson_progress_map[lesson.id] = {
+                        'is_completed': progress.is_completed,
+                        'completion_percentage': progress.completion_percentage,
+                        'current_position': progress.current_position,
+                        'watched_duration': progress.watched_duration
+                    }
+                    if progress.is_completed:
+                        completed_lessons += 1
+                else:
+                    lesson_progress_map[lesson.id] = {
+                        'is_completed': False,
+                        'completion_percentage': 0,
+                        'current_position': 0,
+                        'watched_duration': 0
+                    }
+    
+    # Calculate overall progress
+    overall_progress = 0
+    if total_lessons > 0:
+        overall_progress = round((completed_lessons / total_lessons) * 100, 1)
     
     # Get current lesson (first incomplete or first lesson)
     current_lesson = None
     if enrollment:
         for section in sections:
             for lesson in section.lessons:
-                progress = LessonProgress.query.filter_by(
-                    lesson_id=lesson.id,
-                    enrollment_id=enrollment.id
-                ).first()
-                if not progress or not progress.is_completed:
+                progress = lesson_progress_map.get(lesson.id, {})
+                if not progress.get('is_completed', False):
                     current_lesson = lesson
                     break
             if current_lesson:
@@ -6905,6 +7041,11 @@ def course_learn(course_id):
                          course=course,
                          sections=sections,
                          current_lesson=current_lesson,
+                         enrollment=enrollment,
+                         lesson_progress_map=lesson_progress_map,
+                         overall_progress=overall_progress,
+                         total_lessons=total_lessons,
+                         completed_lessons=completed_lessons,
                          title=f'Learn: {course.title}',
                          mobile=mobile)
 
@@ -7462,6 +7603,7 @@ def course_curriculum(course_id):
 # ============================================================================
 
 @main.route('/api/courses/<int:course_id>/sections', methods=['POST'])
+@csrf.exempt
 def api_create_section(course_id):
     """Create a new section"""
     if not session.get('user_id'):
@@ -7501,7 +7643,29 @@ def api_create_section(course_id):
     })
 
 
+@main.route('/api/sections/<int:section_id>', methods=['GET'])
+def api_get_section(section_id):
+    """Get section details"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import CourseSection
+    
+    section = CourseSection.query.get_or_404(section_id)
+    
+    return jsonify({
+        'success': True,
+        'section': {
+            'id': section.id,
+            'title': section.title,
+            'description': section.description,
+            'order': section.order
+        }
+    })
+
+
 @main.route('/api/courses/<int:course_id>/sections/<int:section_id>', methods=['PUT'])
+@csrf.exempt
 def api_update_section(course_id, section_id):
     """Update a section"""
     if not session.get('user_id'):
@@ -7536,6 +7700,7 @@ def api_update_section(course_id, section_id):
 
 
 @main.route('/api/courses/<int:course_id>/sections/<int:section_id>', methods=['DELETE'])
+@csrf.exempt
 def api_delete_section(course_id, section_id):
     """Delete a section and all its lectures"""
     if not session.get('user_id'):
@@ -7571,6 +7736,7 @@ def api_delete_section(course_id, section_id):
 # ============================================================================
 
 @main.route('/api/sections/<int:section_id>/lectures', methods=['POST'])
+@csrf.exempt
 def api_create_lecture(section_id):
     """Create a new lecture"""
     if not session.get('user_id'):
@@ -7589,6 +7755,9 @@ def api_create_lecture(section_id):
     lesson_type = request.form.get('lesson_type', 'video')
     description = request.form.get('description', '')
     video_url = request.form.get('video_url', '')
+    video_id = request.form.get('video_id', '')  # YouTube video ID
+    video_start_time = request.form.get('video_start_time', 0, type=int)
+    video_end_time = request.form.get('video_end_time', type=int)  # None if empty
     content = request.form.get('content', '')
     duration = request.form.get('duration', 0, type=int)
     is_preview = request.form.get('is_preview') == 'on'
@@ -7605,6 +7774,9 @@ def api_create_lecture(section_id):
         lesson_type=lesson_type,
         description=description,
         video_url=video_url,
+        video_id=video_id,
+        video_start_time=video_start_time,
+        video_end_time=video_end_time,
         content=content,
         duration=duration,
         is_preview=is_preview,
@@ -7622,6 +7794,7 @@ def api_create_lecture(section_id):
 
 
 @main.route('/api/sections/<int:section_id>/lectures/<int:lecture_id>', methods=['PUT'])
+@csrf.exempt
 def api_update_lecture(section_id, lecture_id):
     """Update a lecture"""
     if not session.get('user_id'):
@@ -7649,6 +7822,13 @@ def api_update_lecture(section_id, lecture_id):
         lecture.description = request.form.get('description')
     if request.form.get('video_url') is not None:
         lecture.video_url = request.form.get('video_url')
+    if request.form.get('video_id') is not None:
+        lecture.video_id = request.form.get('video_id')
+    if request.form.get('video_start_time') is not None:
+        lecture.video_start_time = int(request.form.get('video_start_time', 0))
+    if request.form.get('video_end_time') is not None:
+        val = request.form.get('video_end_time')
+        lecture.video_end_time = int(val) if val else None
     if request.form.get('content') is not None:
         lecture.content = request.form.get('content')
     if request.form.get('duration') is not None:
@@ -7664,7 +7844,38 @@ def api_update_lecture(section_id, lecture_id):
     })
 
 
+@main.route('/api/lectures/<int:lecture_id>', methods=['GET'])
+def api_get_lecture(lecture_id):
+    """Get lecture details"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Lesson
+    
+    lecture = Lesson.query.get_or_404(lecture_id)
+    
+    return jsonify({
+        'success': True,
+        'lecture': {
+            'id': lecture.id,
+            'section_id': lecture.section_id,
+            'title': lecture.title,
+            'description': lecture.description,
+            'lesson_type': lecture.lesson_type,
+            'video_url': lecture.video_url,
+            'video_id': lecture.video_id,
+            'video_start_time': lecture.video_start_time or 0,
+            'video_end_time': lecture.video_end_time or 0,
+            'content': lecture.content,
+            'duration': lecture.duration // 60 if lecture.duration else 0,  # Convert to minutes
+            'is_preview': lecture.is_preview,
+            'order': lecture.order
+        }
+    })
+
+
 @main.route('/api/lectures/<int:lecture_id>', methods=['DELETE'])
+@csrf.exempt
 def api_delete_lecture(lecture_id):
     """Delete a lecture"""
     if not session.get('user_id'):
@@ -7690,6 +7901,7 @@ def api_delete_lecture(lecture_id):
 
 
 @main.route('/api/courses/<int:course_id>/publish', methods=['POST'])
+@csrf.exempt
 def api_publish_course(course_id):
     """Publish a course"""
     if not session.get('user_id'):
@@ -7711,3 +7923,730 @@ def api_publish_course(course_id):
         'success': True,
         'message': 'Course published successfully'
     })
+
+
+@main.route('/api/courses/<int:course_id>', methods=['DELETE'])
+@csrf.exempt
+def api_delete_course(course_id):
+    """Delete a course (admin/teacher only)"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course, CourseSection, Lesson
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    try:
+        # Delete all related data
+        sections = CourseSection.query.filter_by(course_id=course_id).all()
+        for section in sections:
+            # Delete lectures in this section
+            Lesson.query.filter_by(section_id=section.id).delete()
+            db.session.delete(section)
+        
+        # Delete course
+        db.session.delete(course)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Course deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error deleting course: {str(e)}'
+        }), 500
+
+
+@main.route('/api/courses/<int:course_id>/archive', methods=['POST'])
+@csrf.exempt
+def api_archive_course(course_id):
+    """Archive/Hide a course (admin/teacher only)"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Check permissions
+    if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    course.status = 'archived'
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Course archived successfully'
+    })
+
+
+@main.route('/api/sections/reorder', methods=['POST'])
+@csrf.exempt
+def api_reorder_sections():
+    """Reorder sections"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import CourseSection, Course
+    
+    try:
+        data = request.get_json()
+        section_ids = data.get('section_ids', [])
+        
+        if not section_ids:
+            return jsonify({'success': False, 'message': 'No section IDs provided'}), 400
+        
+        # Get first section to check course permissions
+        first_section = CourseSection.query.get(section_ids[0])
+        if not first_section:
+            return jsonify({'success': False, 'message': 'Section not found'}), 404
+        
+        course = Course.query.get(first_section.course_id)
+        
+        # Check permissions
+        if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+            return jsonify({'success': False, 'message': 'Forbidden'}), 403
+        
+        # Update order for each section
+        for index, section_id in enumerate(section_ids):
+            section = CourseSection.query.get(section_id)
+            if section and section.course_id == course.id:
+                section.order = index
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Sections reordered successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error reordering sections: {str(e)}'
+        }), 500
+
+
+@main.route('/api/lectures/reorder', methods=['POST'])
+@csrf.exempt
+def api_reorder_lectures():
+    """Reorder lectures within a section"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Lesson, CourseSection, Course
+    
+    try:
+        data = request.get_json()
+        lecture_ids = data.get('lecture_ids', [])
+        section_id = data.get('section_id')
+        
+        if not lecture_ids or not section_id:
+            return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+        
+        # Check section and course permissions
+        section = CourseSection.query.get_or_404(section_id)
+        course = Course.query.get(section.course_id)
+        
+        # Check permissions
+        if session.get('role') not in ['admin', 'teacher'] and course.instructor_id != session.get('user_id'):
+            return jsonify({'success': False, 'message': 'Forbidden'}), 403
+        
+        # Update order for each lecture
+        for index, lecture_id in enumerate(lecture_ids):
+            lecture = Lesson.query.get(lecture_id)
+            if lecture and lecture.section_id == section_id:
+                lecture.order = index
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Lectures reordered successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error reordering lectures: {str(e)}'
+        }), 500
+
+
+@main.route('/api/courses/enrollment-request', methods=['POST'])
+@csrf.exempt
+def api_enrollment_request():
+    """Handle enrollment request and send email notification"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Vui lòng đăng nhập'}), 401
+    
+    from app.models_courses import Course
+    from flask_mail import Message
+    from flask import current_app
+    from app import mail
+    
+    data = request.get_json()
+    
+    course_id = data.get('course_id')
+    student_name = data.get('student_name')
+    phone = data.get('phone')
+    email = data.get('email')
+    notes = data.get('notes', '')
+    
+    if not all([course_id, student_name, phone, email]):
+        return jsonify({
+            'success': False,
+            'message': 'Vui lòng điền đầy đủ thông tin'
+        }), 400
+    
+    course = Course.query.get_or_404(course_id)
+    
+    # Send email notification
+    try:
+        msg = Message(
+            subject=f'🎓 Đăng ký khóa học mới: {course.title}',
+            recipients=[current_app.config['ENROLLMENT_NOTIFICATION_EMAIL']],
+            body=f'''
+THÔNG BÁO ĐĂNG KÝ KHÓA HỌC MỚI
+{'='*50}
+
+Khóa học: {course.title}
+Giá: {"{:,.0f}".format(course.price)}đ
+
+THÔNG TIN HỌC VIÊN:
+- Họ và tên: {student_name}
+- Số điện thoại: {phone}
+- Email: {email}
+
+GHI CHÚ:
+{notes if notes else 'Không có ghi chú'}
+
+{'='*50}
+Vui lòng liên hệ học viên trong 24h để xác nhận đăng ký.
+            '''
+        )
+        
+        mail.send(msg)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đăng ký thành công! Chúng tôi sẽ liên hệ với bạn sớm.'
+        })
+    except Exception as e:
+        print(f"[ERROR] Lỗi gửi email: {e}")
+        # Still return success to user, but log the error
+        return jsonify({
+            'success': True,
+            'message': 'Đăng ký thành công! Chúng tôi sẽ liên hệ với bạn sớm.'
+        })
+
+
+# ==================== ADMIN: ENROLLMENT MANAGEMENT ====================
+
+@main.route('/admin/enrollments')
+def admin_enrollments():
+    """Trang quản lý cấp phép khóa học - Admin only"""
+    if session.get('role') != 'admin':
+        flash('Bạn không có quyền truy cập!', 'danger')
+        return redirect(url_for('main.index'))
+    
+    from app.models_courses import Course, Enrollment
+    from app.models import Child
+    
+    mobile = is_mobile()
+    
+    # Get filter parameters
+    filter_course_id = request.args.get('course_id', type=int)
+    
+    # Get enrollments with optional course filter
+    enrollments_query = Enrollment.query
+    if filter_course_id:
+        enrollments_query = enrollments_query.filter_by(course_id=filter_course_id)
+    enrollments = enrollments_query.order_by(Enrollment.enrolled_at.desc()).all()
+    
+    # Get all students and courses for the form
+    students = Child.query.filter_by(is_active=True).order_by(Child.name).all()
+    courses = Course.query.filter(Course.status.in_(['published', 'draft'])).order_by(Course.title).all()
+    
+    # Get filtered course info if filter is applied
+    filtered_course = None
+    if filter_course_id:
+        filtered_course = Course.query.get(filter_course_id)
+    
+    return render_template('courses/enrollments.html',
+                         enrollments=enrollments,
+                         students=students,
+                         courses=courses,
+                         filtered_course=filtered_course,
+                         filter_course_id=filter_course_id,
+                         title='Quản lý cấp phép',
+                         mobile=mobile)
+
+
+@main.route('/api/admin/enrollments', methods=['POST'])
+@csrf.exempt
+def api_admin_create_enrollment():
+    """Admin cấp phép học sinh vào khóa học"""
+    print(f"[DEBUG] Session role: {session.get('role')}")
+    
+    if session.get('role') != 'admin':
+        print("[ERROR] Unauthorized - not admin")
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Course, Enrollment
+    from datetime import datetime
+    
+    try:
+        data = request.get_json()
+        print(f"[DEBUG] Received data: {data}")
+        
+        student_id = data.get('student_id')
+        course_id = data.get('course_id')
+        
+        print(f"[DEBUG] student_id: {student_id}, course_id: {course_id}")
+        
+        if not student_id or not course_id:
+            print("[ERROR] Missing student_id or course_id")
+            return jsonify({
+                'success': False,
+                'message': 'Thiếu thông tin học sinh hoặc khóa học'
+            }), 400
+        
+        # Validate student exists
+        from app.models import Child
+        student = Child.query.get(student_id)
+        print(f"[DEBUG] Student found: {student.name if student else 'None'}")
+        
+        if not student:
+            print(f"[ERROR] Student ID {student_id} not found")
+            return jsonify({
+                'success': False,
+                'message': f'Không tìm thấy học sinh ID {student_id}'
+            }), 400
+        
+        # Validate course exists
+        course = Course.query.get(course_id)
+        print(f"[DEBUG] Course found: {course.title if course else 'None'}")
+        
+        if not course:
+            print(f"[ERROR] Course ID {course_id} not found")
+            return jsonify({
+                'success': False,
+                'message': f'Không tìm thấy khóa học ID {course_id}'
+            }), 400
+        
+        # Check if already enrolled
+        existing = Enrollment.query.filter_by(
+            student_id=student_id,
+            course_id=course_id
+        ).first()
+        
+        if existing:
+            print(f"[ERROR] Already enrolled - enrollment ID {existing.id}")
+            return jsonify({
+                'success': False,
+                'message': 'Học sinh đã được cấp phép khóa học này!'
+            }), 400
+        
+        # Create enrollment
+        print("[DEBUG] Creating enrollment...")
+        enrollment = Enrollment(
+            student_id=student_id,
+            course_id=course_id,
+            status='active',
+            enrolled_at=datetime.now()
+        )
+        
+        # Update course enrolled count
+        course.enrolled_count = (course.enrolled_count or 0) + 1
+        
+        db.session.add(enrollment)
+        db.session.commit()
+        print(f"[SUCCESS] Enrollment created - ID {enrollment.id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cấp phép thành công!'
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"[EXCEPTION] Error creating enrollment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Lỗi: {str(e)}'
+        }), 500
+
+
+@main.route('/api/admin/enrollments/<int:enrollment_id>', methods=['DELETE'])
+@csrf.exempt
+def api_admin_delete_enrollment(enrollment_id):
+    """Admin thu hồi quyền truy cập khóa học"""
+    if session.get('role') != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Enrollment, Course
+    
+    enrollment = Enrollment.query.get_or_404(enrollment_id)
+    
+    # Update course enrolled count
+    course = Course.query.get(enrollment.course_id)
+    if course and course.enrolled_count > 0:
+        course.enrolled_count -= 1
+    
+    db.session.delete(enrollment)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Đã thu hồi quyền truy cập!'
+    })
+
+
+@main.route('/api/courses/<int:course_id>/enroll', methods=['POST'])
+@csrf.exempt
+def api_enroll_course(course_id):
+    """Enroll in a course - for free courses or after payment"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Vui lòng đăng nhập để đăng ký khóa học'}), 401
+    
+    from app.models_courses import Course, Enrollment
+    
+    course = Course.query.get_or_404(course_id)
+    user_id = session.get('user_id')
+    
+    # Check if already enrolled
+    existing = Enrollment.query.filter_by(
+        course_id=course_id,
+        student_id=user_id
+    ).first()
+    
+    if existing:
+        return jsonify({
+            'success': False,
+            'message': 'Bạn đã đăng ký khóa học này rồi!'
+        }), 400
+    
+    # For paid courses, check if payment is completed (placeholder for now)
+    if course.price > 0:
+        # TODO: Integrate payment gateway here
+        # For now, we'll allow enrollment for testing
+        pass
+    
+    # Create enrollment
+    enrollment = Enrollment(
+        course_id=course_id,
+        student_id=user_id,
+        status='active'
+    )
+    
+    # Update course stats
+    course.enrolled_count = (course.enrolled_count or 0) + 1
+    
+    db.session.add(enrollment)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Đăng ký khóa học thành công!',
+        'redirect': url_for('main.course_learn', course_id=course_id)
+    })
+
+
+# ==================== LESSON PROGRESS API ====================
+@main.route('/api/lessons/<int:lesson_id>/progress', methods=['POST'])
+@csrf.exempt
+def api_update_lesson_progress(lesson_id):
+    """Update lesson progress - save current video position"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Lesson, Enrollment, LessonProgress, Course
+    from datetime import datetime
+    
+    try:
+        data = request.get_json()
+        current_position = data.get('current_position', 0)
+        watched_duration = data.get('watched_duration', 0)
+        is_completed = data.get('is_completed', False)
+        
+        # Get lesson and course
+        lesson = Lesson.query.get_or_404(lesson_id)
+        section = lesson.section
+        course = section.course
+        
+        user_id = session.get('user_id')
+        user_role = session.get('role')
+        
+        # Admin/teacher don't need enrollment tracking
+        if user_role in ['admin', 'teacher']:
+            return jsonify({
+                'success': True,
+                'message': 'Progress not tracked for admin/teacher'
+            })
+        
+        # Get enrollment
+        enrollment = Enrollment.query.filter_by(
+            course_id=course.id,
+            student_id=user_id
+        ).first()
+        
+        if not enrollment:
+            return jsonify({'success': False, 'message': 'Not enrolled'}), 400
+        
+        # Get or create progress
+        progress = LessonProgress.query.filter_by(
+            enrollment_id=enrollment.id,
+            lesson_id=lesson_id
+        ).first()
+        
+        if not progress:
+            progress = LessonProgress(
+                enrollment_id=enrollment.id,
+                lesson_id=lesson_id
+            )
+            db.session.add(progress)
+        
+        # Update progress
+        progress.current_position = int(current_position)
+        progress.watched_duration = max(progress.watched_duration or 0, int(watched_duration))
+        progress.last_accessed_at = datetime.now()
+        
+        # Calculate completion percentage
+        if lesson.duration > 0:
+            progress.completion_percentage = min(100, (watched_duration / lesson.duration) * 100)
+        
+        # Mark as completed if flag is set or watched > 90%
+        if is_completed or (progress.completion_percentage >= 90):
+            progress.is_completed = True
+            if not progress.completed_at:
+                progress.completed_at = datetime.now()
+        
+        db.session.commit()
+        
+        # Recalculate overall course progress
+        update_enrollment_progress(enrollment.id)
+        
+        return jsonify({
+            'success': True,
+            'progress': {
+                'current_position': progress.current_position,
+                'watched_duration': progress.watched_duration,
+                'completion_percentage': progress.completion_percentage,
+                'is_completed': progress.is_completed
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating progress: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Lỗi: {str(e)}'
+        }), 500
+
+
+@main.route('/api/lessons/<int:lesson_id>/complete', methods=['POST'])
+@csrf.exempt
+def api_mark_lesson_complete(lesson_id):
+    """Mark lesson as completed"""
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    from app.models_courses import Lesson, Enrollment, LessonProgress
+    from datetime import datetime
+    
+    try:
+        lesson = Lesson.query.get_or_404(lesson_id)
+        section = lesson.section
+        course = section.course
+        
+        user_id = session.get('user_id')
+        user_role = session.get('role')
+        
+        if user_role in ['admin', 'teacher']:
+            return jsonify({'success': True, 'message': 'Admin/teacher mode'})
+        
+        enrollment = Enrollment.query.filter_by(
+            course_id=course.id,
+            student_id=user_id
+        ).first()
+        
+        if not enrollment:
+            return jsonify({'success': False, 'message': 'Not enrolled'}), 400
+        
+        progress = LessonProgress.query.filter_by(
+            enrollment_id=enrollment.id,
+            lesson_id=lesson_id
+        ).first()
+        
+        if not progress:
+            progress = LessonProgress(
+                enrollment_id=enrollment.id,
+                lesson_id=lesson_id
+            )
+            db.session.add(progress)
+        
+        progress.is_completed = True
+        progress.completion_percentage = 100
+        progress.completed_at = datetime.now()
+        
+        db.session.commit()
+        
+        # Recalculate overall course progress
+        update_enrollment_progress(enrollment.id)
+        
+        return jsonify({'success': True, 'message': 'Lesson marked as complete'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+def update_enrollment_progress(enrollment_id):
+    """Recalculate overall course progress"""
+    from app.models_courses import Enrollment, LessonProgress, CourseSection
+    
+    enrollment = Enrollment.query.get(enrollment_id)
+    if not enrollment:
+        return
+    
+    # Get all lessons in course
+    sections = CourseSection.query.filter_by(course_id=enrollment.course_id).all()
+    total_lessons = 0
+    completed_lessons = 0
+    
+    for section in sections:
+        for lesson in section.lessons:
+            total_lessons += 1
+            progress = LessonProgress.query.filter_by(
+                enrollment_id=enrollment_id,
+                lesson_id=lesson.id
+            ).first()
+            
+            if progress and progress.is_completed:
+                completed_lessons += 1
+    
+    # Update enrollment progress
+    if total_lessons > 0:
+        enrollment.progress = round((completed_lessons / total_lessons) * 100, 1)
+        
+        # Mark course as completed if all lessons done
+        if completed_lessons == total_lessons:
+            enrollment.status = 'completed'
+            if not enrollment.completed_at:
+                from datetime import datetime
+                enrollment.completed_at = datetime.now()
+    
+    db.session.commit()
+
+
+# ==================== YOUTUBE API ====================
+@main.route('/api/youtube/info', methods=['GET'])
+def api_youtube_info():
+    """Fetch YouTube video metadata using YouTube Data API v3"""
+    video_id = request.args.get('video_id')
+    
+    if not video_id:
+        return jsonify({
+            'success': False,
+            'message': 'Missing video_id parameter'
+        }), 400
+    
+    import requests
+    import re
+    from datetime import timedelta
+    
+    api_key = current_app.config.get('YOUTUBE_API_KEY')
+    
+    if not api_key or api_key == 'YOUR_YOUTUBE_API_KEY_HERE':
+        # Fallback: Try to extract info from embed page (limited info)
+        return jsonify({
+            'success': False,
+            'message': 'YouTube API key not configured. Please set YOUTUBE_API_KEY in config.py'
+        }), 500
+    
+    try:
+        # Call YouTube Data API v3
+        url = f'https://www.googleapis.com/youtube/v3/videos'
+        params = {
+            'part': 'snippet,contentDetails,statistics',
+            'id': video_id,
+            'key': api_key
+        }
+        
+        response = requests.get(url, params=params, timeout=10)
+        data = response.json()
+        
+        if 'items' not in data or len(data['items']) == 0:
+            return jsonify({
+                'success': False,
+                'message': 'Video not found or private'
+            }), 404
+        
+        video = data['items'][0]
+        snippet = video['snippet']
+        content_details = video['contentDetails']
+        statistics = video.get('statistics', {})
+        
+        # Parse ISO 8601 duration (PT1H23M45S -> seconds)
+        duration_str = content_details['duration']
+        duration_seconds = parse_iso8601_duration(duration_str)
+        
+        return jsonify({
+            'success': True,
+            'video_id': video_id,
+            'title': snippet['title'],
+            'description': snippet['description'][:500],  # Truncate
+            'duration': duration_seconds,
+            'channel': snippet['channelTitle'],
+            'thumbnail': snippet['thumbnails']['high']['url'] if 'high' in snippet['thumbnails'] else snippet['thumbnails']['default']['url'],
+            'published_at': snippet['publishedAt'],
+            'view_count': statistics.get('viewCount', 0)
+        })
+        
+    except requests.exceptions.Timeout:
+        return jsonify({
+            'success': False,
+            'message': 'YouTube API timeout. Please try again.'
+        }), 408
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error connecting to YouTube API: {str(e)}'
+        }), 500
+    except Exception as e:
+        print(f'Error fetching YouTube info: {str(e)}')
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
+def parse_iso8601_duration(duration_str):
+    """
+    Parse ISO 8601 duration format to seconds
+    Examples: PT1H23M45S, PT15M30S, PT45S
+    """
+    import re
+    
+    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
+    match = re.match(pattern, duration_str)
+    
+    if not match:
+        return 0
+    
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    
+    total_seconds = hours * 3600 + minutes * 60 + seconds
+    return total_seconds

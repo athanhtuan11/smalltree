@@ -20,7 +20,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        cursor: move;
+        cursor: default;
+        user-select: none;
     }
     
     .section-header:hover {
@@ -29,6 +30,10 @@
     
     .section-body {
         padding: 15px;
+    }
+    
+    .section-card.dragging .section-body {
+        pointer-events: none; /* Only disable during drag */
     }
     
     .lecture-item {
@@ -40,7 +45,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        cursor: move;
+        cursor: default;
+        user-select: none;
     }
     
     .lecture-item:hover {
@@ -91,6 +97,24 @@
         color: #999;
     }
     
+    /* Ensure buttons are clickable */
+    .section-card button,
+    .lecture-item button {
+        cursor: pointer !important;
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 10;
+    }
+    
+    /* Drag handles should have move cursor */
+    .bi-grip-vertical {
+        cursor: grab !important;
+    }
+    
+    .bi-grip-vertical:active {
+        cursor: grabbing !important;
+    }
+    
     .stats-bar {
         background: #f8f9fa;
         padding: 15px 20px;
@@ -134,7 +158,10 @@
                         <p class="text-muted mb-0">Tạo sections và lectures cho khóa học</p>
                     </div>
                     <div>
-                        <a href="{{ url_for('main.course_detail', course_id=course.id) }}" class="btn btn-outline-secondary">
+                        <a href="{{ url_for('main.course_edit', course_id=course.id) }}" class="btn btn-outline-primary me-2">
+                            <i class="bi bi-pencil me-1"></i>Edit Course Info
+                        </a>
+                        <a href="{{ url_for('main.course_detail', course_id=course.id) }}" class="btn btn-outline-secondary me-2">
                             <i class="bi bi-eye me-1"></i>Preview
                         </a>
                         <button type="button" class="btn btn-success" onclick="publishCourse()">
@@ -178,7 +205,7 @@
                 <div class="section-card" data-section-id="{{ section.id }}" draggable="true">
                     <div class="section-header">
                         <div class="d-flex align-items-center">
-                            <i class="bi bi-grip-vertical me-3 text-muted"></i>
+                            <i class="bi bi-grip-vertical me-3 text-muted" style="cursor: grab;"></i>
                             <div>
                                 <h5 class="mb-0">Section {{ loop.index }}: {{ section.title }}</h5>
                                 {% if section.description %}
@@ -187,7 +214,7 @@
                             </div>
                         </div>
                         <div>
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editSection({{ section.id }})">
+                            <button class="btn btn-sm btn-outline-success me-2" onclick="editSection({{ section.id }})">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteSection({{ section.id }})">
@@ -203,7 +230,7 @@
                                 {% for lecture in section.lessons %}
                                 <div class="lecture-item" data-lecture-id="{{ lecture.id }}" draggable="true">
                                     <div class="lecture-info d-flex align-items-center">
-                                        <i class="bi bi-grip-vertical me-3 text-muted"></i>
+                                        <i class="bi bi-grip-vertical me-3 text-muted" style="cursor: grab;"></i>
                                         <span class="lecture-type-badge lecture-type-{{ lecture.lesson_type }}">
                                             {% if lecture.lesson_type == 'video' %}
                                                 <i class="bi bi-play-circle"></i> Video
@@ -228,7 +255,7 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editLecture({{ lecture.id }})">
+                                        <button class="btn btn-sm btn-outline-success me-2" onclick="editLecture({{ lecture.id }})">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteLecture({{ lecture.id }})">
@@ -344,10 +371,42 @@
                     
                     <!-- Video URL (for video type) -->
                     <div class="mb-3" id="video-url-field">
-                        <label class="form-label">Video URL</label>
-                        <input type="url" class="form-control" name="video_url" id="lecture-video-url"
-                               placeholder="YouTube, Vimeo, or direct video URL">
-                        <small class="text-muted">Support: YouTube, Vimeo, MP4 links</small>
+                        <label class="form-label">Video URL (YouTube)</label>
+                        <div class="input-group">
+                            <input type="url" class="form-control" name="video_url" id="lecture-video-url"
+                                   placeholder="https://www.youtube.com/watch?v=...&t=123s">
+                            <button type="button" class="btn btn-outline-secondary" onclick="fetchYouTubeInfo()">
+                                <i class="bi bi-search"></i> Get Info
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> Paste YouTube URL (có thể có &t=123s để bắt đầu từ giây thứ 123)
+                        </small>
+                        <div id="youtube-info" class="mt-2"></div>
+                    </div>
+                    
+                    <!-- Video ID (hidden, extracted from URL) -->
+                    <input type="hidden" name="video_id" id="lecture-video-id">
+                    
+                    <!-- Video Time Range -->
+                    <div class="row" id="video-time-range" style="display:none;">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Start Time (seconds)</label>
+                            <input type="number" class="form-control" name="video_start_time" id="lecture-start-time"
+                                   placeholder="0" min="0" value="0">
+                            <small class="text-muted">Từ &t= trong URL</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">End Time (seconds)</label>
+                            <input type="number" class="form-control" name="video_end_time" id="lecture-end-time"
+                                   placeholder="Để trống = hết video" min="0">
+                            <small class="text-muted">Tùy chọn</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Actual Duration</label>
+                            <input type="text" class="form-control" id="lecture-actual-duration" readonly disabled>
+                            <small class="text-muted">End - Start</small>
+                        </div>
                     </div>
                     
                     <!-- Content (for text/article type) -->
@@ -361,7 +420,8 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Duration (minutes)</label>
                             <input type="number" class="form-control" name="duration" id="lecture-duration"
-                                   placeholder="0" min="0">
+                                   placeholder="Auto-filled from YouTube" min="0" readonly>
+                            <small class="text-muted">Auto-filled from video metadata</small>
                         </div>
                         
                         <div class="col-md-6 mb-3">
@@ -402,6 +462,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize drag and drop
     initDragAndDrop();
+    
+    // Add event listeners for time range calculation
+    const startTimeInput = document.getElementById('lecture-start-time');
+    const endTimeInput = document.getElementById('lecture-end-time');
+    
+    if (startTimeInput && endTimeInput) {
+        startTimeInput.addEventListener('input', updateActualDuration);
+        endTimeInput.addEventListener('input', updateActualDuration);
+    }
 });
 
 // Section Functions
@@ -413,10 +482,26 @@ function addSection() {
 }
 
 function editSection(sectionId) {
-    // TODO: Fetch section data and populate form
+    console.log('editSection called with ID:', sectionId);
     document.getElementById('section-modal-title').textContent = 'Edit Section';
     document.getElementById('section-id').value = sectionId;
-    sectionModal.show();
+    
+    // Fetch section data
+    fetch(`/api/sections/${sectionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('section-title').value = data.section.title;
+                document.getElementById('section-description').value = data.section.description || '';
+                sectionModal.show();
+            } else {
+                alert('Error loading section data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading section data');
+        });
 }
 
 function saveSection() {
@@ -424,18 +509,26 @@ function saveSection() {
     const formData = new FormData(form);
     const sectionId = document.getElementById('section-id').value;
     
+    console.log('Saving section...', sectionId ? 'Edit' : 'Create');
+    
     const url = sectionId 
         ? `/api/courses/{{ course.id }}/sections/${sectionId}`
         : `/api/courses/{{ course.id }}/sections`;
     
     const method = sectionId ? 'PUT' : 'POST';
     
+    console.log('Request:', method, url);
+    
     fetch(url, {
         method: method,
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
             sectionModal.hide();
             location.reload();
@@ -444,29 +537,38 @@ function saveSection() {
         }
     })
     .catch(error => {
-        alert('Error saving section');
-        console.error(error);
+        console.error('Error saving section:', error);
+        alert('Error saving section: ' + error.message);
     });
 }
 
 function deleteSection(sectionId) {
-    if (!confirm('Are you sure you want to delete this section and all its lectures?')) {
+    if (!confirm('Bạn có chắc muốn xóa section này và tất cả lectures?')) {
         return;
     }
     
+    console.log('Deleting section...', sectionId);
+    console.log('Request: DELETE /api/courses/{{ course.id }}/sections/' + sectionId);
+    
     fetch(`/api/courses/{{ course.id }}/sections/${sectionId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token() }}'
-        }
+        method: 'DELETE'
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
+            console.log('Section deleted successfully');
             location.reload();
         } else {
             alert('Error: ' + data.message);
         }
+    })
+    .catch(error => {
+        console.error('Error deleting section:', error);
+        alert('Error deleting section: ' + error.message);
     });
 }
 
@@ -481,10 +583,39 @@ function addLecture(sectionId) {
 }
 
 function editLecture(lectureId) {
-    // TODO: Fetch lecture data and populate form
+    console.log('editLecture called with ID:', lectureId);
     document.getElementById('lecture-modal-title').textContent = 'Edit Lecture';
     document.getElementById('lecture-id').value = lectureId;
-    lectureModal.show();
+    
+    // Fetch lecture data
+    fetch(`/api/lectures/${lectureId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const lecture = data.lecture;
+                document.getElementById('lecture-section-id').value = lecture.section_id;
+                document.getElementById('lecture-title').value = lecture.title;
+                document.getElementById('lecture-type').value = lecture.lesson_type;
+                document.getElementById('lecture-description').value = lecture.description || '';
+                document.getElementById('lecture-video-url').value = lecture.video_url || '';
+                document.getElementById('lecture-video-id').value = lecture.video_id || '';
+                document.getElementById('lecture-start-time').value = lecture.video_start_time || 0;
+                document.getElementById('lecture-end-time').value = lecture.video_end_time || '';
+                document.getElementById('lecture-content').value = lecture.content || '';
+                document.getElementById('lecture-duration').value = lecture.duration;
+                document.getElementById('lecture-preview').checked = lecture.is_preview;
+                
+                toggleLectureType();
+                updateActualDuration();
+                lectureModal.show();
+            } else {
+                alert('Error loading lecture data');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error loading lecture data');
+        });
 }
 
 function saveLecture() {
@@ -492,6 +623,9 @@ function saveLecture() {
     const formData = new FormData(form);
     const lectureId = document.getElementById('lecture-id').value;
     const sectionId = document.getElementById('lecture-section-id').value;
+    
+    console.log('Saving lecture...', lectureId ? 'Edit' : 'Create');
+    console.log('Section ID:', sectionId);
     
     // Convert duration from minutes to seconds
     const durationMinutes = formData.get('duration');
@@ -505,12 +639,18 @@ function saveLecture() {
     
     const method = lectureId ? 'PUT' : 'POST';
     
+    console.log('Request:', method, url);
+    
     fetch(url, {
         method: method,
         body: formData
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
             lectureModal.hide();
             location.reload();
@@ -519,53 +659,96 @@ function saveLecture() {
         }
     })
     .catch(error => {
-        alert('Error saving lecture');
-        console.error(error);
+        console.error('Error saving lecture:', error);
+        alert('Error saving lecture: ' + error.message);
     });
 }
 
 function deleteLecture(lectureId) {
-    if (!confirm('Are you sure you want to delete this lecture?')) {
+    if (!confirm('Bạn có chắc muốn xóa lecture này?')) {
         return;
     }
     
+    console.log('Deleting lecture...', lectureId);
+    console.log('Request: DELETE /api/lectures/' + lectureId);
+    
     fetch(`/api/lectures/${lectureId}`, {
-        method: 'DELETE',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token() }}'
-        }
+        method: 'DELETE'
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
+            console.log('Lecture deleted successfully');
             location.reload();
         } else {
             alert('Error: ' + data.message);
         }
+    })
+    .catch(error => {
+        console.error('Error deleting lecture:', error);
+        alert('Error deleting lecture: ' + error.message);
     });
+}
+
+// Calculate actual duration based on start and end time
+function updateActualDuration() {
+    const startTime = parseInt(document.getElementById('lecture-start-time').value) || 0;
+    const endTime = parseInt(document.getElementById('lecture-end-time').value) || 0;
+    const totalDuration = parseInt(document.getElementById('lecture-duration').value) * 60 || 0; // Convert minutes to seconds
+    
+    const actualDurationField = document.getElementById('lecture-actual-duration');
+    
+    if (endTime > 0 && endTime > startTime) {
+        const actualSeconds = endTime - startTime;
+        actualDurationField.value = formatDuration(actualSeconds);
+    } else if (totalDuration > 0) {
+        const actualSeconds = totalDuration - startTime;
+        actualDurationField.value = formatDuration(actualSeconds) + ' (từ start → end video)';
+    } else {
+        actualDurationField.value = '';
+    }
 }
 
 function toggleLectureType() {
     const type = document.getElementById('lecture-type').value;
     const videoField = document.getElementById('video-url-field');
     const contentField = document.getElementById('content-field');
+    const timeRangeField = document.getElementById('video-time-range');
     
     if (type === 'video') {
         videoField.style.display = 'block';
         contentField.style.display = 'none';
+        timeRangeField.style.display = 'flex'; // Show time range for video
     } else if (type === 'text') {
         videoField.style.display = 'none';
         contentField.style.display = 'block';
+        timeRangeField.style.display = 'none';
     } else {
         videoField.style.display = 'none';
         contentField.style.display = 'none';
+        timeRangeField.style.display = 'none';
     }
 }
 
 // Drag and Drop
 function initDragAndDrop() {
-    // Section drag and drop
+    console.log('Initializing drag and drop...');
+    
+    // Prevent buttons from starting drag
+    document.querySelectorAll('.section-card button, .lecture-item button').forEach(btn => {
+        btn.setAttribute('draggable', 'false');
+        btn.addEventListener('mousedown', function(e) {
+            e.stopPropagation(); // Prevent drag start
+        });
+    });
+    
+    // Section drag and drop events
     const sections = document.querySelectorAll('.section-card');
+    console.log('Found sections:', sections.length);
     sections.forEach(section => {
         section.addEventListener('dragstart', handleDragStart);
         section.addEventListener('dragover', handleDragOver);
@@ -573,8 +756,9 @@ function initDragAndDrop() {
         section.addEventListener('dragend', handleDragEnd);
     });
     
-    // Lecture drag and drop
+    // Lecture drag and drop events
     const lectures = document.querySelectorAll('.lecture-item');
+    console.log('Found lectures:', lectures.length);
     lectures.forEach(lecture => {
         lecture.addEventListener('dragstart', handleDragStart);
         lecture.addEventListener('dragover', handleDragOver);
@@ -584,11 +768,24 @@ function initDragAndDrop() {
 }
 
 let draggedElement = null;
+let dragType = null; // 'section' or 'lecture'
 
 function handleDragStart(e) {
     draggedElement = this;
+    
+    // Determine drag type
+    if (this.classList.contains('section-card')) {
+        dragType = 'section';
+        console.log('Dragging section:', this.dataset.sectionId);
+    } else if (this.classList.contains('lecture-item')) {
+        dragType = 'lecture';
+        console.log('Dragging lecture:', this.dataset.lectureId);
+        e.stopPropagation(); // Prevent section drag
+    }
+    
     this.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
 }
 
 function handleDragOver(e) {
@@ -596,40 +793,269 @@ function handleDragOver(e) {
         e.preventDefault();
     }
     e.dataTransfer.dropEffect = 'move';
+    
+    // Add visual feedback for valid drop targets
+    const isValidTarget = 
+        (dragType === 'section' && this.classList.contains('section-card') && this !== draggedElement) ||
+        (dragType === 'lecture' && this.classList.contains('lecture-item') && this !== draggedElement);
+    
+    if (isValidTarget) {
+        this.style.borderTop = '3px solid #43a047';
+    }
+    
     return false;
 }
 
 function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
-    }
+    e.preventDefault();
+    e.stopPropagation();
     
-    if (draggedElement !== this) {
-        // Swap positions
-        const parent = this.parentNode;
-        const draggedIndex = Array.from(parent.children).indexOf(draggedElement);
-        const targetIndex = Array.from(parent.children).indexOf(this);
+    console.log('Drop event on:', this);
+    
+    // Reset visual feedback
+    document.querySelectorAll('.section-card, .lecture-item').forEach(el => {
+        el.style.borderTop = '';
+    });
+    
+    // Handle section drop
+    if (dragType === 'section' && this.classList.contains('section-card') && draggedElement !== this) {
+        console.log('Processing section drop');
+        const container = document.getElementById('sections-container');
+        const allSections = Array.from(container.querySelectorAll('.section-card'));
+        const draggedIndex = allSections.indexOf(draggedElement);
+        const targetIndex = allSections.indexOf(this);
         
+        console.log('Section move from', draggedIndex, 'to', targetIndex);
+        
+        // Reorder DOM
         if (draggedIndex < targetIndex) {
-            parent.insertBefore(draggedElement, this.nextSibling);
+            this.parentNode.insertBefore(draggedElement, this.nextSibling);
         } else {
-            parent.insertBefore(draggedElement, this);
+            this.parentNode.insertBefore(draggedElement, this);
         }
         
-        // Update order in database
-        updateOrder();
+        // Update database
+        updateSectionOrder();
+    }
+    
+    // Handle lecture drop
+    else if (dragType === 'lecture' && this.classList.contains('lecture-item') && draggedElement !== this) {
+        console.log('Processing lecture drop');
+        
+        // Check if same section
+        const draggedSectionCard = draggedElement.closest('.section-card');
+        const targetSectionCard = this.closest('.section-card');
+        
+        if (!draggedSectionCard || !targetSectionCard) {
+            console.error('Could not find section cards');
+            return false;
+        }
+        
+        if (draggedSectionCard !== targetSectionCard) {
+            alert('Không thể di chuyển bài học sang chương khác!');
+            return false;
+        }
+        
+        const container = draggedElement.parentNode;
+        const allLectures = Array.from(container.querySelectorAll('.lecture-item'));
+        const draggedIndex = allLectures.indexOf(draggedElement);
+        const targetIndex = allLectures.indexOf(this);
+        
+        console.log('Lecture move from', draggedIndex, 'to', targetIndex);
+        
+        // Reorder DOM
+        if (draggedIndex < targetIndex) {
+            this.parentNode.insertBefore(draggedElement, this.nextSibling);
+        } else {
+            this.parentNode.insertBefore(draggedElement, this);
+        }
+        
+        // Update database
+        const sectionId = draggedSectionCard.dataset.sectionId;
+        updateLectureOrder(sectionId);
     }
     
     return false;
 }
 
 function handleDragEnd(e) {
+    console.log('Drag ended');
     this.classList.remove('dragging');
+    
+    // Reset all visual feedback
+    document.querySelectorAll('.section-card, .lecture-item').forEach(el => {
+        el.style.borderTop = '';
+    });
+    
+    draggedElement = null;
+    dragType = null;
 }
 
-function updateOrder() {
-    // TODO: Send updated order to backend
-    console.log('Order updated');
+function updateSectionOrder() {
+    const sections = document.querySelectorAll('.section-card');
+    const sectionIds = Array.from(sections).map(section => parseInt(section.dataset.sectionId));
+    
+    fetch('/api/sections/reorder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            section_ids: sectionIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Section order updated successfully');
+        } else {
+            alert('Lỗi: ' + data.message);
+            location.reload(); // Reload to restore original order
+        }
+    })
+    .catch(error => {
+        console.error('Error updating section order:', error);
+        alert('Lỗi khi cập nhật thứ tự chương!');
+        location.reload();
+    });
+}
+
+function updateLectureOrder(sectionId) {
+    const section = document.querySelector(`.section-card[data-section-id="${sectionId}"]`);
+    const lectures = section.querySelectorAll('.lecture-item');
+    const lectureIds = Array.from(lectures).map(lecture => parseInt(lecture.dataset.lectureId));
+    
+    fetch('/api/lectures/reorder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            section_id: parseInt(sectionId),
+            lecture_ids: lectureIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Lecture order updated successfully');
+        } else {
+            alert('Lỗi: ' + data.message);
+            location.reload(); // Reload to restore original order
+        }
+    })
+    .catch(error => {
+        console.error('Error updating lecture order:', error);
+        alert('Lỗi khi cập nhật thứ tự bài học!');
+        location.reload();
+    });
+}
+
+// Extract YouTube video ID from URL
+function extractYouTubeId(url) {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
+        /youtube\.com\/embed\/([^&\n?#]+)/,
+        /youtube\.com\/v\/([^&\n?#]+)/
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return null;
+}
+
+// Fetch YouTube video info using backend API
+async function fetchYouTubeInfo() {
+    const urlInput = document.getElementById('lecture-video-url');
+    const url = urlInput.value.trim();
+    
+    if (!url) {
+        alert('Please enter a YouTube URL first');
+        return;
+    }
+    
+    const videoId = extractYouTubeId(url);
+    
+    if (!videoId) {
+        alert('❌ Invalid YouTube URL. Please use format:\nhttps://www.youtube.com/watch?v=VIDEO_ID');
+        return;
+    }
+    
+    // Parse &t= parameter for start time
+    const startTimeMatch = url.match(/[?&]t=(\d+)s?/);
+    const startTime = startTimeMatch ? parseInt(startTimeMatch[1]) : 0;
+    
+    // Show loading
+    const infoDiv = document.getElementById('youtube-info');
+    infoDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Fetching video info...</div>';
+    
+    try {
+        const response = await fetch(`/api/youtube/info?video_id=${videoId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Fill form with video info
+            document.getElementById('lecture-video-id').value = videoId;
+            document.getElementById('lecture-title').value = data.title || '';
+            document.getElementById('lecture-duration').value = Math.ceil(data.duration / 60); // Convert to minutes
+            
+            // Fill start/end time
+            document.getElementById('lecture-start-time').value = startTime;
+            document.getElementById('lecture-end-time').value = ''; // Empty = full video
+            
+            // Calculate actual duration
+            updateActualDuration();
+            
+            // Show video info
+            let infoHtml = `
+                <div class="alert alert-success">
+                    <strong><i class="bi bi-check-circle"></i> Video Found!</strong><br>
+                    <small>
+                        <strong>Title:</strong> ${data.title}<br>
+                        <strong>Total Duration:</strong> ${formatDuration(data.duration)}<br>`;
+            
+            if (startTime > 0) {
+                infoHtml += `<strong>Start Time:</strong> ${formatDuration(startTime)} (from &t= parameter)<br>`;
+            }
+            
+            infoHtml += `</small></div>`;
+            
+            infoDiv.innerHTML = infoHtml;
+            
+            // Suggest using chapters if video is long
+            if (data.duration > 1800) { // > 30 minutes
+                infoDiv.innerHTML += `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Long Video Detected (${formatDuration(data.duration)})</strong><br>
+                        <small>Consider splitting into multiple lectures or adding chapters for better tracking.</small>
+                    </div>
+                `;
+            }
+        } else {
+            infoDiv.innerHTML = `<div class="alert alert-danger">❌ ${data.message || 'Failed to fetch video info'}</div>`;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        infoDiv.innerHTML = `<div class="alert alert-danger">❌ Error: ${error.message}</div>`;
+    }
+}
+
+function formatDuration(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
 }
 
 function publishCourse() {

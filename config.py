@@ -28,6 +28,20 @@ class Config:
     # PASTE COHERE API KEY CỦA BẠN VÀO ĐÂY ⬇️
     COHERE_API_KEY = os.environ.get('COHERE_API_KEY') or 'J4NQeZN0iLquKjAJnOsEd0pjLbS0hGKPsmFaE4C3'
     
+    # YouTube Data API v3 Configuration
+    # Get your API key from: https://console.cloud.google.com/apis/credentials
+    # Enable YouTube Data API v3 in your Google Cloud project
+    YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY') or 'YOUR_YOUTUBE_API_KEY_HERE'
+    
+    # Email Configuration for Gmail
+    MAIL_SERVER = 'smtp.gmail.com'
+    MAIL_PORT = 587
+    MAIL_USE_TLS = True
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME') or 'mamnoncaynho@gmail.com'
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD') or ''  # App Password from Google
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or 'mamnoncaynho@gmail.com'
+    ENROLLMENT_NOTIFICATION_EMAIL = 'mamnoncaynho@gmail.com'
+    
     # 🚀 GROQ AI Configuration (Free + Fast)
     # Groq API Key từ: https://console.groq.com/
     # Free tier: 5,000 requests/day, tốc độ cực nhanh

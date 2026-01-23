@@ -2,6 +2,7 @@ from flask import Flask, request, session, jsonify
 from app.models import db, Activity
 from flask_migrate import Migrate
 from flask_wtf import CSRFProtect
+from flask_mail import Mail
 import os
 from dotenv import load_dotenv
 import json
@@ -13,6 +14,10 @@ from app.models_tasks import Project, ProjectMember, Task, Sprint, TaskComment, 
 
 # Import new user system models (RBAC) - will create tables alongside old ones
 from app.models_users import User, TeacherProfile, StudentProfile, ParentProfile
+
+# Initialize Flask-Mail and CSRF
+mail = Mail()
+csrf = CSRFProtect()
 
 class CustomJSONEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle SQLAlchemy objects"""
@@ -75,11 +80,12 @@ def create_app():
     app.config.from_object('config.Config')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
+    mail.init_app(app)
     migrate = Migrate(app, db)
 
     # Enable CSRF Protection with proper configuration
     # CSRF Protection - tạm thời tắt trong development do lỗi session initialization
-    csrf = CSRFProtect(app)
+    csrf.init_app(app)
     
     # Note: AI endpoints sẽ cần sử dụng CSRF token hoặc được handle riêng
     

@@ -14,11 +14,24 @@
         <div class="row">
             <div class="col-lg-8">
                 {% if user_role in ['admin', 'teacher'] and (not instructor or instructor.id == session.get('user_id') or instructor.id == session.get('staff_id')) %}
-                <div class="mb-3">
-                    <a href="{{ url_for('main.course_curriculum', course_id=course.id) }}" class="btn btn-warning btn-sm me-2">
+                <div class="mb-3 d-flex gap-2">
+                    <a href="{{ url_for('main.course_curriculum', course_id=course.id) }}" class="btn btn-warning btn-sm">
                         <i class="bi bi-list-ul me-1"></i>Manage Curriculum
                     </a>
-                    <span class="badge bg-secondary">Instructor Tools</span>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i> Actions
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="archiveCourse({{ course.id }}); return false;">
+                                <i class="bi bi-archive me-2"></i>Ẩn khóa học
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteCourse({{ course.id }}); return false;">
+                                <i class="bi bi-trash me-2"></i>Xoá khóa học
+                            </a></li>
+                        </ul>
+                    </div>
                 </div>
                 {% endif %}
                 
@@ -275,13 +288,37 @@
                     <a href="{{ url_for('main.course_learn', course_id=course.id) }}" class="btn btn-success w-100 mb-2">
                         <i class="bi bi-play-circle me-2"></i>Tiếp tục học
                     </a>
+                    {% elif user_role in ['admin', 'teacher'] %}
+                    <a href="{{ url_for('main.course_learn', course_id=course.id) }}" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-play-circle me-2"></i>Học ngay
+                    </a>
+                    <a href="{{ url_for('main.course_edit', course_id=course.id) }}" class="btn btn-outline-primary w-100 mb-2">
+                        <i class="bi bi-pencil me-2"></i>Chỉnh sửa khóa học
+                    </a>
+                    <a href="{{ url_for('main.admin_enrollments') }}?course_id={{ course.id }}" class="btn btn-outline-success w-100 mb-2">
+                        <i class="bi bi-people me-2"></i>Quản lý đăng ký
+                    </a>
+                    <p class="text-center small text-muted mb-3">
+                        Giáo viên/Admin có thể xem tất cả khóa học
+                    </p>
+                    {% elif user_logged_in %}
+                    <button id="enrollBtn" class="btn btn-success w-100 mb-2" data-bs-toggle="modal" data-bs-target="#enrollmentModal">
+                        <i class="bi bi-pencil-square me-2"></i>Đăng ký học
+                    </button>
+                    <p class="text-center small text-muted mb-3">
+                        Điền form đăng ký và chúng tôi sẽ liên hệ với bạn
+                    </p>
                     {% else %}
-                    <button class="btn btn-success w-100 mb-2">
-                        <i class="bi bi-cart-plus me-2"></i>Add to cart
+                    <a href="{{ url_for('main.login') }}" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Đăng nhập để học
+                    </a>
+                    <button id="enrollBtn" class="btn btn-outline-success w-100 mb-2" data-bs-toggle="modal" data-bs-target="#enrollmentModal">
+                        <i class="bi bi-pencil-square me-2"></i>Đăng ký học (khách vãng lai)
+
                     </button>
-                    <button class="btn btn-outline-dark w-100 mb-3">
-                        Buy now
-                    </button>
+                    <p class="text-center small text-muted mb-3">
+                        Điền form đăng ký và chúng tôi sẽ liên hệ với bạn
+                    </p>
                     {% endif %}
                     
                     <div class="text-center mb-3">
@@ -328,7 +365,130 @@
         position: static !important;
     }
 }
+
+/* Green Theme - Đồng bộ với Tasks */
+.breadcrumb {
+    background: transparent;
+}
+
+.breadcrumb-item a {
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.breadcrumb-item a:hover {
+    color: #ffffff;
+}
+
+.btn-success {
+    background-color: #43a047 !important;
+    border-color: #43a047 !important;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-success:hover {
+    background-color: #2e7d32 !important;
+    border-color: #2e7d32 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(67,160,71,0.3);
+}
+
+.btn-outline-success {
+    color: #43a047;
+    border-color: #43a047;
+    font-weight: 600;
+}
+
+.btn-outline-success:hover {
+    background-color: #43a047;
+    border-color: #43a047;
+    color: white;
+}
+
+.text-success {
+    color: #43a047 !important;
+}
+
+.bg-success {
+    background-color: #43a047 !important;
+}
+
+.card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.accordion-button:focus {
+    border-color: #43a047;
+    box-shadow: 0 0 0 0.2rem rgba(67,160,71,0.15);
+}
 </style>
+
+<!-- Enrollment Modal -->
+<div class="modal fade" id="enrollmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>Đăng ký khóa học: {{ course.title }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="enrollmentForm">
+                    <input type="hidden" name="course_id" value="{{ course.id }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Họ và tên <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="student_name" required 
+                               placeholder="Nguyễn Văn A">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Số điện thoại <span class="text-danger">*</span></label>
+                        <input type="tel" class="form-control" name="phone" required 
+                               placeholder="0912345678">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Email <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" name="email" required 
+                               placeholder="example@gmail.com">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Ghi chú (tùy chọn)</label>
+                        <textarea class="form-control" name="notes" rows="3" 
+                                  placeholder="Thời gian học mong muốn, câu hỏi khác..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Sau khi gửi form, chúng tôi sẽ liên hệ với bạn trong 24h để xác nhận và hướng dẫn thanh toán.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-success" onclick="submitEnrollment()">
+                    <i class="bi bi-send me-2"></i>Gửi đăng ký
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 // Handle preview lectures
@@ -341,5 +501,120 @@ document.querySelectorAll('.list-group-item').forEach(item => {
         });
     }
 });
+
+// Submit enrollment form
+async function submitEnrollment() {
+    const form = document.getElementById('enrollmentForm');
+    const formData = new FormData(form);
+    
+    // Validate form
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Convert to JSON
+    const data = {
+        course_id: formData.get('course_id'),
+        student_name: formData.get('student_name'),
+        phone: formData.get('phone'),
+        email: formData.get('email'),
+        notes: formData.get('notes')
+    };
+    
+    // Disable submit button
+    const submitBtn = event.target;
+    const originalHTML = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Đang gửi...';
+    
+    try {
+        const response = await fetch('/api/courses/enrollment-request', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('enrollmentModal'));
+            modal.hide();
+            
+            // Show success message
+            alert('✅ Đăng ký thành công! Chúng tôi sẽ liên hệ với bạn trong 24h.');
+            
+            // Reset form
+            form.reset();
+        } else {
+            alert('❌ ' + (result.message || 'Có lỗi xảy ra. Vui lòng thử lại!'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Có lỗi xảy ra. Vui lòng thử lại!');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHTML;
+    }
+}
+
+// Delete course
+async function deleteCourse(courseId) {
+    if (!confirm('⚠️ Bạn có chắc chắn muốn XOÁ khóa học này?\n\nHành động này không thể hoàn tác!')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/courses/${courseId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Đã xoá khóa học thành công!');
+            window.location.href = '/courses';
+        } else {
+            alert('❌ ' + (data.message || 'Có lỗi xảy ra'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Có lỗi xảy ra. Vui lòng thử lại!');
+    }
+}
+
+// Archive course
+async function archiveCourse(courseId) {
+    if (!confirm('Ẩn khóa học này? Học sinh sẽ không thể xem được khóa học.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/courses/${courseId}/archive`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('✅ Đã ẩn khóa học thành công!');
+            location.reload();
+        } else {
+            alert('❌ ' + (data.message || 'Có lỗi xảy ra'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Có lỗi xảy ra. Vui lòng thử lại!');
+    }
+}
 </script>
 {% endblock %}

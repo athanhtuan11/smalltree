@@ -6,14 +6,19 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ url_for('main.courses') }}">Khóa học</a></li>
+                    {% if is_edit %}
+                    <li class="breadcrumb-item"><a href="{{ url_for('main.course_detail', course_id=course.id) }}">{{ course.title }}</a></li>
+                    <li class="breadcrumb-item active">Chỉnh sửa</li>
+                    {% else %}
                     <li class="breadcrumb-item active">Tạo khóa học mới</li>
+                    {% endif %}
                 </ol>
             </nav>
             <h2 class="fw-bold" style="color:#43a047;">
-                <i class="bi bi-plus-circle me-2"></i>
-                Tạo khóa học mới
+                <i class="bi bi-{{ 'pencil' if is_edit else 'plus-circle' }} me-2"></i>
+                {{ 'Chỉnh sửa khóa học' if is_edit else 'Tạo khóa học mới' }}
             </h2>
-            <p class="text-muted">Điền thông tin cơ bản để tạo khóa học</p>
+            <p class="text-muted">{{ 'Cập nhật thông tin khóa học' if is_edit else 'Điền thông tin cơ bản để tạo khóa học' }}</p>
         </div>
     </div>
 
@@ -31,19 +36,21 @@
                         <div class="mb-3">
                             <label class="form-label">Tên khóa học <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="title" required 
+                                   value="{{ course.title if course else '' }}"
                                    placeholder="VD: Complete Python Bootcamp">
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Subtitle</label>
                             <input type="text" class="form-control" name="subtitle" 
+                                   value="{{ course.short_description if course else '' }}"
                                    placeholder="VD: From Zero to Hero in Python 3">
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Mô tả ngắn <span class="text-danger">*</span></label>
                             <textarea class="form-control" name="description" rows="3" required
-                                      placeholder="Mô tả ngắn gọn về khóa học (hiển thị trên card)"></textarea>
+                                      placeholder="Mô tả ngắn gọn về khóa học (hiển thị trên card)">{{ course.description if course else '' }}</textarea>
                             <small class="text-muted">Tối đa 200 ký tự</small>
                         </div>
                         
@@ -58,13 +65,13 @@
                                 <label class="form-label">Danh mục <span class="text-danger">*</span></label>
                                 <select class="form-select" name="category" required>
                                     <option value="">Chọn danh mục</option>
-                                    <option value="Programming">Programming</option>
-                                    <option value="Web Development">Web Development</option>
-                                    <option value="Data Science">Data Science</option>
-                                    <option value="Mobile Development">Mobile Development</option>
-                                    <option value="Design">Design</option>
-                                    <option value="Business">Business</option>
-                                    <option value="Marketing">Marketing</option>
+                                    <option value="Programming" {{ 'selected' if course and course.category == 'Programming' else '' }}>Programming</option>
+                                    <option value="Web Development" {{ 'selected' if course and course.category == 'Web Development' else '' }}>Web Development</option>
+                                    <option value="Data Science" {{ 'selected' if course and course.category == 'Data Science' else '' }}>Data Science</option>
+                                    <option value="Mobile Development" {{ 'selected' if course and course.category == 'Mobile Development' else '' }}>Mobile Development</option>
+                                    <option value="Design" {{ 'selected' if course and course.category == 'Design' else '' }}>Design</option>
+                                    <option value="Business" {{ 'selected' if course and course.category == 'Business' else '' }}>Business</option>
+                                    <option value="Marketing" {{ 'selected' if course and course.category == 'Marketing' else '' }}>Marketing</option>
                                 </select>
                             </div>
                             
@@ -72,10 +79,10 @@
                                 <label class="form-label">Level <span class="text-danger">*</span></label>
                                 <select class="form-select" name="level" required>
                                     <option value="">Chọn level</option>
-                                    <option value="Beginner">Beginner</option>
-                                    <option value="Intermediate">Intermediate</option>
-                                    <option value="Advanced">Advanced</option>
-                                    <option value="All Levels">All Levels</option>
+                                    <option value="Beginner" {{ 'selected' if course and course.level == 'Beginner' else '' }}>Beginner</option>
+                                    <option value="Intermediate" {{ 'selected' if course and course.level == 'Intermediate' else '' }}>Intermediate</option>
+                                    <option value="Advanced" {{ 'selected' if course and course.level == 'Advanced' else '' }}>Advanced</option>
+                                    <option value="All Levels" {{ 'selected' if course and course.level == 'All Levels' else '' }}>All Levels</option>
                                 </select>
                             </div>
                         </div>
@@ -84,15 +91,18 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Ngôn ngữ</label>
                                 <select class="form-select" name="language">
-                                    <option value="Vietnamese" selected>Vietnamese</option>
-                                    <option value="English">English</option>
+                                    <option value="Vietnamese" {{ 'selected' if course and course.language == 'Vietnamese' else 'selected' }}>Vietnamese</option>
+                                    <option value="English" {{ 'selected' if course and course.language == 'English' else '' }}>English</option>
                                 </select>
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label class="form-label">Thời lượng ước tính</label>
-                                <input type="text" class="form-control" name="duration" 
-                                       placeholder="VD: 42 hours">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="status">
+                                    <option value="draft" {{ 'selected' if course and course.status == 'draft' else 'selected' }}>Draft</option>
+                                    <option value="published" {{ 'selected' if course and course.status == 'published' else '' }}>Published</option>
+                                    <option value="archived" {{ 'selected' if course and course.status == 'archived' else '' }}>Archived</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -108,6 +118,7 @@
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Giá bán (VNĐ) <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" name="price" required 
+                                       value="{{ course.price|int if course else '' }}"
                                        placeholder="399000" min="0">
                             </div>
                             
@@ -128,9 +139,18 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label">Thumbnail <span class="text-danger">*</span></label>
-                            <input type="file" class="form-control" name="thumbnail" accept="image/*" required>
-                            <small class="text-muted">Kích thước khuyến nghị: 1280x720px (16:9)</small>
+                            <label class="form-label">Thumbnail {% if not is_edit %}<span class="text-danger">*</span>{% endif %}</label>
+                            {% if course and course.thumbnail %}
+                            <div class="mb-2">
+                                <img src="{{ course.thumbnail }}" alt="Current thumbnail" class="img-thumbnail" style="max-width: 200px;">
+                                <p class="text-muted small mt-1">Thumbnail hiện tại</p>
+                            </div>
+                            {% endif %}
+                            <input type="file" class="form-control" name="thumbnail" accept="image/*" {% if not is_edit %}required{% endif %}>
+                            <small class="text-muted">
+                                Kích thước khuyến nghị: 1280x720px (16:9)
+                                {% if is_edit %} | Để trống nếu muốn giữ thumbnail hiện tại{% endif %}
+                            </small>
                         </div>
                         
                         <div class="mb-3">
@@ -156,7 +176,7 @@
                                 </button>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addOutcome()">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addOutcome()">
                             <i class="bi bi-plus"></i> Thêm outcome
                         </button>
                     </div>
@@ -177,7 +197,7 @@
                                 </button>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRequirement()">
+                        <button type="button" class="btn btn-sm btn-outline-success" onclick="addRequirement()">
                             <i class="bi bi-plus"></i> Thêm requirement
                         </button>
                     </div>
@@ -188,8 +208,9 @@
             <div class="col-lg-4">
                 <div class="card sticky-top" style="top: 1rem;">
                     <div class="card-body">
-                        <h6 class="mb-3">Publish Settings</h6>
+                        <h6 class="mb-3">Course Settings</h6>
                         
+                        {% if not is_edit %}
                         <div class="mb-3">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" name="is_published" id="publishSwitch">
@@ -199,32 +220,34 @@
                             </div>
                             <small class="text-muted">Khóa học sẽ hiển thị công khai</small>
                         </div>
-                        
-                        <div class="mb-3">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" name="has_certificate" id="certSwitch">
-                                <label class="form-check-label" for="certSwitch">
-                                    Có certificate
-                                </label>
-                            </div>
+                        {% else %}
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Để thay đổi status, sử dụng dropdown "Status" ở trên
                         </div>
+                        {% endif %}
                         
                         <hr>
                         
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success">
-                                <i class="bi bi-check-circle me-2"></i>Tạo khóa học
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-{{ 'check-circle' if is_edit else 'plus-circle' }} me-2"></i>
+                                {{ 'Cập nhật khóa học' if is_edit else 'Tạo khóa học' }}
                             </button>
-                            <a href="{{ url_for('main.courses') }}" class="btn btn-outline-secondary">
+                            <a href="{{ url_for('main.course_detail', course_id=course.id) if is_edit else url_for('main.courses') }}" class="btn btn-outline-secondary">
                                 Hủy
                             </a>
                         </div>
                         
                         <hr>
                         
-                        <div class="alert alert-info small mb-0">
-                            <i class="bi bi-info-circle me-1"></i>
+                        <div class="alert alert-{{ 'warning' if is_edit else 'info' }} small mb-0">
+                            <i class="bi bi-{{ 'exclamation-triangle' if is_edit else 'info-circle' }} me-1"></i>
+                            {% if is_edit %}
+                            Thay đổi sẽ được lưu ngay lập tức. Để quản lý nội dung (sections/lectures), vào trang <a href="{{ url_for('main.course_curriculum', course_id=course.id) }}" class="alert-link">Curriculum</a>.
+                            {% else %}
                             Sau khi tạo, bạn có thể thêm curriculum và upload videos
+                            {% endif %}
                         </div>
                     </div>
                 </div>

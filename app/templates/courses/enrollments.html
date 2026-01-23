@@ -1,0 +1,346 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-fluid mt-4 mb-4">
+    <!-- Header -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h2 class="fw-bold" style="color:#43a047;">
+                <i class="bi bi-shield-check me-2"></i>
+                Quản lý cấp phép khóa học
+            </h2>
+            {% if filtered_course %}
+            <p class="text-muted mb-0">
+                Học sinh đã đăng ký khóa học: <strong class="text-success">{{ filtered_course.title }}</strong>
+                <a href="{{ url_for('main.admin_enrollments') }}" class="btn btn-sm btn-outline-secondary ms-2">
+                    <i class="bi bi-x"></i> Xóa filter
+                </a>
+            </p>
+            <p class="text-muted small">
+                <a href="{{ url_for('main.course_detail', course_id=filtered_course.id) }}" class="text-decoration-none">
+                    <i class="bi bi-arrow-left-circle me-1"></i>Quay lại trang khóa học
+                </a>
+            </p>
+            {% else %}
+            <p class="text-muted">Cấp phép học sinh vào các khóa học</p>
+            {% endif %}
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addEnrollmentModal">
+                <i class="bi bi-plus-circle me-2"></i>Cấp phép mới
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+                <div class="input-group" style="max-width: 300px;">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Tìm học sinh...">
+                </div>
+                <select class="form-select" id="courseFilter" style="width: auto;">
+                    <option value="">Tất cả khóa học</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}">{{ course.title }}</option>
+                    {% endfor %}
+                </select>
+                <select class="form-select" id="statusFilter" style="width: auto;">
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="dropped">Dropped</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enrollments Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Học sinh</th>
+                            <th>Khóa học</th>
+                            <th>Ngày đăng ký</th>
+                            <th>Tiến độ</th>
+                            <th>Trạng thái</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="enrollmentsTable">
+                        {% if enrollments %}
+                        {% for enrollment in enrollments %}
+                        <tr data-enrollment-id="{{ enrollment.id }}" 
+                            data-course-id="{{ enrollment.course_id }}"
+                            data-student-name="{{ enrollment.student.name }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-circle bg-success text-white me-2" style="width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                                        {{ enrollment.student.name[0] if enrollment.student.name else 'S' }}
+                                    </div>
+                                    <div>
+                                        <strong>{{ enrollment.student.name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ enrollment.student.class_name or 'N/A' }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>{{ enrollment.course.title }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    <i class="bi bi-person me-1"></i>{{ enrollment.course.instructor.name if enrollment.course.instructor else 'N/A' }}
+                                </small>
+                            </td>
+                            <td>{{ enrollment.enrolled_at.strftime('%d/%m/%Y') if enrollment.enrolled_at else 'N/A' }}</td>
+                            <td>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: {{ enrollment.progress }}%"
+                                         aria-valuenow="{{ enrollment.progress }}" 
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        {{ "%.0f"|format(enrollment.progress) }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if enrollment.status == 'active' else 'secondary' if enrollment.status == 'completed' else 'warning' }}">
+                                    {{ enrollment.status|upper }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('main.course_learn', course_id=enrollment.course_id) }}">
+                                            <i class="bi bi-play-circle me-2"></i>Xem bài học
+                                        </a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" onclick="revokeEnrollment({{ enrollment.id }}); return false;">
+                                            <i class="bi bi-x-circle me-2"></i>Thu hồi quyền
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                                <p class="text-muted mt-3">Chưa có cấp phép nào</p>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Enrollment Modal -->
+<div class="modal fade" id="addEnrollmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>Cấp phép học sinh vào khóa học
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addEnrollmentForm">
+                    <div class="mb-3">
+                        <label class="form-label">Chọn học sinh <span class="text-danger">*</span></label>
+                        <select class="form-select" name="student_id" required>
+                            <option value="">-- Chọn học sinh --</option>
+                            {% for student in students %}
+                            <option value="{{ student.id }}">{{ student.name }} ({{ student.class_name or 'N/A' }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Chọn khóa học <span class="text-danger">*</span></label>
+                        <select class="form-select" name="course_id" id="courseSelectModal" required>
+                            <option value="">-- Chọn khóa học --</option>
+                            {% for course in courses %}
+                            <option value="{{ course.id }}" {% if filter_course_id == course.id %}selected{% endif %}>
+                                {{ course.title }} ({{ "{:,.0f}".format(course.price) }}đ)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Học sinh sẽ được cấp quyền truy cập vào khóa học ngay lập tức.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-success" onclick="addEnrollment()">
+                    <i class="bi bi-check-circle me-2"></i>Cấp phép
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.avatar-circle {
+    font-size: 16px;
+}
+
+.progress {
+    border-radius: 10px;
+}
+
+.card {
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+</style>
+
+<script>
+// Add enrollment
+async function addEnrollment() {
+    const form = document.getElementById('addEnrollmentForm');
+    const formData = new FormData(form);
+    
+    console.log('[DEBUG] Form validation starting...');
+    
+    if (!form.checkValidity()) {
+        console.log('[ERROR] Form validation failed');
+        form.reportValidity();
+        return;
+    }
+    
+    const studentId = formData.get('student_id');
+    const courseId = formData.get('course_id');
+    
+    console.log('[DEBUG] Raw form data:', {
+        studentId: studentId,
+        courseId: courseId,
+        studentIdType: typeof studentId,
+        courseIdType: typeof courseId
+    });
+    
+    // Validate
+    if (!studentId || !courseId) {
+        console.log('[ERROR] Missing data - studentId:', studentId, 'courseId:', courseId);
+        alert('❌ Vui lòng chọn đầy đủ học sinh và khóa học!');
+        return;
+    }
+    
+    const data = {
+        student_id: parseInt(studentId),
+        course_id: parseInt(courseId)
+    };
+    
+    console.log('[DEBUG] Sending enrollment data:', data);
+    console.log('[DEBUG] JSON payload:', JSON.stringify(data));
+    
+    try {
+        const response = await fetch('/api/admin/enrollments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        console.log('[DEBUG] Response status:', response.status);
+        console.log('[DEBUG] Response ok:', response.ok);
+        
+        const result = await response.json();
+        console.log('[DEBUG] Response data:', result);
+        
+        if (result.success) {
+            alert('✅ Cấp phép thành công!');
+            location.reload();
+        } else {
+            alert('❌ ' + (result.message || 'Có lỗi xảy ra'));
+        }
+    } catch (error) {
+        console.error('[EXCEPTION] Error:', error);
+        alert('❌ Có lỗi xảy ra: ' + error.message);
+    }
+}
+
+// Revoke enrollment
+async function revokeEnrollment(enrollmentId) {
+    if (!confirm('Thu hồi quyền truy cập khóa học này?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/admin/enrollments/${enrollmentId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Đã thu hồi quyền truy cập!');
+            location.reload();
+        } else {
+            alert('❌ ' + (result.message || 'Có lỗi xảy ra'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Có lỗi xảy ra. Vui lòng thử lại!');
+    }
+}
+
+// Search and filter
+document.getElementById('searchInput').addEventListener('input', filterTable);
+document.getElementById('courseFilter').addEventListener('change', filterTable);
+document.getElementById('statusFilter').addEventListener('change', filterTable);
+
+// Pre-select course filter if passed from URL
+{% if filter_course_id %}
+document.getElementById('courseFilter').value = '{{ filter_course_id }}';
+filterTable();
+{% endif %}
+
+function filterTable() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const courseId = document.getElementById('courseFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    
+    const rows = document.querySelectorAll('#enrollmentsTable tr[data-enrollment-id]');
+    
+    rows.forEach(row => {
+        const studentName = row.getAttribute('data-student-name').toLowerCase();
+        const rowCourseId = row.getAttribute('data-course-id');
+        const rowStatus = row.querySelector('.badge').textContent.toLowerCase();
+        
+        const matchSearch = studentName.includes(searchTerm);
+        const matchCourse = !courseId || rowCourseId === courseId;
+        const matchStatus = !status || rowStatus.includes(status.toLowerCase());
+        
+        if (matchSearch && matchCourse && matchStatus) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+
+{% endblock %}

@@ -86,6 +86,9 @@ class Lesson(db.Model):
     
     # Nội dung
     video_url = db.Column(db.String(500))  # URL video (YouTube, Vimeo, hoặc local)
+    video_id = db.Column(db.String(50))  # YouTube video ID (extracted from URL)
+    video_start_time = db.Column(db.Integer, default=0)  # Thời điểm bắt đầu (giây) - từ &t= parameter
+    video_end_time = db.Column(db.Integer)  # Thời điểm kết thúc (giây) - NULL = hết video
     content = db.Column(db.Text)  # Nội dung text (HTML)
     duration = db.Column(db.Integer, default=0)  # Thời lượng (giây)
     
@@ -146,6 +149,7 @@ class LessonProgress(db.Model):
     # Trạng thái
     is_completed = db.Column(db.Boolean, default=False)
     watched_duration = db.Column(db.Integer, default=0)  # Thời lượng đã xem (giây)
+    current_position = db.Column(db.Integer, default=0)  # Vị trí hiện tại trong video (giây) - để resume
     completion_percentage = db.Column(db.Float, default=0)  # % hoàn thành
     
     # Notes của học viên
@@ -189,3 +193,35 @@ class CourseReview(db.Model):
     
     def __repr__(self):
         return f'<CourseReview course={self.course_id} rating={self.rating}>'
+
+
+class VideoChapter(db.Model):
+    """Chapters/Timestamps trong video YouTube"""
+    __tablename__ = 'video_chapters'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('lessons.id'), nullable=False)
+    
+    # Chapter info
+    title = db.Column(db.String(200), nullable=False)  # Tên chapter: "Giới thiệu", "Bài tập 1"
+    timestamp = db.Column(db.Integer, nullable=False)  # Thời điểm bắt đầu (giây)
+    order = db.Column(db.Integer, default=0)  # Thứ tự hiển thị
+    
+    # Metadata
+    description = db.Column(db.Text)  # Mô tả ngắn về chapter này
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    lesson = db.relationship('Lesson', backref=db.backref('chapters', lazy=True, order_by='VideoChapter.order'))
+    
+    def __repr__(self):
+        return f'<VideoChapter {self.title} at {self.timestamp}s>'
+    
+    def formatted_time(self):
+        """Chuyển timestamp (giây) thành format MM:SS hoặc HH:MM:SS"""
+        hours = self.timestamp // 3600
+        minutes = (self.timestamp % 3600) // 60
+        seconds = self.timestamp % 60
+        
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
