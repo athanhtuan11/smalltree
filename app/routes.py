@@ -6992,7 +6992,7 @@ def task_project_create():
                          title='Tạo Project mới',
                          mobile=mobile)
 
-@main.route('/tasks/<project_key>')
+@main.route('/tasks/<project_key>', methods=['GET'])
 def tasks_board(project_key):
     """Kanban board cho project"""
     if session.get('role') not in ['admin', 'teacher']:
@@ -7017,7 +7017,10 @@ def tasks_board(project_key):
     
     tasks = Task.query.filter_by(project_id=project.id).order_by(Task.board_order).all()
     
+    print(f"[DEBUG] Board {project_key}: Found {len(tasks)} tasks for project_id={project.id}")
+    
     for task in tasks:
+        print(f"[DEBUG] Task: {task.task_key} - {task.title} (status={task.status}, project_id={task.project_id})")
         task_data = {
             'id': task.id,
             'key': task.task_key,
@@ -7033,6 +7036,10 @@ def tasks_board(project_key):
         status_key = task.status
         if status_key in tasks_by_status:
             tasks_by_status[status_key].append(task_data)
+        else:
+            print(f"[WARNING] Unknown status '{status_key}' for task {task.task_key}")
+    
+    print(f"[DEBUG] Tasks by status: todo={len(tasks_by_status['todo'])}, in_progress={len(tasks_by_status['in_progress'])}, review={len(tasks_by_status['review'])}, done={len(tasks_by_status['done'])}")
     
     project_data = {
         'id': project.id,
@@ -7042,7 +7049,7 @@ def tasks_board(project_key):
     }
     
     # Get staff list for assignee dropdown
-    staff_list = Staff.query.filter_by(is_active=True).all()
+    staff_list = Staff.query.all()
     
     return render_template('tasks/board.html', 
                          project=project_data,
@@ -7114,8 +7121,119 @@ def task_detail(project_key, task_key):
 
 
 # ============================================================================
+# PROJECT API ENDPOINTS
+# ============================================================================
+
+@main.route('/api/projects/<int:project_id>', methods=['GET'])
+def api_get_project(project_id):
+    """Lấy thông tin project"""
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    return jsonify({
+        'success': True,
+        'project': {
+            'id': project.id,
+            'name': project.name,
+            'key': project.key,
+            'description': project.description,
+            'color': project.color,
+            'status': project.status,
+            'project_type': project.project_type,
+            'owner_id': project.owner_id,
+            'created_at': project.created_at.isoformat() if project.created_at else None
+        }
+    })
+
+@main.route('/api/projects/<int:project_id>', methods=['PUT'])
+def api_update_project(project_id):
+    """Cập nhật project"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    data = request.get_json()
+    
+    # Update fields (không cho đổi key)
+    if 'name' in data:
+        project.name = data['name']
+    if 'description' in data:
+        project.description = data['description']
+    if 'color' in data:
+        project.color = data['color']
+    if 'status' in data:
+        project.status = data['status']
+    if 'project_type' in data:
+        project.project_type = data['project_type']
+    
+    project.updated_at = datetime.utcnow()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Project updated successfully'
+    })
+
+@main.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def api_delete_project(project_id):
+    """Xóa project"""
+    if session.get('role') not in ['admin', 'teacher']:
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+    
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    # Delete all related tasks first
+    Task.query.filter_by(project_id=project_id).delete()
+    ProjectMember.query.filter_by(project_id=project_id).delete()
+    
+    db.session.delete(project)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Project deleted successfully'
+    })
+
+# ============================================================================
 # TASK API ENDPOINTS
 # ============================================================================
+
+@main.route('/api/tasks/<int:task_id>', methods=['GET'])
+def api_get_task(task_id):
+    """Lấy thông tin task"""
+    task = Task.query.get(task_id)
+    if not task:
+        return jsonify({'success': False, 'message': 'Task not found'}), 404
+    
+    assignee_name = None
+    if task.assignee_id:
+        assignee = Staff.query.get(task.assignee_id)
+        if assignee:
+            assignee_name = assignee.name
+    
+    return jsonify({
+        'success': True,
+        'task': {
+            'id': task.id,
+            'key': task.task_key,
+            'title': task.title,
+            'description': task.description,
+            'type': task.task_type,
+            'priority': task.priority,
+            'status': task.status,
+            'assignee_id': task.assignee_id,
+            'assignee': assignee_name,
+            'story_points': task.story_points,
+            'created_at': task.created_at.isoformat() if task.created_at else None,
+            'updated_at': task.updated_at.isoformat() if task.updated_at else None
+        }
+    })
 
 @main.route('/api/tasks/create', methods=['POST'])
 def api_create_task():
@@ -7132,17 +7250,24 @@ def api_create_task():
     assignee_id = data.get('assignee_id')
     story_points = data.get('story_points')
     
+    print(f"[DEBUG] Creating task: project_id={project_id}, title={title}")
+    
     if not project_id or not title:
         return jsonify({'success': False, 'message': 'Missing required fields'}), 400
     
     # Get project
     project = Project.query.get(project_id)
     if not project:
+        print(f"[ERROR] Project not found: {project_id}")
         return jsonify({'success': False, 'message': 'Project not found'}), 404
+    
+    print(f"[DEBUG] Project found: {project.key} - {project.name}")
     
     # Generate task key
     task_count = Task.query.filter_by(project_id=project_id).count()
     task_key = f"{project.key}-{task_count + 1}"
+    
+    print(f"[DEBUG] Generating task key: {task_key} (current count: {task_count})")
     
     # Create task
     new_task = Task(
@@ -7161,13 +7286,16 @@ def api_create_task():
     db.session.add(new_task)
     db.session.commit()
     
+    print(f"[SUCCESS] Task created: ID={new_task.id}, Key={new_task.task_key}")
+    
     return jsonify({
         'success': True,
         'message': 'Task created successfully',
         'task': {
             'id': new_task.id,
             'key': new_task.task_key,
-            'title': new_task.title
+            'title': new_task.title,
+            'project_id': new_task.project_id
         }
     })
 
@@ -7289,65 +7417,6 @@ def api_add_comment(task_id):
             'content': comment.content,
             'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M')
         }
-    })
-
-@main.route('/api/projects/<int:project_id>', methods=['PUT'])
-def api_update_project(project_id):
-    """Cập nhật project"""
-    if session.get('role') not in ['admin', 'teacher']:
-        return jsonify({'success': False, 'message': 'Forbidden'}), 403
-    
-    project = Project.query.get(project_id)
-    if not project:
-        return jsonify({'success': False, 'message': 'Project not found'}), 404
-    
-    data = request.get_json()
-    
-    if 'name' in data:
-        project.name = data['name']
-    if 'description' in data:
-        project.description = data['description']
-    if 'color' in data:
-        project.color = data['color']
-    if 'status' in data:
-        project.status = data['status']
-    
-    project.updated_at = datetime.utcnow()
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Project updated successfully'
-    })
-
-@main.route('/api/projects/<int:project_id>', methods=['DELETE'])
-def api_delete_project(project_id):
-    """Xóa project và tất cả tasks"""
-    if session.get('role') != 'admin':
-        return jsonify({'success': False, 'message': 'Only admin can delete projects'}), 403
-    
-    project = Project.query.get(project_id)
-    if not project:
-        return jsonify({'success': False, 'message': 'Project not found'}), 404
-    
-    # Delete all tasks and related data
-    tasks = Task.query.filter_by(project_id=project_id).all()
-    for task in tasks:
-        TaskComment.query.filter_by(task_id=task.id).delete()
-        TaskAttachment.query.filter_by(task_id=task.id).delete()
-        TaskHistory.query.filter_by(task_id=task.id).delete()
-        db.session.delete(task)
-    
-    # Delete project members
-    ProjectMember.query.filter_by(project_id=project_id).delete()
-    
-    # Delete project
-    db.session.delete(project)
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': 'Project deleted successfully'
     })
 
 

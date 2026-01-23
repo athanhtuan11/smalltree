@@ -87,6 +87,16 @@
                                 {% elif task.priority == 'low' %}
                                 <i class="bi bi-chevron-down text-muted" title="Low"></i>
                                 {% endif %}
+                                <div class="dropdown" onclick="event.stopPropagation();">
+                                    <button class="btn btn-sm btn-link p-0 text-muted task-menu-btn" type="button" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item edit-task" href="#" data-task-id="{{ task.id }}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger delete-task" href="#" data-task-id="{{ task.id }}" data-task-key="{{ task.key }}"><i class="bi bi-trash me-2"></i>Xóa</a></li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                         <h6 class="task-title mb-2">{{ task.title }}</h6>
@@ -111,6 +121,82 @@
     </div>
 </div>
 
+<!-- Edit Task Modal -->
+<div class="modal fade" id="editTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Chỉnh sửa Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editTaskForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="task_id" id="edit_task_id">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Tiêu đề <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="title" id="edit_title" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Mô tả</label>
+                                <textarea class="form-control" name="description" id="edit_description" rows="5"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Loại task</label>
+                                <select class="form-select" name="type" id="edit_type">
+                                    <option value="story">Story</option>
+                                    <option value="task">Task</option>
+                                    <option value="bug">Bug</option>
+                                    <option value="epic">Epic</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Priority</label>
+                                <select class="form-select" name="priority" id="edit_priority">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="urgent">Urgent</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Assignee</label>
+                                <select class="form-select" name="assignee_id" id="edit_assignee_id">
+                                    <option value="">Chưa assign</option>
+                                    {% for staff in staff_list %}
+                                    <option value="{{ staff.id }}">{{ staff.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Story Points</label>
+                                <input type="number" class="form-control" name="story_points" id="edit_story_points" min="1" max="13">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" name="status" id="edit_status">
+                                    <option value="todo">To Do</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="review">Review</option>
+                                    <option value="done">Done</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Create Task Modal -->
 <div class="modal fade" id="createTaskModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -119,7 +205,7 @@
                 <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Tạo Task mới</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" id="createTaskForm">
+            <form id="createTaskForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="project_id" value="{{ project.id }}">
                 <div class="modal-body">
@@ -182,6 +268,84 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
+/* Breadcrumb */
+.breadcrumb {
+    background: #ffffff;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.breadcrumb-item a {
+    color: #43a047;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.breadcrumb-item a:hover {
+    color: #2e7d32;
+    text-decoration: underline;
+}
+
+.breadcrumb-item.active {
+    color: #666;
+    font-weight: 600;
+}
+
+/* Header */
+h3.mb-0 {
+    color: #2e7d32;
+    font-weight: 700;
+}
+
+.btn-success {
+    background-color: #43a047 !important;
+    border-color: #43a047 !important;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(67,160,71,0.3);
+    transition: all 0.2s;
+}
+
+.btn-success:hover {
+    background-color: #2e7d32 !important;
+    border-color: #2e7d32 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(67,160,71,0.4);
+}
+
+/* Filter Card */
+.card {
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.input-group-text {
+    background-color: #f5f5f5;
+    border-color: #e0e0e0;
+    color: #43a047;
+}
+
+.form-control, .form-select {
+    border-color: #e0e0e0;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #43a047;
+    box-shadow: 0 0 0 0.2rem rgba(67,160,71,0.15);
+}
+
+.btn-outline-secondary {
+    color: #666;
+    border-color: #e0e0e0;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #43a047;
+    border-color: #43a047;
+    color: white;
+}
+
 .project-avatar {
     width: 50px;
     height: 50px;
@@ -193,6 +357,7 @@
     font-weight: bold;
     font-size: 18px;
     text-transform: uppercase;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
 }
 
 .kanban-board-wrapper {
@@ -208,12 +373,14 @@
 }
 
 .kanban-column {
-    background: #f8f9fa;
-    border-radius: 8px;
+    background: #ffffff;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
     min-width: 250px;
     max-height: 75vh;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 
 .kanban-header {
@@ -221,7 +388,19 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem;
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f5f5f5;
+    border-radius: 10px 10px 0 0;
+}
+
+.kanban-header h6 {
+    color: #2e7d32;
+    font-weight: 700;
+}
+
+.kanban-header .badge {
+    background-color: #43a047 !important;
+    font-weight: 600;
 }
 
 .kanban-cards {
@@ -229,21 +408,26 @@
     min-height: 200px;
     overflow-y: auto;
     flex-grow: 1;
+    background: #fafafa;
 }
 
 .task-card {
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 0.75rem;
+    background: #ffffff;
+    border: 2px solid #e0e0e0;
+    border-left: 4px solid #43a047;
+    border-radius: 8px;
+    padding: 0.85rem;
     margin-bottom: 0.75rem;
     cursor: grab;
     transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 .task-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(67,160,71,0.25);
+    transform: translateY(-3px);
+    border-left-color: #2e7d32;
+    border-color: #43a047;
 }
 
 .task-card:active {
@@ -251,37 +435,44 @@
 }
 
 .task-card.sortable-ghost {
-    opacity: 0.4;
-    background: #e9ecef;
+    opacity: 0.5;
+    background: #f5f5f5;
+    border-style: dashed;
 }
 
 .task-key {
     font-size: 0.8rem;
-    color: #6c757d;
-    font-weight: 600;
+    color: #43a047;
+    font-weight: 700;
     text-transform: uppercase;
+    background: #e8f5e9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
 }
 
 .task-title {
-    font-size: 0.9rem;
-    line-height: 1.4;
-    color: #212529;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #2e2e2e;
+    font-weight: 600;
 }
 
 .story-points {
-    background: #e9ecef;
-    color: #495057;
-    padding: 2px 8px;
-    border-radius: 4px;
+    background: #43a047;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
     font-size: 0.8rem;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(67,160,71,0.3);
 }
 
 .assignee-avatar {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #6c5ce7;
+    background: #43a047;
     color: white;
     display: flex;
     align-items: center;
@@ -289,6 +480,15 @@
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
+}
+
+.task-menu-btn {
+    line-height: 1;
+    font-size: 1.1rem;
+}
+
+.task-menu-btn:hover {
+    color: #212529 !important;
 }
 
 @media (max-width: 1200px) {
@@ -355,11 +555,76 @@ document.addEventListener('DOMContentLoaded', function() {
     // Click task card to view detail
     document.querySelectorAll('.task-card').forEach(card => {
         card.addEventListener('click', function(e) {
-            // Prevent navigation if dragging
-            if (e.defaultPrevented) return;
+            // Prevent navigation if dragging or clicking dropdown
+            if (e.defaultPrevented || e.target.closest('.dropdown')) return;
             
             const taskKey = this.dataset.taskKey;
             window.location.href = `/tasks/{{ project.key }}/${taskKey}`;
+        });
+    });
+    
+    // Edit task
+    document.querySelectorAll('.edit-task').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const taskId = this.dataset.taskId;
+            
+            // Fetch task data
+            fetch(`/api/tasks/${taskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const task = data.task;
+                        document.getElementById('edit_task_id').value = task.id;
+                        document.getElementById('edit_title').value = task.title;
+                        document.getElementById('edit_description').value = task.description || '';
+                        document.getElementById('edit_type').value = task.type;
+                        document.getElementById('edit_priority').value = task.priority;
+                        document.getElementById('edit_assignee_id').value = task.assignee_id || '';
+                        document.getElementById('edit_story_points').value = task.story_points || '';
+                        document.getElementById('edit_status').value = task.status;
+                        
+                        const editModal = new bootstrap.Modal(document.getElementById('editTaskModal'));
+                        editModal.show();
+                    } else {
+                        alert('Không thể tải thông tin task');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Lỗi khi tải thông tin task');
+                });
+        });
+    });
+    
+    // Delete task
+    document.querySelectorAll('.delete-task').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const taskId = this.dataset.taskId;
+            const taskKey = this.dataset.taskKey;
+            
+            if (confirm(`Bạn có chắc muốn xóa task ${taskKey}?`)) {
+                fetch(`/api/tasks/${taskId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Đã xóa task!');
+                        location.reload();
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Lỗi khi xóa task');
+                });
+            }
         });
     });
     
@@ -368,6 +633,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (createTaskForm) {
         createTaskForm.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log('Create task form submitted');
             
             const formData = new FormData(this);
             const data = {
@@ -380,8 +646,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 story_points: formData.get('story_points') ? parseInt(formData.get('story_points')) : null
             };
             
+            console.log('Task data:', data);
+            
             fetch('/api/tasks/create', {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrf_token')
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(result => {
+                console.log('Result:', result);
+                if (result.success) {
+                    console.log('Task created, reloading page...');
+                    // Close modal first
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createTaskModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    // Show success message and reload
+                    alert('Task đã tạo thành công!');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 100);
+                } else {
+                    console.error('Task creation failed:', result.message);
+                    alert('Lỗi: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Lỗi khi tạo task: ' + error.message);
+            });
+        });
+    }
+    
+    // Edit task form submit
+    const editTaskForm = document.getElementById('editTaskForm');
+    if (editTaskForm) {
+        editTaskForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const taskId = formData.get('task_id');
+            const data = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                type: formData.get('type'),
+                priority: formData.get('priority'),
+                status: formData.get('status'),
+                assignee_id: formData.get('assignee_id') ? parseInt(formData.get('assignee_id')) : null,
+                story_points: formData.get('story_points') ? parseInt(formData.get('story_points')) : null
+            };
+            
+            fetch(`/api/tasks/${taskId}`, {
+                method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': formData.get('csrf_token')
@@ -391,15 +715,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    alert('Task created successfully!');
+                    alert('Đã cập nhật task!');
                     location.reload();
                 } else {
-                    alert('Error: ' + result.message);
+                    alert('Lỗi: ' + result.message);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error creating task');
+                alert('Lỗi khi cập nhật task');
             });
         });
     }

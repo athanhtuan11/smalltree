@@ -22,13 +22,25 @@
             <div class="col-md-4 col-sm-6 mb-4">
                 <div class="card h-100 shadow-sm project-card">
                     <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="project-avatar me-3" style="background-color: {{ project.color }};">
-                                {{ project.key[:2] }}
+                        <div class="d-flex align-items-center mb-3 justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <div class="project-avatar me-3" style="background-color: {{ project.color }};">
+                                    {{ project.key[:2] }}
+                                </div>
+                                <div>
+                                    <h5 class="card-title mb-1">{{ project.name }}</h5>
+                                    <small class="text-muted">{{ project.key }}</small>
+                                </div>
                             </div>
-                            <div>
-                                <h5 class="card-title mb-1">{{ project.name }}</h5>
-                                <small class="text-muted">{{ project.key }}</small>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted p-0" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item edit-project" href="#" data-project-id="{{ project.id }}"><i class="bi bi-pencil me-2"></i>Chỉnh sửa</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger delete-project" href="#" data-project-id="{{ project.id }}" data-project-key="{{ project.key }}"><i class="bi bi-trash me-2"></i>Xóa</a></li>
+                                </ul>
                             </div>
                         </div>
                         <p class="card-text text-muted">{{ project.description }}</p>
@@ -103,21 +115,130 @@
     </div>
 </div>
 
+<!-- Edit Project Modal -->
+<div class="modal fade" id="editProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Chỉnh sửa Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editProjectForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="project_id" id="edit_project_id">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tên Project <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" id="edit_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project Key <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="key" id="edit_key" required readonly>
+                        <small class="text-muted">Key không thể thay đổi</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mô tả</label>
+                        <textarea class="form-control" name="description" id="edit_description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Màu sắc</label>
+                        <input type="color" class="form-control form-control-color w-100" name="color" id="edit_color">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Trạng thái</label>
+                        <select class="form-select" name="status" id="edit_status">
+                            <option value="active">Active</option>
+                            <option value="archived">Archived</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
 .project-card {
     transition: all 0.3s ease;
     border: 1px solid #dee2e6;
 }
 
+.project-card {
+    transition: all 0.3s ease;
+    border: 2px solid #e0e0e0;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
 .project-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+    border-color: #43a047;
+}
+
+.project-card .card-body {
+    background: #ffffff;
+}
+
+.project-card .card-title {
+    color: #2e7d32;
+    font-weight: 700;
+    font-size: 1.15rem;
+}
+
+.project-card .card-text {
+    color: #555;
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.project-card .badge {
+    font-weight: 600;
+    padding: 0.5em 1em;
+    font-size: 0.85rem;
+    border-radius: 20px;
+}
+
+.project-card .badge.bg-primary {
+    background-color: #1976d2 !important;
+}
+
+.project-card .badge.bg-success {
+    background-color: #43a047 !important;
+}
+
+.project-card .btn-outline-success {
+    font-weight: 600;
+    transition: all 0.2s;
+    border-width: 2px;
+    color: #43a047;
+    border-color: #43a047;
+    border-radius: 8px;
+}
+
+.project-card .btn-outline-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(67,160,71,0.4);
+    background: #43a047 !important;
+    border-color: #43a047 !important;
+    color: white !important;
+}
+
+.project-card .card-footer {
+    background: #fafafa;
+    border-top: 1px solid #e0e0e0;
+    padding: 1rem;
 }
 
 .project-avatar {
     width: 50px;
     height: 50px;
-    border-radius: 8px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -125,6 +246,138 @@
     font-weight: bold;
     font-size: 18px;
     text-transform: uppercase;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+
+h2.fw-bold {
+    color: #2e7d32;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.btn-success {
+    background-color: #43a047 !important;
+    border-color: #43a047 !important;
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(67,160,71,0.3);
+    transition: all 0.2s;
+}
+
+.btn-success:hover {
+    background-color: #2e7d32 !important;
+    border-color: #2e7d32 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(67,160,71,0.4);
+}
+
+.text-muted {
+    color: #666 !important;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Edit project
+    document.querySelectorAll('.edit-project').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const projectId = this.dataset.projectId;
+            
+            fetch(`/api/projects/${projectId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const project = data.project;
+                        document.getElementById('edit_project_id').value = project.id;
+                        document.getElementById('edit_name').value = project.name;
+                        document.getElementById('edit_key').value = project.key;
+                        document.getElementById('edit_description').value = project.description || '';
+                        document.getElementById('edit_color').value = project.color;
+                        document.getElementById('edit_status').value = project.status;
+                        
+                        const editModal = new bootstrap.Modal(document.getElementById('editProjectModal'));
+                        editModal.show();
+                    } else {
+                        alert('Không thể tải thông tin project');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Lỗi khi tải thông tin project');
+                });
+        });
+    });
+    
+    // Delete project
+    document.querySelectorAll('.delete-project').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const projectId = this.dataset.projectId;
+            const projectKey = this.dataset.projectKey;
+            
+            if (confirm(`Bạn có chắc muốn xóa project ${projectKey}? Tất cả tasks trong project cũng sẽ bị xóa!`)) {
+                fetch(`/api/projects/${projectId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Đã xóa project!');
+                        location.reload();
+                    } else {
+                        alert('Lỗi: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Lỗi khi xóa project');
+                });
+            }
+        });
+    });
+    
+    // Edit project form submit
+    const editProjectForm = document.getElementById('editProjectForm');
+    if (editProjectForm) {
+        editProjectForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const projectId = formData.get('project_id');
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                color: formData.get('color'),
+                status: formData.get('status')
+            };
+            
+            fetch(`/api/projects/${projectId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': formData.get('csrf_token')
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Đã cập nhật project!');
+                    location.reload();
+                } else {
+                    alert('Lỗi: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Lỗi khi cập nhật project');
+            });
+        });
+    }
+});
+</script>
 {% endblock %}
